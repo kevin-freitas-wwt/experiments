@@ -59,27 +59,17 @@
             .grid { grid-template-columns: 1fr; }
         }
         a.card {
-            display: flex;
-            flex-direction: column;
-            background: var( --card );
+            display: block;
+            padding: 1.25rem 1.5rem;
             border: 1px solid var( --border );
             border-radius: 12px;
             text-decoration: none;
-            color: inherit;
-            overflow: hidden;
+            color: #fff;
             transition: transform 0.15s ease, border-color 0.15s ease;
         }
         a.card:hover {
             transform: translateY( -2px );
             border-color: var( --accent );
-        }
-        .card-thumb {
-            width: 100%;
-            aspect-ratio: 16 / 10;
-            flex-shrink: 0;
-        }
-        .card-body {
-            padding: 1rem 1.25rem 1.25rem;
         }
         a.card h2 {
             margin: 0 0 0.25rem;
@@ -88,8 +78,8 @@
         }
         a.card p {
             margin: 0;
-            color: var( --muted );
             font-size: 0.9rem;
+            opacity: 0.7;
         }
         footer {
             margin-top: 4rem;
@@ -104,33 +94,21 @@
     <p class="tagline">A small collection of standalone web things.</p>
 
     <div class="grid">
-        <a class="card" href="Pop%20o'Clock/">
-            <div class="card-thumb" style="background: #0b2440;"></div>
-            <div class="card-body">
-                <h2>Pop o'Clock</h2>
-                <p>Test your hand-eye-mouse coordination with this simple game</p>
-            </div>
+        <a class="card" href="Pop%20o'Clock/" style="background: #0d3d6b;">
+            <h2>Pop o'Clock</h2>
+            <p>Test your hand-eye-mouse coordination with this simple game</p>
         </a>
-        <a class="card" href="Pic%20Shop/">
-            <div class="card-thumb" style="background: #1a2a1a;"></div>
-            <div class="card-body">
-                <h2>Pic Shop</h2>
-                <p>Basic layer-based image editor</p>
-            </div>
+        <a class="card" href="Pic%20Shop/" style="background: #1a4a28;">
+            <h2>Pic Shop</h2>
+            <p>Basic layer-based image editor</p>
         </a>
-        <a class="card" href="Pixel%20Pics/">
-            <div class="card-thumb" style="background: #1a1a2e;"></div>
-            <div class="card-body">
-                <h2>Pixel Pics</h2>
-                <p>Pixel art converstion tool</p>
-            </div>
+        <a class="card" href="Pixel%20Pics/" style="background: #3b1f6b;">
+            <h2>Pixel Pics</h2>
+            <p>Pixel art converstion tool</p>
         </a>
-        <a class="card" href="Vid%20Stacker%20Web/">
-            <div class="card-thumb" style="background: #2a1a10;"></div>
-            <div class="card-body">
-                <h2>Vid Stacker</h2>
-                <p>Video frame stacker</p>
-            </div>
+        <a class="card" href="Vid%20Stacker%20Web/" style="background: #7a3410;">
+            <h2>Vid Stacker</h2>
+            <p>Video frame stacker</p>
         </a>
     </div>
 
