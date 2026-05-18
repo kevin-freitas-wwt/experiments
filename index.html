@@ -50,24 +50,45 @@
         }
         .grid {
             display: grid;
-            grid-template-columns: repeat( auto-fill, minmax( 240px, 1fr ) );
+            grid-template-columns: repeat( 2, 1fr );
             gap: 1rem;
             width: 100%;
             max-width: 800px;
         }
+        @media ( max-width: 480px ) {
+            .grid { grid-template-columns: 1fr; }
+        }
         a.card {
-            display: block;
-            padding: 1.25rem 1.5rem;
+            display: flex;
+            flex-direction: column;
             background: var( --card );
             border: 1px solid var( --border );
             border-radius: 12px;
             text-decoration: none;
             color: inherit;
+            overflow: hidden;
             transition: transform 0.15s ease, border-color 0.15s ease;
         }
         a.card:hover {
             transform: translateY( -2px );
             border-color: var( --accent );
+        }
+        .card-thumb {
+            width: 100%;
+            aspect-ratio: 16 / 10;
+            overflow: hidden;
+            background: #111;
+            flex-shrink: 0;
+        }
+        .card-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center top;
+            display: block;
+        }
+        .card-body {
+            padding: 1rem 1.25rem 1.25rem;
         }
         a.card h2 {
             margin: 0 0 0.25rem;
@@ -93,20 +114,40 @@
 
     <div class="grid">
         <a class="card" href="Pop%20o'Clock/">
-            <h2>Pop o'Clock</h2>
-            <p>Test your hand-eye-mouse coordination with this simple game</p>
+            <div class="card-thumb">
+                <img src="screenshots/pop-oclock.png" alt="Pop o'Clock screenshot" style="object-position: center 18%;">
+            </div>
+            <div class="card-body">
+                <h2>Pop o'Clock</h2>
+                <p>Test your hand-eye-mouse coordination with this simple game</p>
+            </div>
         </a>
         <a class="card" href="Pic%20Shop/">
-            <h2>Pic Shop</h2>
-            <p>Basic layer-based image editor</p>
+            <div class="card-thumb">
+                <img src="screenshots/pic-shop.png" alt="Pic Shop screenshot">
+            </div>
+            <div class="card-body">
+                <h2>Pic Shop</h2>
+                <p>Basic layer-based image editor</p>
+            </div>
         </a>
         <a class="card" href="Pixel%20Pics/">
-            <h2>Pixel Pics</h2>
-            <p>Pixel art converstion tool</p>
+            <div class="card-thumb">
+                <img src="screenshots/pixel-pics.png" alt="Pixel Pics screenshot">
+            </div>
+            <div class="card-body">
+                <h2>Pixel Pics</h2>
+                <p>Pixel art converstion tool</p>
+            </div>
         </a>
         <a class="card" href="Vid%20Stacker%20Web/">
-            <h2>Vid Stacker</h2>
-            <p>Video frame stacker</p>
+            <div class="card-thumb">
+                <img src="screenshots/vid-stacker.png" alt="Vid Stacker screenshot">
+            </div>
+            <div class="card-body">
+                <h2>Vid Stacker</h2>
+                <p>Video frame stacker</p>
+            </div>
         </a>
     </div>
 
