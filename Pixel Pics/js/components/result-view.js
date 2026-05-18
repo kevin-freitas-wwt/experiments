@@ -160,7 +160,7 @@ export function createResultView( container, props ) {
             bgSelect
         ),
         h('div', { className: 'rv-field' },
-            h('label', { className: 'rv-field-label' }, 'Brush'),
+            h('label', { className: 'rv-field-label' }, 'Eraser'),
             h('div', { className: 'rv-brush-row' }, brushSelect, undoBtn)
         ),
         h('div', { className: 'rv-field' },
