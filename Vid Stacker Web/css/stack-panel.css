@@ -1,0 +1,241 @@
+.sp-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.sp-canvas-area {
+    flex: 1;
+    background: #111;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.sp-canvas {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+    image-rendering: pixelated;
+}
+
+.sp-canvas-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    background: #111;
+}
+
+.sp-progress-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 16px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.8));
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sp-progress-bar {
+    height: 4px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.sp-progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.1s linear;
+}
+
+.sp-progress-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.sp-progress-text,
+.sp-progress-timer {
+    font-size: 11px;
+    color: rgba(255,255,255,0.6);
+    font-variant-numeric: tabular-nums;
+    font-family: 'SF Mono', 'Menlo', monospace;
+}
+
+.sp-error-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: rgba(0,0,0,0.8);
+    color: var(--danger);
+    padding: 24px;
+    text-align: center;
+    font-size: 13px;
+}
+
+.sp-retry-btn {
+    padding: 6px 16px;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    transition: background 0.15s;
+}
+
+.sp-retry-btn:hover {
+    background: var(--bg-hover);
+}
+
+.sp-controls {
+    flex-shrink: 0;
+    height: var(--controls-height);
+    background: var(--bg-panel);
+    border-top: 1px solid var(--border);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+}
+
+.sp-controls-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+}
+
+.sp-blend-group {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sp-spacer {
+    flex: 1;
+}
+
+.sp-section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.sp-select {
+    padding: 6px 8px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    appearance: auto;
+}
+
+.sp-select:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.sp-stack-btn {
+    min-width: 96px;
+    padding: 8px 16px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 600;
+    transition: background 0.15s, opacity 0.15s;
+}
+
+.sp-stack-btn:hover:not(:disabled) {
+    background: var(--accent-hover);
+}
+
+.sp-stack-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.sp-add-frame-btn {
+    min-width: 96px;
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.15s, opacity 0.15s;
+}
+
+.sp-add-frame-btn:hover:not(:disabled) {
+    background: rgba(74, 158, 255, 0.1);
+}
+
+.sp-add-frame-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.sp-undo-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 8px 16px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 600;
+    transition: background 0.15s;
+    z-index: 2;
+}
+
+.sp-undo-btn:hover {
+    background: var(--accent-hover);
+}
+
+.sp-export-btn {
+    min-width: 96px;
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid var(--success);
+    color: var(--success);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.15s, opacity 0.15s;
+}
+
+.sp-export-btn:hover:not(:disabled) {
+    background: rgba(80, 250, 123, 0.1);
+}
+
+.sp-export-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}

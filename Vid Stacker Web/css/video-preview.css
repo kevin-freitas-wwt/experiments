@@ -1,0 +1,163 @@
+.vp-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+}
+.vp-container:hover {
+    opacity: 1;
+}
+
+.vp-video-wrap {
+    flex: 1;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    min-height: 0;
+    position: relative;
+}
+
+.vp-new-video-btn {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    padding: 8px 16px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 600;
+    transition: background 0.15s;
+    z-index: 2;
+}
+
+.vp-new-video-btn:hover {
+    background: var(--accent-hover);
+}
+
+.vp-error-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.92);
+    color: var(--text-primary);
+    text-align: center;
+}
+
+.vp-error-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--danger);
+}
+
+.vp-error-hint {
+    font-size: 13px;
+    color: var(--text-primary);
+    max-width: 520px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.vp-error-detail {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: 'SF Mono', 'Menlo', monospace;
+    max-width: 520px;
+    line-height: 1.4;
+    margin-top: 8px;
+    word-break: break-word;
+}
+
+.vp-video {
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
+    object-fit: contain;
+}
+
+.vp-controls {
+    flex-shrink: 0;
+    height: var(--controls-height);
+    background: var(--bg-panel);
+    border-top: 1px solid var(--border);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+}
+
+.vp-transport-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.vp-timeline-slot {
+    flex: 1;
+    min-width: 0;
+}
+
+.vp-play-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+
+.vp-play-btn:hover {
+    background: var(--accent-hover);
+}
+
+.vp-play-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vp-time-display {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
+    font-family: 'SF Mono', 'Menlo', monospace;
+    flex-shrink: 0;
+}
+
+.vp-selection-info {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.vp-info-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
+    font-family: 'SF Mono', 'Menlo', monospace;
+}
+
+.vp-info-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
