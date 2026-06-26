@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Idea Garden</title>
+    <link rel="stylesheet" href="./src/style.css" />
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.185.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div id="crosshair" aria-hidden="true"></div>
+
+    <div id="hint">Wander the courtyard &middot; read front &amp; back &middot; Esc to step back</div>
+
+    <div id="overlay">
+        <div class="card">
+            <h1>Idea Garden</h1>
+            <p>A quiet courtyard at dusk. Your ideas hang from an overhead lattice, swaying in the warm light &mdash; wander among them and read each one, front or back.</p>
+            <ul class="controls">
+                <li><kbd>E</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd> or arrows &mdash; move</li>
+                <li>Mouse &mdash; look around</li>
+                <li>Wander among the cards &mdash; read front or back</li>
+                <li><kbd>Esc</kbd> &mdash; release the mouse</li>
+            </ul>
+            <button id="enter">Enter the garden</button>
+        </div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html>

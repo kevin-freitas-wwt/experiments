@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#9e1b18">
+    <title>The Nugget Council · Panda Express</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --panda-red: #c8102e;
+            --panda-red-dark: #9b0c22;
+            --panda-red-deep: #780a1a;
+            --panda-black: #161210;
+            --gold: #f4b33e;
+            --gold-dark: #c98a1f;
+            --orange: #ef7b2e;
+            --cream: #fff4e3;
+            --ink: #2a1c12;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body { height: 100%; }
+
+        body {
+            font-family: "Barlow", "Trebuchet MS", "Helvetica Neue", Arial, sans-serif;
+            background:
+                radial-gradient( circle at 50% -10%, #e23a32 0%, var(--panda-red) 40%, var(--panda-red-dark) 100% );
+            color: var(--cream);
+            display: flex;
+            justify-content: center;
+            min-height: 100%;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #app {
+            width: 100%;
+            max-width: 440px;
+            min-height: 100vh;
+            min-height: 100dvh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom);
+            overflow: hidden;
+        }
+
+        /* faint heraldic backdrop */
+        #app::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image:
+                radial-gradient( circle at 50% 32%, rgba(244, 179, 62, 0.10) 0 1px, transparent 2px );
+            background-size: 26px 26px;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .ic {
+            width: 1em;
+            height: 1em;
+            fill: currentColor;
+            display: inline-block;
+            vertical-align: -0.14em;
+        }
+
+        /* Frutiger-Condensed-style display face (Barlow Semi Condensed) for all headline / chrome type */
+        .court-prompt, .verdict-reward, .verdict-label, .verdict-tier,
+        .docket, .new-banner, .btn, .rewards-pts,
+        .logo-lockup .wordmark .w1, .logo-lockup .wordmark .w2 {
+            font-family: "Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif;
+        }
+
+        /* ---- brand bar ---- */
+        .brandbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 16px 2px 8px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .logo-lockup {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-lockup .panda-tile {
+            width: 38px;
+            height: 38px;
+            flex: 0 0 auto;
+        }
+
+        .logo-lockup .wordmark {
+            line-height: 0.92;
+        }
+
+        .logo-lockup .wordmark .w1 {
+            display: block;
+            font-weight: 900;
+            font-size: 17px;
+            letter-spacing: 1px;
+            color: #fff;
+        }
+
+        .logo-lockup .wordmark .w2 {
+            display: block;
+            font-weight: 900;
+            font-size: 17px;
+            letter-spacing: 1px;
+            color: var(--gold);
+        }
+
+        /* Official Panda Express logo (nugget-council/logo.png) */
+        .brand-logo { height: 60px; width: auto; display: block; }
+
+        /* Panda Points chip: squared black tile, white figure, red star (app-style) */
+        .rewards-pts {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: var(--panda-black);
+            color: #fff;
+            font-size: 12.5px;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            padding: 5px 11px 5px 9px;
+            border-radius: 7px;
+        }
+
+        .rewards-pts .ic { color: var(--panda-red); font-size: 13px; }
+
+        /* ---- screens ---- */
+        .screen {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            position: relative;
+            z-index: 1;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .screen.active { display: flex; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ---- intro ---- */
+        #screen-intro {
+            justify-content: center;
+            text-align: center;
+            gap: 16px;
+            padding-bottom: 34px;
+        }
+
+        .seal {
+            width: 190px;
+            height: 190px;
+            margin: 0 auto;
+            filter: drop-shadow( 0 6px 14px rgba(0, 0, 0, 0.4) );
+            animation: sealIn 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes sealIn {
+            from { transform: scale(0.6) rotate(-12deg); opacity: 0; }
+            to { transform: scale(1) rotate(0); opacity: 1; }
+        }
+
+        .docket {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            background: var(--panda-black);
+            color: var(--gold);
+            border: 1px solid var(--gold-dark);
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border-radius: 4px;
+            margin: 0 auto;
+        }
+
+        .tagline {
+            font-size: 15px;
+            opacity: 0.95;
+            max-width: 290px;
+            margin: 0 auto;
+            line-height: 1.5;
+            font-family: "Helvetica Neue", Arial, sans-serif;
+        }
+
+        .tagline strong { color: var(--gold); }
+
+        .new-banner {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            background: var(--orange);
+            color: var(--panda-black);
+            font-weight: 900;
+            font-size: 12.5px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            padding: 7px 14px;
+            border-radius: 6px;
+            margin: 0 auto;
+            box-shadow: 0 3px 0 #b85416;
+        }
+
+        .btn {
+            border: none;
+            border-radius: 3px;
+            font-weight: 800;
+            font-size: 17px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 16px 28px;
+            cursor: pointer;
+            transition: transform 0.12s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+        }
+
+        .btn:active { transform: scale(0.96); }
+
+        /* Panda's standard CTA: squared, solid red, white text (used on light surfaces) */
+        .btn-primary {
+            background: var(--panda-red);
+            color: #fff;
+            box-shadow: 0 4px 0 var(--panda-red-deep);
+            margin: 4px auto 0;
+            min-width: 250px;
+        }
+
+        /* white CTA used on Panda's red promo fields (their inverse button) */
+        .btn-onred {
+            background: #fff;
+            color: var(--panda-red);
+            box-shadow: 0 4px 0 rgba(0, 0, 0, 0.28);
+            margin: 4px auto 0;
+            min-width: 250px;
+        }
+
+        .btn-line {
+            background: transparent;
+            color: var(--cream);
+            border: 2px solid rgba(255, 244, 227, 0.5);
+            font-size: 14px;
+            padding: 12px 22px;
+        }
+
+        .fine { font-size: 11px; opacity: 0.62; margin-top: 2px; letter-spacing: 0.5px; }
+
+        /* ---- court ---- */
+        #screen-court {
+            justify-content: flex-start;
+            text-align: center;
+            gap: 4px;
+        }
+
+        .court-prompt {
+            font-size: 23px;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-top: 8px;
+        }
+
+        .court-sub {
+            font-size: 13.5px;
+            opacity: 0.92;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 10px;
+            line-height: 1.4;
+            font-family: "Helvetica Neue", Arial, sans-serif;
+        }
+
+        .bench { position: relative; margin-top: auto; }
+
+        .nugget-row {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 10px;
+            padding: 0 4px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .bench-board {
+            background: linear-gradient( #6f4322, #4a2c14 );
+            height: 80px;
+            border-radius: 10px 10px 0 0;
+            margin-top: -16px;
+            position: relative;
+            z-index: 3;
+            box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.08), 0 -2px 8px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: var(--gold);
+            font-weight: 900;
+            font-size: 12px;
+            letter-spacing: 1.5px;
+        }
+
+        .bench-board .ic { font-size: 18px; }
+
+        .floor {
+            background: #3c2410;
+            height: 26px;
+            filter: brightness(0.7);
+        }
+
+        /* ---- nugget character ---- */
+        .nugget {
+            width: 74px;
+            height: 66px;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.18s ease, filter 0.3s ease;
+            flex: 0 0 auto;
+        }
+
+        .nugget .body {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient( circle at 40% 30%, #f4b86a, #e8a14b 60%, #c9802f 100% );
+            border-radius: 48% 52% 55% 45% / 55% 50% 50% 45%;
+            box-shadow: 0 5px 0 #a5661f, inset 0 -4px 6px rgba(0, 0, 0, 0.15);
+            border: 2px solid #c9802f;
+        }
+
+        .nugget .eyes {
+            position: absolute;
+            top: 24px; left: 0; right: 0;
+            display: flex; justify-content: center; gap: 12px;
+            z-index: 2;
+        }
+
+        .nugget .eye {
+            width: 11px; height: 13px;
+            background: #fff; border-radius: 50%;
+            position: relative;
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+        }
+
+        .nugget .eye::after {
+            content: "";
+            position: absolute;
+            width: 6px; height: 6px;
+            background: var(--ink); border-radius: 50%;
+            top: 5px; left: 3px;
+        }
+
+        .nugget .brow {
+            position: absolute;
+            top: 19px; left: 0; right: 0;
+            display: flex; justify-content: center; gap: 12px;
+            z-index: 3;
+        }
+
+        .nugget .brow span {
+            width: 13px; height: 3px;
+            background: #a5661f; border-radius: 2px;
+        }
+
+        .nugget .brow span:first-child { transform: rotate(12deg); }
+        .nugget .brow span:last-child { transform: rotate(-12deg); }
+
+        .nugget .mouth {
+            position: absolute;
+            bottom: 16px; left: 50%;
+            transform: translateX(-50%);
+            width: 16px; height: 3px;
+            background: var(--ink); border-radius: 3px;
+            z-index: 2; opacity: 0.7;
+        }
+
+        .nugget:active { transform: translateY(2px) scale(0.97); }
+
+        @media (hover: hover) {
+            .nugget:hover { transform: translateY(-4px) rotate(-2deg); }
+        }
+
+        .nugget.tap-hint { animation: bob 1.8s ease-in-out infinite; }
+        .nugget:nth-child(2).tap-hint { animation-delay: 0.2s; }
+        .nugget:nth-child(3).tap-hint { animation-delay: 0.4s; }
+        .nugget:nth-child(4).tap-hint { animation-delay: 0.6s; }
+
+        @keyframes bob {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        .nugget.chosen { animation: deliberate 0.5s ease-in-out infinite; z-index: 5; }
+
+        .nugget.chosen .body {
+            box-shadow: 0 5px 0 #a5661f, 0 0 0 4px var(--gold), 0 0 22px var(--gold);
+        }
+
+        @keyframes deliberate {
+            0%, 100% { transform: translateY(0) rotate(-3deg); }
+            50% { transform: translateY(-7px) rotate(3deg); }
+        }
+
+        .nugget.dimmed { filter: grayscale(0.6) brightness(0.7); opacity: 0.5; pointer-events: none; }
+
+        .gavel {
+            position: absolute;
+            top: -16px; left: 50%;
+            width: 42px; height: 42px;
+            color: var(--gold);
+            transform-origin: bottom left;
+            opacity: 0;
+            z-index: 6;
+        }
+
+        .gavel.bang { animation: bang 0.5s ease 2; opacity: 1; }
+
+        @keyframes bang {
+            0% { transform: translate(-50%, -20px) rotate(-45deg); }
+            40% { transform: translate(-50%, 0) rotate(0deg); }
+            100% { transform: translate(-50%, -20px) rotate(-45deg); }
+        }
+
+        /* ---- verdict overlay ---- */
+        #verdict {
+            position: absolute;
+            inset: 0;
+            z-index: 30;
+            background: rgba(40, 8, 8, 0.84);
+            backdrop-filter: blur(3px);
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        #verdict.show { display: flex; }
+
+        .verdict-card {
+            background:
+                repeating-linear-gradient( 0deg, rgba(0,0,0,0.015) 0 2px, transparent 2px 4px ),
+                var(--cream);
+            color: var(--ink);
+            width: 100%;
+            max-width: 440px;
+            border-radius: 22px 22px 0 0;
+            padding: 24px 24px calc(24px + env(safe-area-inset-bottom));
+            text-align: center;
+            box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.4);
+            border-top: 5px solid var(--gold);
+            animation: slideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .verdict-seal-stamp {
+            width: 64px; height: 64px;
+            margin: -52px auto 6px;
+            color: var(--panda-red);
+            background: var(--cream);
+            border-radius: 50%;
+            padding: 4px;
+        }
+
+        .verdict-label {
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: var(--panda-red);
+            margin-bottom: 10px;
+        }
+
+        .verdict-tier {
+            display: inline-block;
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--gold);
+            background: var(--panda-black);
+            padding: 4px 13px;
+            border-radius: 20px;
+            margin-bottom: 12px;
+        }
+
+        .verdict-reward {
+            font-size: 32px;
+            font-weight: 900;
+            line-height: 1.02;
+            color: var(--panda-red);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        .verdict-detail {
+            font-size: 14.5px;
+            opacity: 0.82;
+            line-height: 1.45;
+            margin-bottom: 16px;
+            font-family: "Helvetica Neue", Arial, sans-serif;
+        }
+
+        .code-box {
+            border: 2px dashed var(--gold-dark);
+            border-radius: 12px;
+            padding: 12px;
+            background: #fff;
+            margin-bottom: 4px;
+        }
+
+        .code-box .label {
+            font-size: 11px; letter-spacing: 1px;
+            text-transform: uppercase; opacity: 0.6;
+            font-family: "Helvetica Neue", Arial, sans-serif;
+        }
+
+        .code-box .code {
+            font-size: 27px; font-weight: 900;
+            letter-spacing: 3px; color: var(--ink);
+            font-family: "Courier New", monospace;
+        }
+
+        .code-box .expires {
+            font-size: 11px; opacity: 0.6;
+            font-family: "Helvetica Neue", Arial, sans-serif;
+        }
+
+        .verdict-card .btn-primary { width: 100%; min-width: 0; margin-top: 14px; }
+
+        .restart {
+            display: block;
+            margin: 12px auto 0;
+            background: none; border: none;
+            color: var(--panda-red);
+            font-size: 13px; font-weight: bold;
+            text-decoration: underline;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        /* ---- locked ---- */
+        #screen-locked { justify-content: center; text-align: center; gap: 14px; padding-bottom: 40px; }
+
+        .locked-mark {
+            width: 90px; height: 90px;
+            margin: 0 auto;
+            color: var(--gold);
+        }
+
+        /* ---- confetti ---- */
+        .confetti {
+            position: absolute;
+            width: 9px; height: 14px;
+            top: -20px; z-index: 40;
+            border-radius: 2px;
+            pointer-events: none;
+        }
+
+        @keyframes fall {
+            to { transform: translateY(110vh) rotate(540deg); opacity: 0.9; }
+        }
+    </style>
+</head>
+<body>
+    <!-- ===== SVG icon sprite ===== -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <!-- Panda face only (no tile) -->
+            <symbol id="ic-panda-face" viewBox="0 0 100 100">
+                <circle cx="29" cy="27" r="13" fill="#161210"/>
+                <circle cx="71" cy="27" r="13" fill="#161210"/>
+                <circle cx="50" cy="54" r="31" fill="#fff"/>
+                <ellipse cx="38" cy="48" rx="8.5" ry="12" fill="#161210" transform="rotate(-18 38 48)"/>
+                <ellipse cx="62" cy="48" rx="8.5" ry="12" fill="#161210" transform="rotate(18 62 48)"/>
+                <circle cx="39" cy="50" r="3" fill="#fff"/>
+                <circle cx="61" cy="50" r="3" fill="#fff"/>
+                <ellipse cx="50" cy="63" rx="4.5" ry="3.2" fill="#161210"/>
+            </symbol>
+
+            <symbol id="ic-scales" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M12 2a1 1 0 0 1 1 1v.6l6.3 1.6a1 1 0 0 1-.5 1.94L13 5.7V19h4a1 1 0 1 1 0 2H7a1 1 0 1 1 0-2h4V5.7L5.2 7.14a1 1 0 1 1-.5-1.94L11 3.6V3a1 1 0 0 1 1-1Z"/>
+                <path fill="currentColor" d="M6 8 3 14.5c0 1.66 1.34 2.5 3 2.5s3-.84 3-2.5L6 8Zm0 3.6 1.3 2.9H4.7L6 11.6ZM18 8l-3 6.5c0 1.66 1.34 2.5 3 2.5s3-.84 3-2.5L18 8Zm0 3.6 1.3 2.9h-2.6L18 11.6Z"/>
+            </symbol>
+
+            <symbol id="ic-gavel" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M14.7 2.3a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4l-2.1 2.1a1 1 0 0 1-1.4 0l-5.6-5.6a1 1 0 0 1 0-1.4l2.1-2.1Z"/>
+                <path fill="currentColor" d="m9.9 7.1 7 7-2 2-7-7 2-2Zm-1.4 5.6 2.8 2.8-6 6a2 2 0 0 1-2.8-2.8l6-6Z"/>
+                <rect x="13" y="20" width="10" height="2.4" rx="1.2" fill="currentColor"/>
+            </symbol>
+
+            <symbol id="ic-star" viewBox="0 0 24 24">
+                <path fill="currentColor" d="m12 2 2.9 6.1 6.6.8-4.9 4.5 1.3 6.6L12 17.8 6.1 20l1.3-6.6L2.5 8.9l6.6-.8L12 2Z"/>
+            </symbol>
+
+            <symbol id="ic-chopsticks" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M3 20.5 19 4.2l1.3 1.3L4.3 21.8 3 20.5Zm3.4 1.3L21 5.9l1.3 1.3L7.7 23 6.4 21.8Z"/>
+            </symbol>
+        </defs>
+    </svg>
+
+    <div id="app">
+        <div class="brandbar">
+            <div class="logo-lockup">
+                <img class="brand-logo" src="logo.png" alt="Panda Express"
+                     onerror="if(this.dataset.s!=='1'){this.dataset.s='1'; this.src='https://logo.clearbit.com/pandaexpress.com?size=200';}else{this.style.visibility='hidden';}">
+            </div>
+        </div>
+
+        <!-- INTRO -->
+        <section id="screen-intro" class="screen active">
+            <svg class="seal" viewBox="0 0 200 200">
+                <defs>
+                    <path id="sealcurve" d="M100,100 m-74,0 a74,74 0 1,1 148,0 a74,74 0 1,1 -148,0"/>
+                </defs>
+                <circle cx="100" cy="100" r="96" fill="#6d100e"/>
+                <circle cx="100" cy="100" r="96" fill="none" stroke="#f4b33e" stroke-width="3"/>
+                <circle cx="100" cy="100" r="88" fill="none" stroke="#f4b33e" stroke-width="1.5" opacity="0.6"/>
+                <circle cx="100" cy="100" r="66" fill="#8c1714"/>
+                <text font-family="Barlow Semi Condensed, Arial Narrow, Arial, sans-serif" font-size="13.5" font-weight="800" letter-spacing="3.2" fill="#f4b33e">
+                    <textPath href="#sealcurve" startOffset="0">★ THE NUGGET COUNCIL ★ EST. 2026 ★ PANDA EXPRESS </textPath>
+                </text>
+                <use href="#ic-chopsticks" x="34" y="34" width="132" height="132" color="#f4b33e" opacity="0.28"/>
+                <use href="#ic-panda-face" x="55" y="48" width="90" height="90"/>
+                <use href="#ic-scales" x="84" y="120" width="32" height="32" color="#f4b33e"/>
+            </svg>
+            <div class="docket"><svg class="ic"><use href="#ic-gavel"/></svg> Now in Session</div>
+            <p class="tagline">Four crispy new <strong>Orange Chicken Nuggets</strong> have formed a tribunal. Plead your case &mdash; one of them rules on your reward.</p>
+            <button class="btn btn-onred" id="startBtn"><svg class="ic"><use href="#ic-scales"/></svg> Approach the Bench</button>
+            <p class="fine">One verdict per customer, per day.</p>
+        </section>
+
+        <!-- COURT -->
+        <section id="screen-court" class="screen">
+            <p class="court-prompt">The Council will now decide your fate</p>
+            <p class="court-sub" id="courtSub">Choose a council member to hear your verdict&hellip;</p>
+            <div class="bench">
+                <svg class="gavel" id="gavel"><use href="#ic-gavel"/></svg>
+                <div class="nugget-row" id="nuggetRow"></div>
+                <div class="bench-board">
+                    <svg class="ic"><use href="#ic-scales"/></svg> THE NUGGET COUNCIL
+                    <svg class="ic"><use href="#ic-scales"/></svg>
+                </div>
+            </div>
+            <div class="floor"></div>
+        </section>
+
+        <!-- LOCKED -->
+        <section id="screen-locked" class="screen">
+            <svg class="locked-mark" viewBox="0 0 100 100"><use href="#ic-panda-face"/></svg>
+            <h2 class="court-prompt" style="font-size:24px;">Court is adjourned</h2>
+            <p class="tagline">The Council has already ruled today. Your verdict is saved in <strong>Panda Rewards</strong> &mdash; return tomorrow for a new case.</p>
+            <button class="btn btn-line" id="seeVerdictBtn">See today's verdict</button>
+            <button class="restart" id="resetBtn" style="color:var(--cream); opacity:0.55;">Reset (demo)</button>
+        </section>
+
+        <!-- VERDICT -->
+        <div id="verdict">
+            <div class="verdict-card">
+                <svg class="verdict-seal-stamp" viewBox="0 0 24 24"><use href="#ic-scales"/></svg>
+                <div class="verdict-label">— Verdict —</div>
+                <div class="verdict-tier" id="vTier">Reward</div>
+                <div class="verdict-reward" id="vReward">&mdash;</div>
+                <div class="verdict-detail" id="vDetail">&mdash;</div>
+                <div class="code-box">
+                    <div class="label">Show this code in-store or scan in app</div>
+                    <div class="code" id="vCode">OCN-0000</div>
+                    <div class="expires" id="vExpires">Expires soon</div>
+                </div>
+                <button class="btn btn-primary" id="claimBtn"><svg class="ic"><use href="#ic-star"/></svg> Add to Panda Rewards</button>
+                <button class="restart" id="playAgainBtn">Play again (demo)</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        "use strict";
+
+        const STORAGE_KEY = "nuggetCouncil.verdict.v1";
+
+        const REWARDS = [
+            { weight: 30, tier: "Council Favor", reward: "$1 OFF Any Plate", detail: "$1 off any Panda Plate. The Council is feeling generous.", prefix: "OCN" },
+            { weight: 28, tier: "New Item Unlock", reward: "Free Orange Chicken Nuggets", detail: "A free 3-pc of the NEW Orange Chicken Nuggets with any entrée purchase.", prefix: "NUG" },
+            { weight: 20, tier: "Council Favor", reward: "Buy One, Get One", detail: "BOGO on the NEW Orange Chicken Nuggets. Bring a fellow juror.", prefix: "BGO" },
+            { weight: 15, tier: "Council Favor", reward: "20% OFF", detail: "20% off your entire order. Case dismissed in your favor.", prefix: "PCT" },
+            { weight: 7, tier: "★ Supreme Verdict ★", reward: "Free 6-pc Nuggets", detail: "A full free 6-pc of the NEW Orange Chicken Nuggets. The highest honor the Council can bestow.", prefix: "SUP" }
+        ];
+
+        const COURT_LINES = [
+            "Council member #2 narrows their eyes&hellip;",
+            "A hush falls over the bench&hellip;",
+            "They are reviewing your order history&hellip;",
+            "Deliberations are heated&hellip;",
+            "The gavel is raised&hellip;"
+        ];
+
+        function $( id ) {
+            return document.getElementById( id );
+        }
+
+        function showScreen( id ) {
+            document.querySelectorAll( ".screen" ).forEach( function( s ) {
+                s.classList.remove( "active" );
+            } );
+            $( id ).classList.add( "active" );
+        }
+
+        function nuggetMarkup() {
+            return '<div class="body"></div>' +
+                '<div class="brow"><span></span><span></span></div>' +
+                '<div class="eyes"><div class="eye"></div><div class="eye"></div></div>' +
+                '<div class="mouth"></div>';
+        }
+
+        function pickReward() {
+            const total = REWARDS.reduce( function( sum, r ) { return sum + r.weight; }, 0 );
+            let roll = Math.random() * total;
+            for ( let i = 0; i < REWARDS.length; i++ ) {
+                roll -= REWARDS[ i ].weight;
+                if ( roll <= 0 ) {
+                    return REWARDS[ i ];
+                }
+            }
+            return REWARDS[ 0 ];
+        }
+
+        function makeCode( prefix ) {
+            const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+            let s = "";
+            for ( let i = 0; i < 4; i++ ) {
+                s += chars.charAt( Math.floor( Math.random() * chars.length ) );
+            }
+            return prefix + "-" + s;
+        }
+
+        function tomorrowLabel() {
+            const d = new Date();
+            d.setDate( d.getDate() + 1 );
+            return d.toLocaleDateString( undefined, { month: "short", day: "numeric" } );
+        }
+
+        function loadVerdict() {
+            try {
+                const raw = localStorage.getItem( STORAGE_KEY );
+                if ( !raw ) {
+                    return null;
+                }
+                const data = JSON.parse( raw );
+                return data.day === new Date().toDateString() ? data : null;
+            } catch ( e ) {
+                return null;
+            }
+        }
+
+        function saveVerdict( data ) {
+            try {
+                localStorage.setItem( STORAGE_KEY, JSON.stringify( data ) );
+            } catch ( e ) {}
+        }
+
+        function clearVerdict() {
+            try {
+                localStorage.removeItem( STORAGE_KEY );
+            } catch ( e ) {}
+        }
+
+        function burstConfetti() {
+            const colors = [ "#f4b33e", "#d2232a", "#ef7b2e", "#fff4e3", "#161210" ];
+            const app = $( "app" );
+            for ( let i = 0; i < 60; i++ ) {
+                const c = document.createElement( "div" );
+                c.className = "confetti";
+                c.style.left = Math.random() * 100 + "%";
+                c.style.background = colors[ Math.floor( Math.random() * colors.length ) ];
+                const dur = 1.6 + Math.random() * 1.6;
+                c.style.animation = "fall " + dur + "s linear forwards";
+                c.style.animationDelay = Math.random() * 0.4 + "s";
+                app.appendChild( c );
+                window.setTimeout( function() { c.remove(); }, ( dur + 0.5 ) * 1000 );
+            }
+        }
+
+        function renderVerdict( v ) {
+            $( "vTier" ).textContent = v.tier;
+            $( "vReward" ).innerHTML = v.reward;
+            $( "vDetail" ).textContent = v.detail;
+            $( "vCode" ).textContent = v.code;
+            $( "vExpires" ).textContent = "Expires " + v.expires + " · valid in app & in-store";
+            $( "verdict" ).classList.add( "show" );
+        }
+
+        let busy = false;
+
+        function buildCourt() {
+            const row = $( "nuggetRow" );
+            row.innerHTML = "";
+            for ( let i = 0; i < 4; i++ ) {
+                const n = document.createElement( "div" );
+                n.className = "nugget tap-hint";
+                n.innerHTML = nuggetMarkup();
+                n.addEventListener( "click", function() { onChoose( n ); } );
+                row.appendChild( n );
+            }
+        }
+
+        function onChoose( chosen ) {
+            if ( busy ) {
+                return;
+            }
+            busy = true;
+
+            const all = Array.prototype.slice.call( $( "nuggetRow" ).children );
+            all.forEach( function( n ) {
+                n.classList.remove( "tap-hint" );
+                if ( n === chosen ) {
+                    n.classList.add( "chosen" );
+                } else {
+                    n.classList.add( "dimmed" );
+                }
+            } );
+
+            $( "courtSub" ).innerHTML = COURT_LINES[ Math.floor( Math.random() * COURT_LINES.length ) ];
+
+            window.setTimeout( function() {
+                $( "gavel" ).classList.add( "bang" );
+            }, 900 );
+
+            window.setTimeout( function() {
+                const reward = pickReward();
+                const verdict = {
+                    day: new Date().toDateString(),
+                    tier: reward.tier,
+                    reward: reward.reward,
+                    detail: reward.detail,
+                    code: makeCode( reward.prefix ),
+                    expires: tomorrowLabel()
+                };
+                saveVerdict( verdict );
+                burstConfetti();
+                renderVerdict( verdict );
+                $( "gavel" ).classList.remove( "bang" );
+                busy = false;
+            }, 1700 );
+        }
+
+        function init() {
+            buildCourt();
+
+            $( "startBtn" ).addEventListener( "click", function() {
+                if ( loadVerdict() ) {
+                    showScreen( "screen-locked" );
+                } else {
+                    showScreen( "screen-court" );
+                }
+            } );
+
+            $( "claimBtn" ).addEventListener( "click", function() {
+                $( "verdict" ).classList.remove( "show" );
+                showScreen( "screen-locked" );
+            } );
+
+            $( "playAgainBtn" ).addEventListener( "click", function() {
+                clearVerdict();
+                $( "verdict" ).classList.remove( "show" );
+                buildCourt();
+                $( "courtSub" ).innerHTML = "Choose a council member to hear your verdict&hellip;";
+                showScreen( "screen-court" );
+            } );
+
+            $( "seeVerdictBtn" ).addEventListener( "click", function() {
+                const existing = loadVerdict();
+                if ( existing ) {
+                    renderVerdict( existing );
+                }
+            } );
+
+            $( "resetBtn" ).addEventListener( "click", function() {
+                clearVerdict();
+                showScreen( "screen-intro" );
+            } );
+        }
+
+        document.addEventListener( "DOMContentLoaded", init );
+    </script>
+</body>
+</html>

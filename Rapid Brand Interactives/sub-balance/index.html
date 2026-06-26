@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#134a7c">
+    <title>Sub Balance Challenge · Jersey Mike's</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Mulish:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --jm-blue: #134a7c;
+            --jm-blue-dark: #0e3a63;
+            --jm-blue-deep: #0a2c4b;
+            --jm-red: #ee3327;
+            --jm-red-dark: #c2261c;
+            --cream: #f7f1e6;
+            --ink: #1d2a38;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body { height: 100%; }
+
+        body {
+            font-family: "Mulish", "Segoe UI", system-ui, sans-serif;
+            background: radial-gradient( circle at 50% 0%, #1b5e9c 0%, var(--jm-blue) 45%, var(--jm-blue-deep) 100% );
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            min-height: 100%;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #app {
+            width: 100%;
+            max-width: 440px;
+            min-height: 100vh;
+            min-height: 100dvh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            padding: env(safe-area-inset-top) 18px env(safe-area-inset-bottom);
+            overflow: hidden;
+        }
+
+        .display-font {
+            font-family: "Fredoka", "Mulish", sans-serif;
+        }
+
+        .ic {
+            width: 1em;
+            height: 1em;
+            fill: currentColor;
+            display: inline-block;
+            vertical-align: -0.14em;
+        }
+
+        /* ---- brand bar ---- */
+        .brandbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 2px 8px;
+            position: relative;
+            z-index: 3;
+        }
+
+        .jm-badge {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            background: #fff;
+            border: 2px solid var(--jm-blue);
+            border-radius: 50% / 50%;
+            padding: 5px 18px;
+            line-height: 1;
+        }
+
+        .jm-badge .redrule {
+            width: 100%;
+            height: 2px;
+            background: var(--jm-red);
+            border-radius: 2px;
+        }
+
+        .jm-badge .jm-name {
+            font-family: "Fredoka", sans-serif;
+            font-weight: 700;
+            font-size: 17px;
+            color: var(--jm-blue);
+            letter-spacing: 0.2px;
+            margin: 2px 0;
+        }
+
+        .jm-badge .jm-sub {
+            font-size: 7px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            color: var(--jm-red);
+            margin-bottom: 2px;
+        }
+
+        /* Official Jersey Mike's logo (sub-balance/logo.png) */
+        .brand-logo { height: 60px; width: auto; display: block; }
+
+        /* Points chip: blue tile, red underline accent, sub icon */
+        .rewards-pts {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: var(--jm-blue-deep);
+            color: #fff;
+            font-size: 12.5px;
+            font-weight: 800;
+            padding: 5px 12px;
+            border-radius: 8px;
+            border-bottom: 2px solid var(--jm-red);
+        }
+
+        .rewards-pts .ic { color: #fff; font-size: 14px; }
+
+        /* ---- screens ---- */
+        .screen {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            position: relative;
+            z-index: 1;
+            min-height: 0;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .screen.active { display: flex; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ---- intro ---- */
+        #screen-intro {
+            justify-content: center;
+            text-align: center;
+            gap: 14px;
+            padding-bottom: 28px;
+        }
+
+        .new-flag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--jm-red);
+            color: #fff;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            padding: 6px 13px;
+            border-radius: 30px;
+            text-transform: uppercase;
+            box-shadow: 0 3px 0 var(--jm-red-dark);
+        }
+
+        .hero-art { width: 124px; height: auto; margin: 0 auto; }
+
+        .title {
+            font-size: 36px;
+            line-height: 0.95;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .title .small {
+            display: block;
+            color: #ffd23c;
+            font-size: 15px;
+            letter-spacing: 3px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .tagline {
+            font-size: 14.5px;
+            opacity: 0.95;
+            max-width: 300px;
+            margin: 0 auto;
+            line-height: 1.5;
+        }
+
+        .tagline strong { color: #ffd23c; }
+
+        .btn {
+            border: none;
+            border-radius: 12px;
+            font-family: "Fredoka", sans-serif;
+            font-weight: 600;
+            font-size: 17px;
+            padding: 15px 26px;
+            cursor: pointer;
+            transition: transform 0.12s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+        }
+
+        .btn:active { transform: scale(0.96); }
+
+        /* Jersey Mike's CTA: chunky rounded-rect, lava red */
+        .btn-primary {
+            background: var(--jm-red);
+            color: #fff;
+            box-shadow: 0 5px 0 var(--jm-red-dark);
+            margin: 4px auto 0;
+            min-width: 250px;
+        }
+
+        .btn-line {
+            background: transparent;
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.55);
+            font-size: 14px;
+            padding: 12px 22px;
+        }
+
+        .fine { font-size: 11px; opacity: 0.62; margin-top: 2px; }
+
+        /* ---- play ---- */
+        #screen-play { gap: 0; }
+
+        .play-hud {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 2px 8px;
+            flex: 0 0 auto;
+        }
+
+        .play-hud .hud-tip {
+            font-size: 13px;
+            font-weight: 700;
+            opacity: 0.9;
+        }
+
+        .timer {
+            font-family: "Fredoka", sans-serif;
+            font-weight: 700;
+            font-size: 22px;
+            color: #ffd23c;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .stage {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            border-radius: 20px;
+            overflow: hidden;
+            background:
+                linear-gradient( 180deg, #bfe3ff 0%, #e9f5ff 62%, #cdb38a 62%, #b89a6c 100% );
+            cursor: grab;
+            touch-action: none;
+            box-shadow: inset 0 0 0 4px #fff, 0 8px 0 var(--jm-blue-deep);
+        }
+
+        .stage:active { cursor: grabbing; }
+
+        .stage .ground-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 38%;
+            background-image: repeating-linear-gradient( 90deg, rgba(0,0,0,0.05) 0 18px, transparent 18px 36px );
+            pointer-events: none;
+        }
+
+        .finger {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 116px;
+            will-change: transform;
+            pointer-events: none;
+            transition: opacity 0.25s ease, filter 0.25s ease;
+        }
+
+        .finger svg { width: 100%; display: block; }
+        .finger.gone { opacity: 0; transform: translateY(60px) scale(0.9) !important; }
+
+        .sub {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 120px;
+            transform-origin: 50% 96%;
+            will-change: transform;
+            pointer-events: none;
+        }
+
+        .sub svg { width: 100%; display: block; filter: drop-shadow( 0 6px 6px rgba(0,0,0,0.18) ); }
+
+        .start-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(10, 44, 75, 0.55);
+            color: #fff;
+            font-family: "Fredoka", sans-serif;
+            font-size: 30px;
+            font-weight: 700;
+            z-index: 6;
+            text-align: center;
+            padding: 20px;
+            transition: opacity 0.3s ease;
+        }
+
+        .start-overlay small { display: block; font-size: 14px; font-family: "Mulish", sans-serif; font-weight: 700; opacity: 0.9; margin-top: 8px; }
+
+        .piece {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 64px;
+            will-change: transform;
+            pointer-events: none;
+            z-index: 4;
+        }
+
+        .piece svg { width: 100%; display: block; }
+
+        .splat {
+            position: absolute;
+            width: 130px;
+            height: 34px;
+            background: radial-gradient( ellipse, rgba(120,80,40,0.30), transparent 70% );
+            border-radius: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            transition: transform 0.4s ease;
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        .splat.show { transform: translate(-50%, -50%) scale(1); }
+
+        /* ---- result ---- */
+        #screen-result { justify-content: center; text-align: center; gap: 10px; padding-bottom: 24px; }
+
+        .score-line {
+            font-family: "Fredoka", sans-serif;
+            font-size: 17px;
+            color: #ffd23c;
+            font-weight: 600;
+        }
+
+        .reward-card {
+            background: var(--cream);
+            color: var(--ink);
+            border-radius: 18px;
+            padding: 18px;
+            text-align: center;
+            box-shadow: 0 8px 0 var(--jm-blue-deep);
+            border-top: 5px solid var(--jm-red);
+            animation: pop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes pop {
+            from { transform: scale(0.85); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .reward-ic-svg { width: 42px; height: 42px; color: var(--jm-blue); }
+
+        .reward-card .won-reward {
+            font-family: "Fredoka", sans-serif;
+            font-size: 24px;
+            color: var(--jm-red);
+            line-height: 1.04;
+            margin: 4px 0;
+            font-weight: 700;
+        }
+
+        .reward-card .won-detail { font-size: 13px; color: #4a5a68; line-height: 1.4; margin-bottom: 12px; }
+
+        .code-box {
+            border: 2px dashed var(--jm-blue);
+            border-radius: 12px;
+            padding: 10px;
+            background: #fff;
+            margin-bottom: 12px;
+        }
+
+        .code-box .label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #8593a0; }
+        .code-box .code { font-size: 24px; font-weight: 800; letter-spacing: 3px; color: var(--ink); font-family: "Courier New", monospace; }
+        .code-box .expires { font-size: 11px; color: #8593a0; }
+
+        .reward-card .btn-primary { width: 100%; min-width: 0; font-size: 15px; padding: 13px; }
+
+        .restart {
+            display: block;
+            margin: 10px auto 0;
+            background: none;
+            border: none;
+            color: #cfe0f0;
+            font-size: 12px;
+            font-weight: 700;
+            text-decoration: underline;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        /* ---- locked ---- */
+        #screen-locked { justify-content: center; text-align: center; gap: 14px; padding-bottom: 40px; }
+        .locked-art { width: 84px; height: auto; margin: 0 auto; }
+
+        .confetti {
+            position: absolute;
+            width: 9px; height: 14px;
+            top: -20px; z-index: 40;
+            border-radius: 2px;
+            pointer-events: none;
+        }
+
+        @keyframes fall {
+            to { transform: translateY(110vh) rotate(540deg); opacity: 0.9; }
+        }
+    </style>
+</head>
+<body>
+    <!-- ===== SVG sprite ===== -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <!-- open hand traced as a spline; balancing on the index fingertip (apex ~ x45%, y top) -->
+            <symbol id="ic-finger" viewBox="0 0 210 290">
+                <!-- sleeve cuff behind the wrist -->
+                <rect x="56" y="262" width="104" height="40" rx="14" fill="#134a7c"/>
+                <rect x="56" y="264" width="104" height="11" fill="#ee3327"/>
+                <!-- hand silhouette -->
+                <path fill="#e9b48d" stroke="#cf9469" stroke-width="2" stroke-linejoin="round" d="
+                    M64 272
+                    C52 250 44 230 40 206
+                    C35 186 26 166 20 150
+                    C15 138 30 132 40 146
+                    C50 154 62 158 72 166
+                    C75 140 78 70 84 32
+                    C86 20 100 20 102 34
+                    C105 64 108 84 110 96
+                    C114 76 122 50 126 42
+                    C128 32 140 32 143 44
+                    C146 68 149 92 151 104
+                    C155 88 162 68 165 60
+                    C167 50 178 50 180 62
+                    C182 86 184 108 186 120
+                    C189 108 195 92 197 86
+                    C199 78 208 80 208 92
+                    C209 116 206 150 200 178
+                    C194 208 176 250 150 272
+                    Z" />
+                <!-- finger-separation creases -->
+                <g stroke="#cf9469" stroke-width="1.6" fill="none" opacity="0.5" stroke-linecap="round">
+                    <path d="M110 98 C108 120 106 140 104 158"/>
+                    <path d="M151 106 C150 128 148 146 146 162"/>
+                    <path d="M186 122 C185 142 183 158 181 172"/>
+                    <path d="M72 168 C76 188 78 206 78 222"/>
+                </g>
+                <!-- nails -->
+                <ellipse cx="93" cy="36" rx="8" ry="11" fill="#f4d3ba"/>
+                <ellipse cx="134" cy="50" rx="7.5" ry="10" fill="#f1cdb0" transform="rotate(10 134 50)"/>
+                <ellipse cx="172" cy="68" rx="7" ry="9" fill="#f1cdb0" transform="rotate(26 172 68)"/>
+                <ellipse cx="202" cy="96" rx="6" ry="8" fill="#f1cdb0" transform="rotate(42 202 96)"/>
+                <ellipse cx="30" cy="150" rx="8" ry="10" fill="#f1cdb0" transform="rotate(-52 30 150)"/>
+            </symbol>
+
+            <!-- assembled sub, standing ON-END (contact point bottom-center ~70,288) -->
+            <symbol id="ic-sub-full" viewBox="0 0 140 300">
+                <!-- bottom bun (left band) -->
+                <rect x="18" y="20" width="40" height="262" rx="20" fill="#e0a651" stroke="#c2872f" stroke-width="3"/>
+                <!-- top bun (right band, slightly taller) -->
+                <rect x="82" y="12" width="40" height="270" rx="20" fill="#e8b46a" stroke="#c2872f" stroke-width="3"/>
+                <!-- meat backing down the centre -->
+                <rect x="50" y="34" width="40" height="234" rx="20" fill="#b94a38"/>
+                <!-- lettuce ruffle (circles poking out both edges) -->
+                <g fill="#6fb04a">
+                    <circle cx="48" cy="62" r="11"/><circle cx="48" cy="100" r="11"/><circle cx="48" cy="138" r="11"/><circle cx="48" cy="176" r="11"/><circle cx="48" cy="214" r="11"/><circle cx="48" cy="248" r="11"/>
+                    <circle cx="92" cy="62" r="11"/><circle cx="92" cy="100" r="11"/><circle cx="92" cy="138" r="11"/><circle cx="92" cy="176" r="11"/><circle cx="92" cy="214" r="11"/><circle cx="92" cy="248" r="11"/>
+                </g>
+                <!-- cheese triangles -->
+                <g fill="#f3c33f" stroke="#d9a82a" stroke-width="1.5">
+                    <path d="M52 82 l-20 9 20 9 Z"/>
+                    <path d="M88 160 l20 9 -20 9 Z"/>
+                    <path d="M52 236 l-20 9 20 9 Z"/>
+                </g>
+                <!-- tomatoes -->
+                <g>
+                    <circle cx="70" cy="90" r="13" fill="#e0413a"/><circle cx="70" cy="90" r="8" fill="#ef6a5c"/>
+                    <circle cx="70" cy="176" r="13" fill="#e0413a"/><circle cx="70" cy="176" r="8" fill="#ef6a5c"/>
+                    <circle cx="70" cy="248" r="12" fill="#e0413a"/><circle cx="70" cy="248" r="7" fill="#ef6a5c"/>
+                </g>
+                <!-- sesame on top bun -->
+                <g fill="#f3d9ac" opacity="0.85"><circle cx="102" cy="58" r="2.4"/><circle cx="110" cy="104" r="2.4"/><circle cx="102" cy="150" r="2.4"/><circle cx="110" cy="196" r="2.4"/><circle cx="102" cy="240" r="2.4"/></g>
+                <!-- sheen -->
+                <path d="M104 40 q10 110 0 220" stroke="#fff" stroke-width="4" opacity="0.2" fill="none" stroke-linecap="round"/>
+            </symbol>
+
+            <!-- fall-apart pieces -->
+            <symbol id="pc-buntop" viewBox="0 0 100 44"><path d="M6 40 q0-38 44-39 h0 q44 1 44 39 q0 4-8 4 H14 q-8 0-8-4 Z" fill="#e8b46a" stroke="#c2872f" stroke-width="3"/><g fill="#f3d9ac" opacity="0.8"><circle cx="36" cy="16" r="2.4"/><circle cx="56" cy="13" r="2.4"/><circle cx="72" cy="17" r="2.4"/></g></symbol>
+            <symbol id="pc-bunbot" viewBox="0 0 100 34"><path d="M10 4 q-8 0-8 13 q0 13 14 13 h70 q14 0 14-13 q0-13-8-13 Z" fill="#e0a651" stroke="#c2872f" stroke-width="3"/></symbol>
+            <symbol id="pc-lettuce" viewBox="0 0 100 30"><path d="M4 22 q14-20 24-4 q12-20 24-4 q12-20 24-4 q10-14 20-2 l0 18 H4 Z" fill="#6fb04a"/></symbol>
+            <symbol id="pc-tomato" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17" fill="#e0413a"/><circle cx="20" cy="20" r="11" fill="#ef6a5c"/></symbol>
+            <symbol id="pc-cheese" viewBox="0 0 44 40"><path d="M2 4 H42 L22 38 Z" fill="#f3c33f" stroke="#d9a82a" stroke-width="2"/></symbol>
+            <symbol id="pc-meat" viewBox="0 0 100 26"><path d="M2 14 q12-12 24 0 q12-12 24 0 q12-12 24 0 q12-12 24 0 l0 10 H2 Z" fill="#b94a38"/></symbol>
+
+            <!-- ui / reward icons -->
+            <symbol id="ic-sub" viewBox="0 0 24 24"><path fill="currentColor" d="M3 12a4 4 0 0 1 4-4h10a4 4 0 0 1 0 8H7a4 4 0 0 1-4-4Z"/></symbol>
+            <symbol id="ic-cup" viewBox="0 0 24 24"><path fill="currentColor" d="M5 4h14l-1.3 16.2A2 2 0 0 1 15.7 22H8.3a2 2 0 0 1-2-1.8L5 4Zm2.3 2 .25 3.5h8.9L16.7 6H7.3Z"/></symbol>
+            <symbol id="ic-bag" viewBox="0 0 24 24"><path fill="currentColor" d="M7.5 3h9l-1 4 1 14h-9l1-14-1-4Zm2.2 2 .6 2h3.4l.6-2H9.7Z"/></symbol>
+            <symbol id="ic-tag" viewBox="0 0 24 24"><path fill="currentColor" d="M2 12 12 2h8a2 2 0 0 1 2 2v8L12 22 2 12Zm15-7a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></symbol>
+            <symbol id="ic-flame" viewBox="0 0 24 24"><path fill="currentColor" d="M13.5 2s5.5 4 5.5 9.5a7 7 0 0 1-14 0c0-2.2 1-3.5 1-3.5s.2 2.2 2.2 2.2C8.2 7 10.5 5 13.5 2Z"/></symbol>
+            <symbol id="ic-star" viewBox="0 0 24 24"><path fill="currentColor" d="m12 2 2.9 6.1 6.6.8-4.9 4.5 1.3 6.6L12 17.8 6.1 20l1.3-6.6L2.5 8.9l6.6-.8L12 2Z"/></symbol>
+            <symbol id="ic-refresh" viewBox="0 0 24 24"><path fill="currentColor" d="M12 6V2.5L7 7l5 4.5V8a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7Z"/></symbol>
+        </defs>
+    </svg>
+
+    <div id="app">
+        <div class="brandbar">
+            <img class="brand-logo" src="logo.png" alt="Jersey Mike's Subs"
+                 onerror="if(this.dataset.s!=='1'){this.dataset.s='1'; this.src='https://logo.clearbit.com/jerseymikes.com?size=200';}else{this.style.visibility='hidden';}">
+        </div>
+
+        <!-- INTRO -->
+        <section id="screen-intro" class="screen active">
+            <svg class="hero-art" viewBox="0 0 210 290"><use href="#ic-finger"/></svg>
+            <h1 class="title display-font"><span class="small">The</span>Sub Balance Challenge</h1>
+            <p class="tagline">Balance a fresh sub on your fingertip for as long as you can. Spoiler: <strong>nobody keeps it up</strong> &mdash; but you still walk away with a reward.</p>
+            <button class="btn btn-primary" id="startBtn"><svg class="ic"><use href="#ic-sub"/></svg> Start Balancing</button>
+            <p class="fine">One reward per customer, per day.</p>
+        </section>
+
+        <!-- PLAY -->
+        <section id="screen-play" class="screen">
+            <div class="play-hud">
+                <span class="hud-tip">Drag left / right to balance</span>
+                <span class="timer" id="timer">0.0s</span>
+            </div>
+            <div class="stage" id="stage">
+                <div class="ground-line"></div>
+                <div class="sub" id="subEl"><svg viewBox="0 0 140 300"><use href="#ic-sub-full"/></svg></div>
+                <div class="finger" id="fingerEl"><svg viewBox="0 0 210 290"><use href="#ic-finger"/></svg></div>
+                <div class="start-overlay" id="startOverlay">Get ready&hellip;<small>Press &amp; drag to keep the sub up</small></div>
+            </div>
+        </section>
+
+        <!-- RESULT -->
+        <section id="screen-result" class="screen">
+            <div class="score-line display-font" id="scoreLine">You balanced 0.0s!</div>
+            <div class="reward-card">
+                <span id="wIcon"></span>
+                <div class="won-reward" id="wReward">&mdash;</div>
+                <div class="won-detail" id="wDetail">&mdash;</div>
+                <div class="code-box">
+                    <div class="label">Show in-store or scan in app</div>
+                    <div class="code" id="wCode">JM-0000</div>
+                    <div class="expires" id="wExpires">Expires soon</div>
+                </div>
+                <button class="btn btn-primary" id="claimBtn"><svg class="ic"><use href="#ic-sub"/></svg> Add to My Rewards</button>
+            </div>
+            <button class="restart" id="resultReset">Play again (demo)</button>
+        </section>
+
+        <!-- LOCKED -->
+        <section id="screen-locked" class="screen">
+            <svg class="locked-art" viewBox="0 0 140 300"><use href="#ic-sub-full"/></svg>
+            <h2 class="title display-font" style="font-size:25px;">That's a wrap for today</h2>
+            <p class="tagline">You've already taken today's shot at the sub. Your reward is saved in <strong>My Rewards</strong> &mdash; come back tomorrow to try again.</p>
+            <button class="btn btn-line" id="seeRewardBtn">See today's reward</button>
+            <button class="restart" id="lockReset">Reset (demo)</button>
+        </section>
+    </div>
+
+    <script>
+        "use strict";
+
+        const STORAGE_KEY = "subBalance.reward.v1";
+
+        const REWARDS = [
+            { weight: 30, icon: "ic-tag", reward: "$2 OFF a Giant Sub", detail: "Two bucks off any Giant sub. A Sub Above, for less.", prefix: "GNT" },
+            { weight: 28, icon: "ic-flame", reward: "BOGO the NEW Cheese Steak", detail: "Buy one NEW Bacon Ranch Chicken Cheese Steak, get one free.", prefix: "BRC" },
+            { weight: 20, icon: "ic-cup", reward: "FREE Chips & Drink", detail: "Free chips and a fountain drink with any regular sub.", prefix: "CMB" },
+            { weight: 15, icon: "ic-sub", reward: "FREE Mini Sub", detail: "One free Mini sub, made Mike's Way if you like.", prefix: "MIN" },
+            { weight: 7, icon: "ic-star", reward: "FREE Regular Sub", detail: "A full free Regular sub or Sub-in-a-Tub. The big drop pays off!", prefix: "REG" }
+        ];
+
+        function $( id ) { return document.getElementById( id ); }
+
+        function showScreen( id ) {
+            document.querySelectorAll( ".screen" ).forEach( function( s ) { s.classList.remove( "active" ); } );
+            $( id ).classList.add( "active" );
+        }
+
+        function iconSVG( id ) {
+            return '<svg class="reward-ic-svg" viewBox="0 0 24 24"><use href="#' + id + '"/></svg>';
+        }
+
+        function pickReward() {
+            const total = REWARDS.reduce( function( s, r ) { return s + r.weight; }, 0 );
+            let roll = Math.random() * total;
+            for ( let i = 0; i < REWARDS.length; i++ ) {
+                roll -= REWARDS[ i ].weight;
+                if ( roll <= 0 ) { return REWARDS[ i ]; }
+            }
+            return REWARDS[ 0 ];
+        }
+
+        function makeCode( prefix ) {
+            const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+            let s = "";
+            for ( let i = 0; i < 4; i++ ) {
+                s += chars.charAt( Math.floor( Math.random() * chars.length ) );
+            }
+            return prefix + "-" + s;
+        }
+
+        function tomorrowLabel() {
+            const d = new Date();
+            d.setDate( d.getDate() + 1 );
+            return d.toLocaleDateString( undefined, { month: "short", day: "numeric" } );
+        }
+
+        function loadReward() {
+            try {
+                const raw = localStorage.getItem( STORAGE_KEY );
+                if ( !raw ) { return null; }
+                const data = JSON.parse( raw );
+                return data.day === new Date().toDateString() ? data : null;
+            } catch ( e ) { return null; }
+        }
+
+        function saveReward( data ) {
+            try { localStorage.setItem( STORAGE_KEY, JSON.stringify( data ) ); } catch ( e ) {}
+        }
+
+        function clearReward() {
+            try { localStorage.removeItem( STORAGE_KEY ); } catch ( e ) {}
+        }
+
+        function burstConfetti() {
+            const colors = [ "#ffd23c", "#ee3327", "#134a7c", "#ffffff", "#6fb04a" ];
+            const app = $( "app" );
+            for ( let i = 0; i < 55; i++ ) {
+                const c = document.createElement( "div" );
+                c.className = "confetti";
+                c.style.left = Math.random() * 100 + "%";
+                c.style.background = colors[ Math.floor( Math.random() * colors.length ) ];
+                const dur = 1.6 + Math.random() * 1.6;
+                c.style.animation = "fall " + dur + "s linear forwards";
+                c.style.animationDelay = Math.random() * 0.4 + "s";
+                app.appendChild( c );
+                window.setTimeout( function() { c.remove(); }, ( dur + 0.5 ) * 1000 );
+            }
+        }
+
+        /* ===== balance physics ===== */
+        const SUB_W = 120;
+        const FINGER_W = 116;
+
+        let stage, stageW, stageH;
+        let fingerTipY, groundY;
+        let fingerX, prevFingerX, pointerX;
+        let theta, omega, elapsed, lastKick;
+        let state = "idle";          // idle | balancing | falling | burst | done
+        let fallVy = 0, fallY = 0, spin = 0;
+        let rafId = null, lastT = 0;
+        let balanceTime = 0;
+
+        /* tuned to be winnable for a few seconds, then instability ramps and it drops */
+        const BASE_G = 2.8;
+        const RAMP = 0.9;
+        const CONTROL = 4.2;
+        const DAMP = 0.99;
+        const MAX_THETA = 0.95;
+        const HARD_TIMEOUT = 12;
+        const GRACE = 1.1;
+
+        function layout() {
+            stageW = stage.clientWidth;
+            stageH = stage.clientHeight;
+            fingerTipY = stageH * 0.56;
+            groundY = stageH * 0.84;
+        }
+
+        function placeFinger() {
+            const el = $( "fingerEl" );
+            const w = FINGER_W;
+            const h = w * ( 290 / 210 );
+            const tipX = w * 0.45;
+            const tipY = h * 0.065;
+            el.style.transform = "translate(" + ( fingerX - tipX ) + "px," + ( fingerTipY - tipY ) + "px)";
+        }
+
+        function placeSub() {
+            const el = $( "subEl" );
+            const w = SUB_W;
+            const h = w * ( 300 / 140 );
+            const contactX = w * 0.5;
+            const contactY = h * 0.96;
+            const x = fingerX - contactX;
+            const y = fingerTipY - contactY + fallY;
+            el.style.transform = "translate(" + x + "px," + y + "px) rotate(" + ( ( theta + spin ) * 180 / Math.PI ) + "deg)";
+        }
+
+        function startGame() {
+            layout();
+            fingerX = prevFingerX = pointerX = stageW / 2;
+            theta = ( Math.random() - 0.5 ) * 0.05;
+            omega = 0;
+            elapsed = 0;
+            lastKick = 0;
+            fallVy = 0; fallY = 0; spin = 0;
+            balanceTime = 0;
+            state = "balancing";
+            $( "fingerEl" ).classList.remove( "gone" );
+            $( "subEl" ).style.display = "block";
+            $( "timer" ).textContent = "0.0s";
+            placeFinger();
+            placeSub();
+
+            const ov = $( "startOverlay" );
+            ov.style.opacity = "1";
+            ov.textContent = "Get ready…";
+            window.setTimeout( function() { ov.style.opacity = "0"; }, 700 );
+
+            lastT = performance.now();
+            cancelAnimationFrame( rafId );
+            rafId = requestAnimationFrame( tick );
+        }
+
+        function tick( now ) {
+            let dt = ( now - lastT ) / 1000;
+            lastT = now;
+            if ( dt > 0.05 ) { dt = 0.05; }
+
+            /* finger eases toward pointer */
+            fingerX += ( pointerX - fingerX ) * Math.min( 1, dt * 10 );
+            fingerX = Math.max( 30, Math.min( stageW - 30, fingerX ) );
+
+            if ( state === "balancing" ) {
+                elapsed += dt;
+                $( "timer" ).textContent = elapsed.toFixed( 1 ) + "s";
+
+                const g = BASE_G + Math.max( 0, elapsed - GRACE ) * RAMP;
+                omega += g * Math.sin( theta ) * dt;
+
+                /* corrective torque from finger movement (move under the lean to recover) */
+                const fingerVelNorm = ( fingerX - prevFingerX ) / stageW;
+                omega -= CONTROL * fingerVelNorm * Math.cos( theta );
+
+                /* random wobble so it inevitably gets away from you */
+                lastKick += dt;
+                if ( lastKick > 0.9 ) {
+                    omega += ( Math.random() - 0.5 ) * 0.55;
+                    lastKick = 0;
+                }
+                omega += ( Math.random() - 0.5 ) * 0.15 * dt;
+
+                omega *= DAMP;
+                theta += omega * dt;
+
+                if ( Math.abs( theta ) > MAX_THETA || elapsed > HARD_TIMEOUT ) {
+                    beginFall();
+                }
+            } else if ( state === "falling" ) {
+                fallVy += 1300 * dt;       // gravity (px/s^2) — gentler drop
+                fallY += fallVy * dt;
+                spin += ( theta > 0 ? 4.5 : -4.5 ) * dt;
+                if ( fingerTipY + fallY >= groundY ) {
+                    burst();
+                }
+            }
+
+            prevFingerX = fingerX;
+            placeFinger();
+            if ( state === "balancing" || state === "falling" ) { placeSub(); }
+
+            if ( state === "balancing" || state === "falling" ) {
+                rafId = requestAnimationFrame( tick );
+            }
+        }
+
+        function beginFall() {
+            state = "falling";
+            balanceTime = elapsed;
+            $( "fingerEl" ).classList.add( "gone" );   // finger disappears first
+            fallVy = 40;
+        }
+
+        const PIECES = [
+            { id: "pc-buntop", w: 96, dx: -10, dy: -34 },
+            { id: "pc-tomato", w: 34, dx: -60, dy: -6 },
+            { id: "pc-lettuce", w: 92, dx: 14, dy: -8 },
+            { id: "pc-cheese", w: 40, dx: 60, dy: -4 },
+            { id: "pc-meat", w: 96, dx: -8, dy: 2 },
+            { id: "pc-bunbot", w: 96, dx: 8, dy: 16 }
+        ];
+
+        function burst() {
+            state = "burst";
+            $( "subEl" ).style.display = "none";
+
+            const cx = fingerX;
+            const gy = groundY + 8;
+
+            const splat = document.createElement( "div" );
+            splat.className = "splat";
+            splat.style.left = cx + "px";
+            splat.style.top = gy + "px";
+            stage.appendChild( splat );
+            requestAnimationFrame( function() { splat.classList.add( "show" ); } );
+
+            PIECES.forEach( function( p ) {
+                const el = document.createElement( "div" );
+                el.className = "piece";
+                el.style.width = p.w + "px";
+                el.innerHTML = '<svg viewBox="0 0 100 44"><use href="#' + p.id + '"/></svg>';
+                const startX = cx - p.w / 2 + p.dx;
+                const startY = gy - 70 + p.dy;
+                el.style.transform = "translate(" + startX + "px," + startY + "px) rotate(0deg)";
+                stage.appendChild( el );
+
+                const spread = ( Math.random() - 0.5 ) * 220 + p.dx * 2;
+                const rot = ( Math.random() - 0.5 ) * 160;
+                const endX = Math.max( 6, Math.min( stageW - p.w - 6, cx - p.w / 2 + spread ) );
+                const endY = gy - 6 - Math.random() * 10;
+                requestAnimationFrame( function() {
+                    el.style.transition = "transform 0.7s cubic-bezier(0.3, 0.9, 0.4, 1)";
+                    el.style.transform = "translate(" + endX + "px," + endY + "px) rotate(" + rot + "deg)";
+                } );
+            } );
+
+            window.setTimeout( reveal, 1150 );
+        }
+
+        function fillReward( data ) {
+            $( "wIcon" ).innerHTML = iconSVG( data.icon );
+            $( "wReward" ).innerHTML = data.reward;
+            $( "wDetail" ).textContent = data.detail;
+            $( "wCode" ).textContent = data.code;
+            $( "wExpires" ).textContent = "Expires " + data.expires;
+        }
+
+        function scoreText( t ) {
+            if ( t >= 5 ) { return "Whoa — " + t.toFixed( 1 ) + "s! Steady hands."; }
+            if ( t >= 3 ) { return "Not bad — you balanced " + t.toFixed( 1 ) + "s!"; }
+            return "You balanced " + t.toFixed( 1 ) + "s before the drop!";
+        }
+
+        function reveal() {
+            state = "done";
+            let data = loadReward();
+            if ( !data ) {
+                const r = pickReward();
+                data = {
+                    day: new Date().toDateString(),
+                    icon: r.icon,
+                    reward: r.reward,
+                    detail: r.detail,
+                    code: makeCode( r.prefix ),
+                    expires: tomorrowLabel()
+                };
+                saveReward( data );
+            }
+            $( "scoreLine" ).textContent = scoreText( balanceTime );
+            fillReward( data );
+            showScreen( "screen-result" );
+            burstConfetti();
+            clearPieces();
+        }
+
+        function clearPieces() {
+            stage.querySelectorAll( ".piece, .splat" ).forEach( function( el ) { el.remove(); } );
+        }
+
+        /* ===== input ===== */
+        function pointerXFromEvent( e ) {
+            const rect = stage.getBoundingClientRect();
+            const px = ( e.touches ? e.touches[ 0 ].clientX : e.clientX ) - rect.left;
+            return Math.max( 0, Math.min( stageW, px ) );
+        }
+
+        function bindStage() {
+            let dragging = false;
+            function down( e ) { dragging = true; pointerX = pointerXFromEvent( e ); e.preventDefault(); }
+            function move( e ) { if ( dragging ) { pointerX = pointerXFromEvent( e ); e.preventDefault(); } }
+            function up() { dragging = false; }
+
+            stage.addEventListener( "mousedown", down );
+            stage.addEventListener( "mousemove", move );
+            window.addEventListener( "mouseup", up );
+            stage.addEventListener( "touchstart", down, { passive: false } );
+            stage.addEventListener( "touchmove", move, { passive: false } );
+            stage.addEventListener( "touchend", up );
+        }
+
+        function init() {
+            stage = $( "stage" );
+            bindStage();
+
+            $( "startBtn" ).addEventListener( "click", function() {
+                if ( loadReward() ) {
+                    showScreen( "screen-locked" );
+                } else {
+                    showScreen( "screen-play" );
+                    requestAnimationFrame( startGame );
+                }
+            } );
+
+            $( "claimBtn" ).addEventListener( "click", function() { showScreen( "screen-locked" ); } );
+
+            $( "resultReset" ).addEventListener( "click", function() {
+                clearReward();
+                showScreen( "screen-play" );
+                requestAnimationFrame( startGame );
+            } );
+
+            $( "seeRewardBtn" ).addEventListener( "click", function() {
+                const data = loadReward();
+                if ( data ) {
+                    $( "scoreLine" ).textContent = "Today's reward";
+                    fillReward( data );
+                    showScreen( "screen-result" );
+                }
+            } );
+
+            $( "lockReset" ).addEventListener( "click", function() {
+                clearReward();
+                showScreen( "screen-intro" );
+            } );
+        }
+
+        document.addEventListener( "DOMContentLoaded", init );
+    </script>
+</body>
+</html>

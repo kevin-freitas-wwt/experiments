@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#00853e">
+    <title>Glaze Forecast · Krispy Kreme</title>
+    <style>
+        :root {
+            --kk-green: #00853e;
+            --kk-green-dark: #006630;
+            --kk-red: #d12027;
+            --kk-cream: #fdf6ef;
+            --ink: #213027;
+            --sky: #cfe7ff;
+            --sky-deep: #a9d6f5;
+            --cloud: #e9eef2;
+            --gold: #f6c453;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+            background: linear-gradient( 180deg, var(--kk-green) 0%, var(--kk-green-dark) 100% );
+            color: var(--kk-cream);
+            display: flex;
+            justify-content: center;
+            min-height: 100%;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #app {
+            width: 100%;
+            max-width: 440px;
+            min-height: 100vh;
+            min-height: 100dvh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom);
+            overflow: hidden;
+        }
+
+        .brandbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 16px 2px 6px;
+            font-weight: bold;
+        }
+
+        .brandbar .logo { font-size: 20px; }
+
+        .brandbar .name {
+            font-size: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .brandbar .name .kk-red { color: var(--gold); }
+
+        .brandbar .rewards-pts {
+            margin-left: auto;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+
+        .screen {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .screen.active { display: flex; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ---- Intro ---- */
+        #screen-intro {
+            justify-content: center;
+            text-align: center;
+            gap: 16px;
+            padding-bottom: 36px;
+        }
+
+        .new-flag {
+            display: inline-block;
+            background: var(--gold);
+            color: var(--ink);
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            padding: 5px 12px;
+            border-radius: 6px;
+            transform: rotate(-3deg);
+            text-transform: uppercase;
+        }
+
+        .title {
+            font-size: 38px;
+            line-height: 1;
+            font-weight: 900;
+            text-shadow: 0 3px 0 var(--kk-green-dark);
+        }
+
+        .title .small {
+            display: block;
+            color: var(--gold);
+            font-size: 18px;
+            letter-spacing: 3px;
+            margin-bottom: 6px;
+            text-shadow: none;
+        }
+
+        .tagline {
+            font-size: 15px;
+            opacity: 0.95;
+            max-width: 290px;
+            margin: 0 auto;
+            line-height: 1.5;
+        }
+
+        .cloud-emoji { font-size: 60px; }
+
+        .btn {
+            border: none;
+            border-radius: 40px;
+            font-family: inherit;
+            font-weight: 900;
+            font-size: 17px;
+            padding: 16px 28px;
+            cursor: pointer;
+            transition: transform 0.12s ease;
+        }
+
+        .btn:active { transform: scale(0.96); }
+
+        .btn-primary {
+            background: var(--gold);
+            color: var(--ink);
+            box-shadow: 0 6px 0 #cf9a2c;
+            margin: 6px auto 0;
+            min-width: 240px;
+        }
+
+        .fine { font-size: 11px; opacity: 0.7; margin-top: 2px; }
+
+        /* ---- Forecast / scratch ---- */
+        #screen-forecast {
+            justify-content: flex-start;
+            text-align: center;
+            gap: 4px;
+        }
+
+        .forecast-head {
+            font-size: 22px;
+            font-weight: 900;
+            margin-top: 8px;
+        }
+
+        .forecast-date {
+            font-size: 13px;
+            opacity: 0.85;
+            margin-bottom: 4px;
+        }
+
+        .scratch-wrap {
+            margin: auto;
+            width: 100%;
+            max-width: 320px;
+            background: linear-gradient( 180deg, var(--sky), var(--sky-deep) );
+            border-radius: 22px;
+            padding: 16px;
+            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.25), inset 0 0 0 4px rgba(255, 255, 255, 0.5);
+        }
+
+        .radar-label {
+            color: var(--ink);
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            opacity: 0.6;
+            margin-bottom: 8px;
+        }
+
+        .scratch-area {
+            position: relative;
+            width: 100%;
+            height: 230px;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .prize-under {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 14px;
+            color: var(--ink);
+            text-align: center;
+        }
+
+        .prize-under .p-emoji { font-size: 46px; }
+
+        .prize-under .p-reward {
+            font-size: 25px;
+            font-weight: 900;
+            color: var(--kk-red);
+            line-height: 1.05;
+        }
+
+        .prize-under .p-detail {
+            font-size: 12.5px;
+            opacity: 0.8;
+            line-height: 1.35;
+            max-width: 240px;
+        }
+
+        #scratchCanvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            cursor: grab;
+        }
+
+        .scratch-hint {
+            font-size: 13px;
+            color: var(--ink);
+            opacity: 0.75;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        /* ---- Reveal / code ---- */
+        .code-card {
+            background: var(--kk-cream);
+            color: var(--ink);
+            border-radius: 20px;
+            padding: 18px;
+            margin: auto auto 0;
+            width: 100%;
+            max-width: 320px;
+            text-align: center;
+            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.25);
+            display: none;
+            animation: pop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .code-card.show { display: block; }
+
+        @keyframes pop {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .code-card .won-emoji { font-size: 40px; }
+
+        .code-card .won-reward {
+            font-size: 24px;
+            font-weight: 900;
+            color: var(--kk-red);
+            line-height: 1.05;
+            margin: 2px 0 4px;
+        }
+
+        .code-card .won-detail {
+            font-size: 13px;
+            opacity: 0.8;
+            line-height: 1.4;
+            margin-bottom: 12px;
+        }
+
+        .code-box {
+            border: 2px dashed var(--kk-green);
+            border-radius: 12px;
+            padding: 10px;
+            background: #fff;
+            margin-bottom: 12px;
+        }
+
+        .code-box .label {
+            font-size: 10px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            opacity: 0.6;
+        }
+
+        .code-box .code {
+            font-size: 24px;
+            font-weight: 900;
+            letter-spacing: 3px;
+            font-family: "Courier New", monospace;
+        }
+
+        .code-box .expires { font-size: 11px; opacity: 0.6; }
+
+        .code-card .btn-primary {
+            width: 100%;
+            min-width: 0;
+            font-size: 15px;
+            padding: 13px;
+        }
+
+        .restart {
+            display: block;
+            margin: 10px auto 0;
+            background: none;
+            border: none;
+            color: var(--kk-green);
+            font-size: 12px;
+            font-weight: bold;
+            text-decoration: underline;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        /* ---- Locked ---- */
+        #screen-locked {
+            justify-content: center;
+            text-align: center;
+            gap: 14px;
+            padding-bottom: 40px;
+        }
+
+        .locked-emoji { font-size: 50px; }
+
+        .confetti {
+            position: absolute;
+            width: 9px;
+            height: 14px;
+            top: -20px;
+            z-index: 40;
+            border-radius: 2px;
+            pointer-events: none;
+        }
+
+        @keyframes fall {
+            to { transform: translateY(110vh) rotate(540deg); opacity: 0.9; }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="brandbar">
+            <span class="logo">🍩</span>
+            <span class="name">Krispy <span class="kk-red">Kreme</span></span>
+            <span class="rewards-pts">★ Rewards</span>
+        </div>
+
+        <!-- INTRO -->
+        <section id="screen-intro" class="screen active">
+            <div class="new-flag">★ New · Cosmic Brûlée Doughnut</div>
+            <div class="cloud-emoji">🌥️🍩</div>
+            <h1 class="title"><span class="small">— today's —</span>Glaze Forecast</h1>
+            <p class="tagline">Doppler's picking up a <strong>glaze front</strong> moving in. Scratch the cloud to reveal your forecast &mdash; and your reward.</p>
+            <button class="btn btn-primary" id="startBtn">🌧️ Check the Forecast</button>
+            <p class="fine">One forecast per customer, per day.</p>
+        </section>
+
+        <!-- FORECAST -->
+        <section id="screen-forecast" class="screen">
+            <p class="forecast-head">Glaze Doppler 9000™</p>
+            <p class="forecast-date" id="fDate">&mdash;</p>
+
+            <div class="scratch-wrap">
+                <div class="radar-label">Live Glaze Radar</div>
+                <div class="scratch-area">
+                    <div class="prize-under" id="prizeUnder">
+                        <div class="p-emoji" id="pEmoji">🍩</div>
+                        <div class="p-reward" id="pReward">&mdash;</div>
+                        <div class="p-detail" id="pDetail">&mdash;</div>
+                    </div>
+                    <canvas id="scratchCanvas"></canvas>
+                </div>
+            </div>
+            <p class="scratch-hint" id="scratchHint">👆 Scratch away the storm clouds</p>
+
+            <!-- code card revealed after scratch -->
+            <div class="code-card" id="codeCard">
+                <div class="won-emoji" id="wEmoji">🍩</div>
+                <div class="won-reward" id="wReward">&mdash;</div>
+                <div class="won-detail" id="wDetail">&mdash;</div>
+                <div class="code-box">
+                    <div class="label">Show in-store or scan in app</div>
+                    <div class="code" id="wCode">KK-0000</div>
+                    <div class="expires" id="wExpires">Expires soon</div>
+                </div>
+                <button class="btn btn-primary" id="claimBtn">Add to Rewards</button>
+                <button class="restart" id="playAgainBtn">Play again (demo)</button>
+            </div>
+        </section>
+
+        <!-- LOCKED -->
+        <section id="screen-locked" class="screen">
+            <div class="locked-emoji">🌤️🍩</div>
+            <h2 class="title" style="font-size:26px;">Skies are clear</h2>
+            <p class="tagline">You've already checked today's forecast. Your reward is saved in <strong>Rewards</strong> &mdash; new front rolls in tomorrow.</p>
+            <button class="btn btn-primary" id="seeRewardBtn" style="background:transparent; color:var(--kk-cream); border:2px solid rgba(255,255,255,0.5); box-shadow:none; font-size:14px;">See today's reward</button>
+            <button class="restart" id="resetBtn" style="color:var(--kk-cream); opacity:0.6;">Reset (demo)</button>
+        </section>
+    </div>
+
+    <script>
+        "use strict";
+
+        const STORAGE_KEY = "glazeForecast.reward.v1";
+
+        const REWARDS = [
+            {
+                weight: 32,
+                emoji: "🍩",
+                reward: "FREE Original Glazed",
+                detail: "One free Original Glazed doughnut. Sunny with a chance of sugar.",
+                prefix: "OG"
+            },
+            {
+                weight: 28,
+                emoji: "🌌",
+                reward: "FREE Cosmic Brûlée",
+                detail: "Try the NEW Cosmic Brûlée Doughnut free with any dozen.",
+                prefix: "CB"
+            },
+            {
+                weight: 18,
+                emoji: "📦",
+                reward: "Dozen BOGO",
+                detail: "Buy any dozen, get a second Original Glazed dozen free.",
+                prefix: "DZ"
+            },
+            {
+                weight: 15,
+                emoji: "☕",
+                reward: "FREE Brewed Coffee",
+                detail: "Any size brewed coffee, on the house. Warm front incoming.",
+                prefix: "CF"
+            },
+            {
+                weight: 7,
+                emoji: "🌈",
+                reward: "FREE Original Dozen",
+                detail: "A full free dozen Original Glazed. Forecast: total glaze-out.",
+                prefix: "JKP"
+            }
+        ];
+
+        function $( id ) {
+            return document.getElementById( id );
+        }
+
+        function showScreen( id ) {
+            document.querySelectorAll( ".screen" ).forEach( function( s ) {
+                s.classList.remove( "active" );
+            } );
+            $( id ).classList.add( "active" );
+        }
+
+        function pickReward() {
+            const total = REWARDS.reduce( function( sum, r ) { return sum + r.weight; }, 0 );
+            let roll = Math.random() * total;
+            for ( let i = 0; i < REWARDS.length; i++ ) {
+                roll -= REWARDS[ i ].weight;
+                if ( roll <= 0 ) {
+                    return REWARDS[ i ];
+                }
+            }
+            return REWARDS[ 0 ];
+        }
+
+        function makeCode( prefix ) {
+            const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+            let s = "";
+            for ( let i = 0; i < 4; i++ ) {
+                s += chars.charAt( Math.floor( Math.random() * chars.length ) );
+            }
+            return prefix + "-" + s;
+        }
+
+        function todayLabel() {
+            return new Date().toLocaleDateString( undefined, { weekday: "long", month: "short", day: "numeric" } );
+        }
+
+        function tomorrowLabel() {
+            const d = new Date();
+            d.setDate( d.getDate() + 1 );
+            return d.toLocaleDateString( undefined, { month: "short", day: "numeric" } );
+        }
+
+        function loadReward() {
+            try {
+                const raw = localStorage.getItem( STORAGE_KEY );
+                if ( !raw ) {
+                    return null;
+                }
+                const data = JSON.parse( raw );
+                if ( data.day !== new Date().toDateString() ) {
+                    return null;
+                }
+                return data;
+            } catch ( e ) {
+                return null;
+            }
+        }
+
+        function saveReward( data ) {
+            try {
+                localStorage.setItem( STORAGE_KEY, JSON.stringify( data ) );
+            } catch ( e ) {}
+        }
+
+        function clearReward() {
+            try {
+                localStorage.removeItem( STORAGE_KEY );
+            } catch ( e ) {}
+        }
+
+        function burstConfetti() {
+            const colors = [ "#f6c453", "#d12027", "#00853e", "#ffffff", "#a9d6f5" ];
+            const app = $( "app" );
+            for ( let i = 0; i < 55; i++ ) {
+                const c = document.createElement( "div" );
+                c.className = "confetti";
+                c.style.left = Math.random() * 100 + "%";
+                c.style.background = colors[ Math.floor( Math.random() * colors.length ) ];
+                const dur = 1.6 + Math.random() * 1.6;
+                c.style.animation = "fall " + dur + "s linear forwards";
+                c.style.animationDelay = Math.random() * 0.4 + "s";
+                app.appendChild( c );
+                window.setTimeout( function() { c.remove(); }, ( dur + 0.5 ) * 1000 );
+            }
+        }
+
+        /* ---------- scratch canvas ---------- */
+        let current = null;
+        let revealed = false;
+        let scratching = false;
+
+        function paintCover( ctx, w, h ) {
+            /* stormy glaze cloud cover */
+            const grad = ctx.createLinearGradient( 0, 0, w, h );
+            grad.addColorStop( 0, "#dfe7ec" );
+            grad.addColorStop( 0.5, "#c2cdd6" );
+            grad.addColorStop( 1, "#9fb0bd" );
+            ctx.fillStyle = grad;
+            ctx.fillRect( 0, 0, w, h );
+
+            /* puffy cloud blobs for texture */
+            ctx.fillStyle = "rgba(255,255,255,0.45)";
+            for ( let i = 0; i < 14; i++ ) {
+                const x = Math.random() * w;
+                const y = Math.random() * h;
+                const r = 18 + Math.random() * 30;
+                ctx.beginPath();
+                ctx.arc( x, y, r, 0, Math.PI * 2 );
+                ctx.fill();
+            }
+
+            ctx.fillStyle = "rgba(40,60,75,0.55)";
+            ctx.font = "900 16px 'Trebuchet MS', sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText( "⛈  STORM CLOUDS  ⛈", w / 2, h / 2 );
+        }
+
+        function setupScratch() {
+            const canvas = $( "scratchCanvas" );
+            const area = canvas.parentElement;
+            const w = area.clientWidth;
+            const h = area.clientHeight;
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext( "2d" );
+            paintCover( ctx, w, h );
+            revealed = false;
+            scratching = false;
+
+            function pos( e ) {
+                const rect = canvas.getBoundingClientRect();
+                const p = e.touches ? e.touches[ 0 ] : e;
+                return { x: p.clientX - rect.left, y: p.clientY - rect.top };
+            }
+
+            function scratch( e ) {
+                if ( revealed ) {
+                    return;
+                }
+                e.preventDefault();
+                const { x, y } = pos( e );
+                ctx.globalCompositeOperation = "destination-out";
+                ctx.beginPath();
+                ctx.arc( x, y, 26, 0, Math.PI * 2 );
+                ctx.fill();
+                checkProgress( ctx, w, h );
+            }
+
+            function start( e ) { scratching = true; scratch( e ); }
+            function move( e ) { if ( scratching ) { scratch( e ); } }
+            function end() { scratching = false; }
+
+            canvas.addEventListener( "mousedown", start );
+            canvas.addEventListener( "mousemove", move );
+            window.addEventListener( "mouseup", end );
+            canvas.addEventListener( "touchstart", start, { passive: false } );
+            canvas.addEventListener( "touchmove", move, { passive: false } );
+            canvas.addEventListener( "touchend", end );
+        }
+
+        function checkProgress( ctx, w, h ) {
+            /* sample a grid to estimate cleared area */
+            const step = 14;
+            let clear = 0;
+            let total = 0;
+            const img = ctx.getImageData( 0, 0, w, h ).data;
+            for ( let y = 0; y < h; y += step ) {
+                for ( let x = 0; x < w; x += step ) {
+                    const idx = ( y * w + x ) * 4 + 3;
+                    total++;
+                    if ( img[ idx ] < 50 ) {
+                        clear++;
+                    }
+                }
+            }
+            if ( clear / total > 0.52 ) {
+                finishReveal( ctx, w, h );
+            }
+        }
+
+        function finishReveal( ctx, w, h ) {
+            if ( revealed ) {
+                return;
+            }
+            revealed = true;
+            /* clear remaining cover */
+            ctx.clearRect( 0, 0, w, h );
+            $( "scratchCanvas" ).style.display = "none";
+            $( "scratchHint" ).style.display = "none";
+
+            const reward = current;
+            const data = {
+                day: new Date().toDateString(),
+                emoji: reward.emoji,
+                reward: reward.reward,
+                detail: reward.detail,
+                code: makeCode( reward.prefix ),
+                expires: tomorrowLabel()
+            };
+            saveReward( data );
+
+            $( "wEmoji" ).textContent = data.emoji;
+            $( "wReward" ).innerHTML = data.reward;
+            $( "wDetail" ).textContent = data.detail;
+            $( "wCode" ).textContent = data.code;
+            $( "wExpires" ).textContent = "Expires " + data.expires;
+            $( "codeCard" ).classList.add( "show" );
+            burstConfetti();
+        }
+
+        function startForecast() {
+            current = pickReward();
+            $( "pEmoji" ).textContent = current.emoji;
+            $( "pReward" ).innerHTML = current.reward;
+            $( "pDetail" ).textContent = current.detail;
+            $( "fDate" ).textContent = todayLabel();
+            $( "scratchCanvas" ).style.display = "block";
+            $( "scratchHint" ).style.display = "block";
+            $( "codeCard" ).classList.remove( "show" );
+            showScreen( "screen-forecast" );
+            /* canvas needs layout to measure size */
+            window.requestAnimationFrame( setupScratch );
+        }
+
+        function showSavedReward( data ) {
+            $( "pEmoji" ).textContent = data.emoji;
+            $( "pReward" ).innerHTML = data.reward;
+            $( "pDetail" ).textContent = data.detail;
+            $( "fDate" ).textContent = todayLabel();
+            $( "scratchCanvas" ).style.display = "none";
+            $( "scratchHint" ).style.display = "none";
+            $( "wEmoji" ).textContent = data.emoji;
+            $( "wReward" ).innerHTML = data.reward;
+            $( "wDetail" ).textContent = data.detail;
+            $( "wCode" ).textContent = data.code;
+            $( "wExpires" ).textContent = "Expires " + data.expires;
+            $( "codeCard" ).classList.add( "show" );
+            showScreen( "screen-forecast" );
+        }
+
+        function init() {
+            $( "startBtn" ).addEventListener( "click", function() {
+                if ( loadReward() ) {
+                    showScreen( "screen-locked" );
+                } else {
+                    startForecast();
+                }
+            } );
+
+            $( "claimBtn" ).addEventListener( "click", function() {
+                showScreen( "screen-locked" );
+            } );
+
+            $( "playAgainBtn" ).addEventListener( "click", function() {
+                clearReward();
+                startForecast();
+            } );
+
+            $( "seeRewardBtn" ).addEventListener( "click", function() {
+                const data = loadReward();
+                if ( data ) {
+                    showSavedReward( data );
+                }
+            } );
+
+            $( "resetBtn" ).addEventListener( "click", function() {
+                clearReward();
+                showScreen( "screen-intro" );
+            } );
+        }
+
+        document.addEventListener( "DOMContentLoaded", init );
+    </script>
+</body>
+</html>

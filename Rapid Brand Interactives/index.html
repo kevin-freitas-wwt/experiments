@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rapid Brand Interactives · Meme Tie-In Concepts</title>
+    <style>
+        :root {
+            --bg: #0e1116;
+            --bg-2: #161b22;
+            --panel: #1c2230;
+            --line: #2b3242;
+            --text: #e7ecf3;
+            --muted: #95a0b3;
+            --accent: #f4b400;
+            --bezel: #0a0c10;
+            --bezel-edge: #2a2f3a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+            background:
+                radial-gradient( circle at 15% 0%, #1b2230 0%, transparent 45% ),
+                radial-gradient( circle at 90% 10%, #1a2433 0%, transparent 40% ),
+                var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 40px 20px 80px;
+        }
+
+        header {
+            text-align: center;
+            max-width: 760px;
+            margin: 0 auto 14px;
+        }
+
+        .kicker {
+            display: inline-block;
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            border-radius: 20px;
+            padding: 5px 14px;
+            margin-bottom: 16px;
+        }
+
+        h1 {
+            font-size: 34px;
+            line-height: 1.1;
+            font-weight: 900;
+            margin-bottom: 12px;
+        }
+
+        header p {
+            color: var(--muted);
+            font-size: 15px;
+            line-height: 1.55;
+            max-width: 620px;
+            margin: 0 auto;
+        }
+
+        .gallery {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 36px;
+            margin-top: 48px;
+        }
+
+        .device-col {
+            width: 330px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .caption {
+            text-align: center;
+            margin-bottom: 18px;
+            min-height: 96px;
+        }
+
+        .caption .brand {
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--accent);
+        }
+
+        .caption .game-name {
+            font-size: 20px;
+            font-weight: 900;
+            margin: 4px 0 6px;
+        }
+
+        .caption .meta {
+            font-size: 12.5px;
+            color: var(--muted);
+            line-height: 1.45;
+        }
+
+        .caption .tag {
+            display: inline-block;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            padding: 2px 8px;
+            margin-top: 8px;
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        /* ---- Phone frame ---- */
+        .phone {
+            position: relative;
+            width: 330px;
+            height: 682px;
+            background: var(--bezel);
+            border-radius: 46px;
+            padding: 12px;
+            box-shadow:
+                0 0 0 2px var(--bezel-edge),
+                0 30px 60px rgba(0, 0, 0, 0.55),
+                inset 0 0 4px rgba(255, 255, 255, 0.08);
+        }
+
+        .phone::before {
+            /* notch */
+            content: "";
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 26px;
+            background: var(--bezel);
+            border-radius: 0 0 16px 16px;
+            z-index: 5;
+        }
+
+        .phone::after {
+            /* side button */
+            content: "";
+            position: absolute;
+            right: -3px;
+            top: 150px;
+            width: 3px;
+            height: 60px;
+            background: var(--bezel-edge);
+            border-radius: 2px;
+        }
+
+        .screen-glass {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            border-radius: 34px;
+            overflow: hidden;
+            background: #000;
+        }
+
+        .screen-glass iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            display: block;
+        }
+
+        .reload {
+            position: absolute;
+            bottom: 14px;
+            right: 14px;
+            z-index: 8;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(0, 0, 0, 0.45);
+            color: #fff;
+            font-size: 18px;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            transition: transform 0.2s ease, background 0.2s ease;
+        }
+
+        .reload:hover {
+            background: rgba(0, 0, 0, 0.7);
+            transform: rotate(90deg);
+        }
+
+        /* ---- Placeholder ---- */
+        .placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            text-align: center;
+            padding: 30px;
+            background:
+                repeating-linear-gradient( 45deg, #14181f 0 14px, #171c24 14px 28px );
+            color: var(--muted);
+        }
+
+        .placeholder .ph-emoji {
+            font-size: 44px;
+            opacity: 0.55;
+        }
+
+        .placeholder .ph-title {
+            font-size: 17px;
+            font-weight: 900;
+            color: var(--text);
+        }
+
+        .placeholder .ph-sub {
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .placeholder .ph-pill {
+            margin-top: 6px;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--accent);
+            border: 1px dashed var(--accent);
+            border-radius: 20px;
+            padding: 5px 12px;
+        }
+
+        footer {
+            text-align: center;
+            color: var(--muted);
+            font-size: 12px;
+            margin-top: 64px;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 640px) {
+            h1 { font-size: 26px; }
+            .gallery { gap: 44px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <span class="kicker">Rapid Brand Interactives</span>
+        <h1>Meme Tie-In Loyalty Concepts</h1>
+        <p>Lightweight, front-end-only mini-games that let a QSR jump on a trending meme through their loyalty program &mdash; each one rewards a small discount or credit and seeds trial of a new product. Tap into any phone to play.</p>
+    </header>
+
+    <main class="gallery">
+        <!-- SLOT 1 — Nugget Council (live) -->
+        <div class="device-col">
+            <div class="caption">
+                <div class="brand">Panda Express</div>
+                <div class="game-name">The Nugget Council</div>
+                <div class="meta">Meme: <em>"Nugget Council"</em> tribunal · Mechanic: pick-a-juror reveal</div>
+                <span class="tag">New product: Orange Chicken Nuggets</span>
+            </div>
+            <div class="phone">
+                <div class="screen-glass">
+                    <iframe src="nugget-council/index.html" title="The Nugget Council" loading="lazy"></iframe>
+                    <button class="reload" data-target="nugget-council/index.html" title="Reload">↻</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLOT 2 — Donut Hole Cam (live) -->
+        <div class="device-col">
+            <div class="caption">
+                <div class="brand">Krispy Kreme</div>
+                <div class="game-name">Donut Hole Cam</div>
+                <div class="meta">Meme: <em>hand-circle "in the hole" photobomb</em> · Mechanic: live camera selfie booth</div>
+                <span class="tag">Seasonal: Strawberry Lemonade doughnut</span>
+            </div>
+            <div class="phone">
+                <div class="screen-glass">
+                    <iframe src="donut-hole/index.html" title="Donut Hole Cam" loading="lazy" allow="camera"></iframe>
+                    <button class="reload" data-target="donut-hole/index.html" title="Reload">↻</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLOT 3 — Sub Balance Challenge (live) -->
+        <div class="device-col">
+            <div class="caption">
+                <div class="brand">Jersey Mike's</div>
+                <div class="game-name">Sub Balance Challenge</div>
+                <div class="meta">Meme: <em>balancing an item on a fingertip &rarr; epic drop</em> · Mechanic: drag-to-balance physics</div>
+                <span class="tag">LTO: Bacon Ranch Chicken Cheese Steak</span>
+            </div>
+            <div class="phone">
+                <div class="screen-glass">
+                    <iframe src="sub-balance/index.html" title="Sub Balance Challenge" loading="lazy"></iframe>
+                    <button class="reload" data-target="sub-balance/index.html" title="Reload">↻</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        Concept prototypes · front-end only (HTML/CSS/JS) · rewards &amp; codes are generated client-side for demo purposes.<br>
+        Each phone is an independent, embeddable interactive.
+    </footer>
+
+    <script>
+        "use strict";
+
+        /* Reload a single embedded game (handy for re-testing the once-per-day games). */
+        document.querySelectorAll( ".reload" ).forEach( function( btn ) {
+            btn.addEventListener( "click", function() {
+                const frame = btn.parentElement.querySelector( "iframe" );
+                if ( frame ) {
+                    frame.src = btn.getAttribute( "data-target" );
+                }
+            } );
+        } );
+    </script>
+</body>
+</html>

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WaterTemp — Track Water Temperatures Worldwide</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <header class="app-header">
+        <button class="btn-hamburger" id="btn-hamburger" aria-label="Toggle filters">
+            <span></span><span></span><span></span>
+        </button>
+        <div class="header-brand">
+            <svg class="brand-icon" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M16 2C12 9 4 14 4 22a12 12 0 0 0 24 0C28 14 20 9 16 2z" fill="#8CC4D8" opacity="0.7"/>
+                <path d="M16 2C12 9 4 14 4 22a12 12 0 0 0 24 0C28 14 20 9 16 2z" stroke="#4A9AB8" stroke-width="1.5" fill="none"/>
+                <rect x="14.5" y="9" width="3" height="14" rx="1.5" fill="white" opacity="0.9"/>
+                <rect x="14.5" y="18" width="3" height="6" rx="0" fill="#D46030" opacity="0.95"/>
+                <circle cx="16" cy="25" r="3.5" fill="#D46030" opacity="0.95"/>
+                <circle cx="16" cy="25" r="2" fill="white" opacity="0.4"/>
+                <line x1="17.5" y1="12" x2="19.5" y2="12" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.8"/>
+                <line x1="17.5" y1="15" x2="19.5" y2="15" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.8"/>
+            </svg>
+            <span class="brand-name">WaterTemp</span>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-unit" id="btn-unit-toggle" title="Toggle between Celsius and Fahrenheit">°C / °F</button>
+            <button class="btn btn-primary" id="btn-open-submit">Log a Reading</button>
+        </div>
+    </header>
+
+    <div class="app-body">
+
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-inner">
+
+                <div class="search-group">
+                    <div class="search-input-wrap">
+                        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                        </svg>
+                        <input type="search" id="input-search" class="search-input" placeholder="Search locations…" aria-label="Search locations" autocomplete="off">
+                        <button class="btn-clear-search" id="btn-clear-search" aria-label="Clear search" hidden>&#10005;</button>
+                    </div>
+                    <div class="search-suggestions" id="search-suggestions" hidden></div>
+                    <button class="btn btn-gps" id="btn-gps" title="Find readings near your current location">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <circle cx="12" cy="12" r="3" fill="currentColor"/>
+                            <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+                            <circle cx="12" cy="12" r="9"/>
+                        </svg>
+                        Near Me
+                    </button>
+                </div>
+
+                <div class="filter-section">
+                    <h3 class="filter-heading">Water Type</h3>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label"><input type="checkbox" name="type" value="lake" checked> Lake</label>
+                        <label class="checkbox-label"><input type="checkbox" name="type" value="river" checked> River</label>
+                        <label class="checkbox-label"><input type="checkbox" name="type" value="ocean" checked> Ocean / Sea</label>
+                        <label class="checkbox-label"><input type="checkbox" name="type" value="pond" checked> Pond</label>
+                        <label class="checkbox-label"><input type="checkbox" name="type" value="stream" checked> Stream</label>
+                    </div>
+                </div>
+
+                <div class="filter-section">
+                    <h3 class="filter-heading">Source</h3>
+                    <div class="radio-group">
+                        <label class="radio-label"><input type="radio" name="source" value="all" checked> All sources</label>
+                        <label class="radio-label"><input type="radio" name="source" value="citizen"> Citizen scientist</label>
+                        <label class="radio-label"><input type="radio" name="source" value="public"> Public data</label>
+                    </div>
+                </div>
+
+                <div class="filter-section">
+                    <h3 class="filter-heading">Date Range</h3>
+                    <div class="date-range">
+                        <div class="date-field">
+                            <label for="filter-date-from">From</label>
+                            <input type="date" id="filter-date-from">
+                        </div>
+                        <div class="date-field">
+                            <label for="filter-date-to">To</label>
+                            <input type="date" id="filter-date-to">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="filter-section">
+                    <h3 class="filter-heading">Temperature Range <span class="filter-unit-label" id="filter-unit-label">(°C)</span></h3>
+                    <div class="temp-range-inputs">
+                        <input type="number" id="filter-temp-min" min="-10" max="50" value="-10" step="1" aria-label="Minimum temperature">
+                        <span class="range-sep">—</span>
+                        <input type="number" id="filter-temp-max" min="-10" max="50" value="50" step="1" aria-label="Maximum temperature">
+                    </div>
+                </div>
+
+                <div class="filter-actions">
+                    <button class="btn btn-ghost btn-sm" id="btn-reset-filters">Reset Filters</button>
+                </div>
+
+                <div class="sidebar-footer">
+                    <div class="reading-count">
+                        Showing <strong id="reading-count">0</strong> readings
+                    </div>
+                    <div class="data-sources">
+                        <span class="data-sources-label">Public data:</span>
+                        USGS · NOAA · EEA · Copernicus Marine · BOM
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+
+        <main class="map-container">
+            <div id="map"></div>
+            <div class="map-legend" id="map-legend">
+                <div class="legend-title">Temperature</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#1664A8"></span> <span class="legend-label" data-below="5">&lt;5°C</span></div>
+                <div class="legend-item"><span class="legend-dot" style="background:#2590C8"></span> <span class="legend-label" data-range="5,10">5–10°C</span></div>
+                <div class="legend-item"><span class="legend-dot" style="background:#25A89A"></span> <span class="legend-label" data-range="10,15">10–15°C</span></div>
+                <div class="legend-item"><span class="legend-dot" style="background:#5EA842"></span> <span class="legend-label" data-range="15,20">15–20°C</span></div>
+                <div class="legend-item"><span class="legend-dot" style="background:#D4A020"></span> <span class="legend-label" data-range="20,25">20–25°C</span></div>
+                <div class="legend-item"><span class="legend-dot" style="background:#D46030"></span> <span class="legend-label" data-above="25">&gt;25°C</span></div>
+            </div>
+        </main>
+
+    </div>
+
+    <!-- Sidebar overlay for mobile -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <!-- Submit Modal -->
+    <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden>
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modal-title">Log a Water Temperature</h2>
+                <button class="modal-close" id="btn-modal-close" aria-label="Close form">&#10005;</button>
+            </div>
+            <div class="modal-body">
+
+                <form id="form-submit" novalidate>
+
+                    <!-- 1. Photo — fills date & location from EXIF when provided -->
+                    <div class="form-group">
+                        <label for="f-photo">Photo</label>
+                        <p class="field-hint">Optional — date &amp; location will be read from the photo if available.</p>
+                        <div class="photo-upload-area" id="photo-upload-area">
+                            <input type="file" id="f-photo" name="photo"
+                                accept="image/*" class="photo-file-input" aria-label="Upload photo">
+                            <div class="photo-placeholder" id="photo-placeholder">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                    <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>
+                                    <circle cx="12" cy="13" r="3"/>
+                                </svg>
+                                <span>Click or drag a photo here</span>
+                            </div>
+                            <div class="photo-preview-wrap" id="photo-preview-wrap" hidden>
+                                <img id="photo-preview" class="photo-preview" alt="Preview">
+                                <button type="button" class="photo-remove" id="btn-photo-remove" aria-label="Remove photo">&#10005;</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Location — click map to set; EXIF fills this automatically -->
+                    <div class="form-group">
+                        <label>Location <span class="req" aria-hidden="true">*</span></label>
+                        <p class="location-hint" id="location-hint">Click the map to set your location.</p>
+                        <p class="location-coords-display" id="location-coords-display" hidden></p>
+                        <input type="hidden" id="f-lat" name="lat">
+                        <input type="hidden" id="f-lng" name="lng">
+                        <div id="form-map" class="form-map" role="application" aria-label="Location picker map"></div>
+                        <span class="field-error" id="err-location" role="alert"></span>
+                    </div>
+
+                    <!-- 3. Water type -->
+                    <div class="form-group">
+                        <label>Water type <span class="req" aria-hidden="true">*</span></label>
+                        <div class="type-pills" role="group" aria-label="Water type">
+                            <button type="button" class="type-pill" data-value="lake">Lake</button>
+                            <button type="button" class="type-pill" data-value="river">River</button>
+                            <button type="button" class="type-pill" data-value="ocean">Ocean / Sea</button>
+                            <button type="button" class="type-pill" data-value="pond">Pond</button>
+                            <button type="button" class="type-pill" data-value="stream">Stream</button>
+                            <button type="button" class="type-pill" data-value="other">Other</button>
+                        </div>
+                        <input type="hidden" id="f-water-type" name="type">
+                        <span class="field-error" id="err-water-type" role="alert"></span>
+                    </div>
+
+                    <!-- 4. Temperature + date -->
+                    <div class="form-row">
+                        <div class="form-group form-group-sm">
+                            <label for="f-temp">Temperature <span class="req" aria-hidden="true">*</span></label>
+                            <div class="temp-input-wrap">
+                                <input type="number" id="f-temp" name="temp"
+                                    placeholder="0.0" step="0.1" required>
+                                <div class="unit-toggle-inline">
+                                    <label class="unit-opt"><input type="radio" name="tempUnit" value="C" checked> °C</label>
+                                    <label class="unit-opt"><input type="radio" name="tempUnit" value="F"> °F</label>
+                                </div>
+                            </div>
+                            <span class="field-error" id="err-temp" role="alert"></span>
+                        </div>
+                        <div class="form-group form-group-grow">
+                            <label for="f-date">Date &amp; Time <span class="req" aria-hidden="true">*</span></label>
+                            <input type="datetime-local" id="f-date" name="date" required>
+                            <span class="field-error" id="err-date" role="alert"></span>
+                        </div>
+                    </div>
+
+                    <!-- 5. Email -->
+                    <div class="form-group">
+                        <label for="f-email">Your email <span class="req" aria-hidden="true">*</span></label>
+                        <input type="email" id="f-email" name="email"
+                            placeholder="you@example.com" required autocomplete="email">
+                        <span class="field-hint">Used for verification and attribution only — displayed as j***@domain.com</span>
+                        <span class="field-error" id="err-email" role="alert"></span>
+                    </div>
+
+                    <!-- 6. Notes -->
+                    <div class="form-group">
+                        <label for="f-notes">Notes (optional)</label>
+                        <textarea id="f-notes" name="notes" rows="2"
+                            placeholder="Where exactly did you measure? Any observations?"></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-ghost" id="btn-cancel-submit">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="btn-submit-form">Submit Reading</button>
+                    </div>
+
+                </form>
+
+                <div class="submit-success" id="submit-success" hidden>
+                    <svg class="success-icon" viewBox="0 0 60 60" fill="none" aria-hidden="true">
+                        <circle cx="30" cy="30" r="28" stroke="#4A7A3A" stroke-width="3" fill="#C4DEB8" opacity="0.4"/>
+                        <polyline points="18 30 27 39 42 22" stroke="#2D4A2D" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <h3>Reading submitted!</h3>
+                    <p>Thank you for contributing to WaterTemp. Your reading is now visible on the map.</p>
+                    <button class="btn btn-primary" id="btn-submit-another">Log Another</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile floating action button -->
+    <button class="fab" id="fab-submit" aria-label="Log a water temperature reading">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+    </button>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="https://unpkg.com/exifr@7.1.3/dist/lite.umd.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/submit.js"></script>
+    <script src="js/app.js"></script>
+
+</body>
+</html>

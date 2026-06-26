@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#fbf4e9">
+    <title>Donut Hole Cam · Krispy Kreme</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&family=Lobster&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --kk-green: #1c7a3f;
+            --kk-green-dark: #135a2d;
+            --kk-red: #cf202e;
+            --kk-red-dark: #a5151f;
+            --cream: #fbf4e9;
+            --cream-deep: #f3e7d3;
+            --ink: #34291c;
+            --yellow: #f6c453;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body { height: 100%; }
+
+        body {
+            font-family: "Jost", "Century Gothic", "Trebuchet MS", system-ui, sans-serif;
+            background: var(--cream);
+            color: var(--ink);
+            display: flex;
+            justify-content: center;
+            min-height: 100%;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #app {
+            width: 100%;
+            max-width: 440px;
+            min-height: 100vh;
+            min-height: 100dvh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            padding: env(safe-area-inset-top) 18px env(safe-area-inset-bottom);
+            overflow: hidden;
+            background: var(--cream);
+        }
+
+        /* retro polka-dot wash */
+        #app::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient( circle, rgba(28, 122, 63, 0.10) 0 5px, transparent 6px );
+            background-size: 30px 30px;
+            background-position: 0 0;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Futura-Bold-style display face (Jost) — matches KK's "Doughnuts" + display type */
+        .headline-font {
+            font-family: "Jost", "Century Gothic", "Trebuchet MS", sans-serif;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        /* KK script wordmark ≈ Lobster */
+        .script-font {
+            font-family: "Lobster", "Brush Script MT", "Segoe Script", cursive;
+        }
+
+        .ic {
+            width: 1em;
+            height: 1em;
+            fill: currentColor;
+            display: inline-block;
+            vertical-align: -0.14em;
+        }
+
+        /* ---- brand bar ---- */
+        .brandbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 2px 8px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .kk-logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .kk-logo .bowtie { width: 30px; height: 16px; color: var(--kk-green); }
+
+        .kk-logo .words { line-height: 0.85; }
+
+        .kk-logo .words .name {
+            display: block;
+            font-size: 25px;
+            line-height: 1;
+            color: var(--kk-red);
+        }
+
+        .kk-logo .words .sub {
+            display: block;
+            font-size: 8.5px;
+            letter-spacing: 3px;
+            font-weight: 900;
+            color: var(--kk-green);
+            text-transform: uppercase;
+        }
+
+        /* Official Krispy Kreme logo (donut-hole/logo.png) */
+        .brand-logo { height: 60px; width: auto; display: block; }
+
+        /* Smiles chip: fully-rounded solid green pill with a smiley (KK's loyalty currency) */
+        .rewards-pts {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: var(--kk-green);
+            border: none;
+            color: #fff;
+            font-size: 12px;
+            padding: 5px 12px 5px 9px;
+            border-radius: 30px;
+            font-weight: 700;
+        }
+
+        .rewards-pts .ic { font-size: 14px; }
+
+        /* ---- screens ---- */
+        .screen {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            min-height: 0;
+            position: relative;
+            z-index: 1;
+            animation: fadeIn 0.35s ease;
+        }
+
+        .screen.active { display: flex; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ---- intro ---- */
+        #screen-intro {
+            justify-content: center;
+            text-align: center;
+            gap: 14px;
+            padding-bottom: 28px;
+        }
+
+        .hero-donut {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto;
+            position: relative;
+            animation: spinIn 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes spinIn {
+            from { transform: scale(0.5) rotate(-40deg); opacity: 0; }
+            to { transform: scale(1) rotate(0); opacity: 1; }
+        }
+
+        .hero-donut .cam-badge {
+            position: absolute;
+            right: -6px;
+            bottom: -2px;
+            width: 46px;
+            height: 46px;
+            background: var(--kk-red);
+            color: #fff;
+            border: 4px solid var(--cream);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+
+        .new-flag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--yellow);
+            color: var(--ink);
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+            padding: 6px 13px;
+            border-radius: 30px;
+            text-transform: uppercase;
+            box-shadow: 0 3px 0 #d6a531;
+        }
+
+        .title {
+            font-size: 38px;
+            line-height: 0.95;
+            color: var(--kk-red);
+        }
+
+        .title .small {
+            display: block;
+            color: var(--kk-green);
+            font-size: 16px;
+            letter-spacing: 2px;
+            margin-bottom: 4px;
+            font-family: "Trebuchet MS", sans-serif;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .tagline {
+            font-size: 14.5px;
+            color: #5e5040;
+            max-width: 300px;
+            margin: 0 auto;
+            line-height: 1.5;
+        }
+
+        .tagline strong { color: var(--kk-red); }
+
+        .btn {
+            border: none;
+            border-radius: 30px;
+            font-family: "Trebuchet MS", sans-serif;
+            font-weight: 900;
+            font-size: 16px;
+            padding: 14px 24px;
+            cursor: pointer;
+            transition: transform 0.12s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:active { transform: scale(0.96); }
+
+        /* KK app-style CTA: fully rounded pill, flat fill, soft drop shadow */
+        .btn-primary {
+            background: var(--kk-green);
+            color: #fff;
+            box-shadow: 0 5px 14px rgba(19, 90, 45, 0.32);
+            margin: 4px auto 0;
+            min-width: 240px;
+        }
+
+        .btn-primary.red { background: var(--kk-red); box-shadow: 0 5px 14px rgba(165, 21, 31, 0.32); }
+
+        .btn-line {
+            background: #fff;
+            color: var(--kk-green);
+            border: 2px solid var(--kk-green);
+            font-size: 14px;
+            padding: 11px 20px;
+        }
+
+        .fine { font-size: 11px; color: #9b8d78; margin-top: 2px; }
+
+        /* ---- choose ---- */
+        #screen-choose { gap: 8px; padding-bottom: 14px; }
+
+        .step-head {
+            text-align: center;
+            font-size: 22px;
+            color: var(--kk-red);
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .step-head .num {
+            background: var(--kk-green);
+            color: #fff;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            font-family: "Trebuchet MS", sans-serif;
+        }
+
+        .step-sub { text-align: center; font-size: 13px; color: #7c6e58; margin-bottom: 6px; }
+
+        .donut-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: auto 0;
+        }
+
+        .donut-card {
+            background: #fff;
+            border: 2px solid var(--cream-deep);
+            border-radius: 18px;
+            padding: 12px 8px 10px;
+            text-align: center;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.12s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 3px 0 var(--cream-deep);
+        }
+
+        .donut-card:active { transform: scale(0.97); }
+
+        .donut-card.selected {
+            border-color: var(--kk-green);
+            box-shadow: 0 3px 0 var(--kk-green);
+        }
+
+        .donut-card .thumb { width: 84px; height: 84px; margin: 0 auto 6px; }
+        .donut-card .thumb svg { width: 100%; height: 100%; display: block; }
+
+        .donut-card .d-name {
+            font-size: 12.5px;
+            font-weight: bold;
+            color: var(--ink);
+            line-height: 1.2;
+            min-height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .donut-card .d-name .ic { color: var(--yellow); font-size: 14px; }
+
+        .donut-card .d-tag {
+            position: absolute;
+            top: -8px;
+            right: -6px;
+            background: var(--kk-red);
+            color: #fff;
+            font-size: 9px;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+            padding: 3px 8px;
+            border-radius: 10px;
+            transform: rotate(6deg);
+            text-transform: uppercase;
+        }
+
+        #toCameraBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* ---- camera ---- */
+        #screen-camera { gap: 8px; }
+
+        .cam-stage {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            border-radius: 22px;
+            overflow: hidden;
+            background: #11151a;
+            margin-top: 4px;
+            border: 4px solid #fff;
+            box-shadow: 0 6px 0 var(--cream-deep);
+        }
+
+        #video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+            background: #11151a;
+        }
+
+        .donut-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .donut-overlay svg {
+            width: 168%;
+            max-width: none;
+            flex: 0 0 auto;
+            filter: drop-shadow( 0 10px 18px rgba(0, 0, 0, 0.5) );
+        }
+
+        .cam-tip {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.5);
+            color: #fff;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 6px 14px;
+            border-radius: 20px;
+            white-space: nowrap;
+            backdrop-filter: blur(4px);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .cam-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            padding: 6px 0 4px;
+            flex: 0 0 auto;
+        }
+
+        .shutter {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            border: 5px solid #fff;
+            background: var(--kk-red);
+            color: #fff;
+            cursor: pointer;
+            box-shadow: 0 0 0 4px var(--cream-deep);
+            transition: transform 0.12s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+        }
+
+        .shutter:active { transform: scale(0.92); }
+
+        .cam-mini {
+            background: #fff;
+            border: 2px solid var(--cream-deep);
+            color: var(--kk-green);
+            font-size: 12px;
+            font-weight: 900;
+            padding: 9px 13px;
+            border-radius: 20px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .cam-fallback {
+            position: absolute;
+            inset: 0;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            text-align: center;
+            padding: 26px;
+            background: #11151a;
+            color: var(--cream);
+        }
+
+        .cam-fallback.show { display: flex; }
+        .cam-fallback .fb-emoji { font-size: 40px; color: var(--yellow); }
+        .cam-fallback .fb-text { font-size: 13.5px; opacity: 0.85; line-height: 1.5; max-width: 260px; }
+        .cam-fallback label {
+            background: var(--yellow);
+            color: var(--ink);
+            font-weight: 900;
+            padding: 12px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+        }
+        .cam-fallback input { display: none; }
+
+        /* ---- result ---- */
+        #screen-result { gap: 10px; padding-bottom: 12px; }
+
+        .photo-frame {
+            position: relative;
+            margin: 6px auto 0;
+            border-radius: 18px;
+            overflow: hidden;
+            background: #000;
+            box-shadow: 0 6px 0 var(--cream-deep);
+            border: 4px solid #fff;
+            line-height: 0;
+        }
+
+        .photo-frame img { width: 100%; display: block; }
+
+        .result-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .result-actions .btn { min-width: 0; margin: 0; }
+
+        /* ---- reward card ---- */
+        .reward-card {
+            background: #fff;
+            border: 2px dashed var(--kk-green);
+            border-radius: 18px;
+            padding: 16px;
+            text-align: center;
+            box-shadow: 0 6px 0 var(--cream-deep);
+            display: none;
+            animation: pop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .reward-card.show { display: block; }
+
+        @keyframes pop {
+            from { transform: scale(0.85); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .reward-ic-svg { width: 40px; height: 40px; color: var(--kk-green); }
+
+        .reward-card .won-reward {
+            font-size: 23px;
+            color: var(--kk-red);
+            line-height: 1.02;
+            margin: 4px 0 4px;
+        }
+
+        .reward-card .won-detail { font-size: 12.5px; color: #6e6050; line-height: 1.4; margin-bottom: 10px; }
+
+        .code-box {
+            border: 2px dashed var(--cream-deep);
+            border-radius: 12px;
+            padding: 8px;
+            background: var(--cream);
+            margin-bottom: 10px;
+        }
+        .code-box .label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #9b8d78; }
+        .code-box .code { font-size: 22px; font-weight: 900; letter-spacing: 3px; color: var(--ink); font-family: "Courier New", monospace; }
+        .code-box .expires { font-size: 11px; color: #9b8d78; }
+
+        .reward-card .btn-primary { width: 100%; min-width: 0; font-size: 15px; padding: 12px; }
+
+        .restart {
+            display: block;
+            margin: 8px auto 0;
+            background: none;
+            border: none;
+            color: var(--kk-green);
+            font-size: 12px;
+            font-weight: bold;
+            text-decoration: underline;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        /* ---- locked ---- */
+        #screen-locked { justify-content: center; text-align: center; gap: 14px; padding-bottom: 40px; }
+        .locked-mark { width: 84px; height: 84px; margin: 0 auto; color: var(--kk-green); }
+
+        .confetti {
+            position: absolute;
+            width: 9px; height: 14px;
+            top: -20px; z-index: 40;
+            border-radius: 2px;
+            pointer-events: none;
+        }
+
+        @keyframes fall {
+            to { transform: translateY(110vh) rotate(540deg); opacity: 0.9; }
+        }
+    </style>
+</head>
+<body>
+    <!-- ===== SVG icon sprite ===== -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <symbol id="ic-bowtie" viewBox="0 0 48 24">
+                <path d="M3 4 22 11.5 3 20 Z" fill="#1c7a3f"/>
+                <path d="M45 4 26 11.5 45 20 Z" fill="#1c7a3f"/>
+                <rect x="20.5" y="7" width="7" height="9" rx="2" fill="#135a2d"/>
+            </symbol>
+
+            <symbol id="ic-donut" viewBox="0 0 24 24">
+                <path fill="#e6ad62" fill-rule="evenodd" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 6.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Z"/>
+                <path fill="#f49ac1" fill-rule="evenodd" d="M12 3.3a8.7 8.7 0 1 0 0 17.4 8.7 8.7 0 0 0 0-17.4Zm0 4.5a4.2 4.2 0 1 1 0 8.4 4.2 4.2 0 0 1 0-8.4Z"/>
+                <g fill="#fff"><circle cx="12" cy="5.7" r=".95"/><circle cx="7.6" cy="9" r=".95"/><circle cx="16.4" cy="9" r=".95"/><circle cx="8" cy="15" r=".95"/><circle cx="16" cy="15" r=".95"/><circle cx="12" cy="18.3" r=".95"/></g>
+            </symbol>
+
+            <symbol id="ic-camera" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M9 4 8 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4l-1-2H9Zm3 5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9Zm0 2a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z"/>
+            </symbol>
+
+            <symbol id="ic-download" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v8.6l2.3-2.3 1.4 1.4L12 16.4 7.3 11.7l1.4-1.4L11 12.6V4a1 1 0 0 1 1-1ZM5 18h14v2H5z"/>
+            </symbol>
+
+            <symbol id="ic-refresh" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M12 6V2.5L7 7l5 4.5V8a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7Z"/>
+            </symbol>
+
+            <symbol id="ic-flip" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M9 4 8 6H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h7v-2H4V8h4.1l1-2h5.8l1 2H20v3h2V8a2 2 0 0 0-2-2h-4l-1-2H9Z"/>
+                <path fill="currentColor" d="M20 13v-2.2l3.2 3.2-3.2 3.2V15a3 3 0 0 0-3 3h-2.1a5 5 0 0 1 5.1-5Z"/>
+            </symbol>
+
+            <symbol id="ic-gift" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M20 7h-2.2a3 3 0 0 0-4.8-3.4L12 4.3l-1-.7A3 3 0 0 0 6.2 7H4a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h7V8h2v4h7a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1ZM9.2 5a1 1 0 0 1 1 1v1H9.2a1 1 0 1 1 0-2Zm5.6 0a1 1 0 0 1 0 2H14V6a1 1 0 0 1 .8-1ZM5 14v6a1 1 0 0 0 1 1h5v-7H5Zm8 7h5a1 1 0 0 0 1-1v-6h-6v7Z"/>
+            </symbol>
+
+            <symbol id="ic-chevron-left" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M15 5 8 12l7 7 1.5-1.5L11 12l5.5-5.5L15 5Z"/>
+            </symbol>
+
+            <symbol id="ic-check-badge" viewBox="0 0 24 24">
+                <path fill="currentColor" d="m12 1.5 2.5 1.9 3.1-.3 1.2 2.9 2.9 1.2-.3 3.1L23 12l-1.9 2.5.3 3.1-2.9 1.2-1.2 2.9-3.1-.3L12 22.5l-2.5-1.9-3.1.3-1.2-2.9-2.9-1.2.3-3.1L1 12l1.9-2.5-.3-3.1 2.9-1.2 1.2-2.9 3.1.3L12 1.5Zm-1.2 13.6 5.4-5.4-1.5-1.5-3.9 4-1.8-1.8-1.5 1.5 3.3 3.2Z"/>
+            </symbol>
+
+            <symbol id="ic-star" viewBox="0 0 24 24">
+                <path fill="currentColor" d="m12 2 2.9 6.1 6.6.8-4.9 4.5 1.3 6.6L12 17.8 6.1 20l1.3-6.6L2.5 8.9l6.6-.8L12 2Z"/>
+            </symbol>
+
+            <symbol id="ic-smile" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20ZM8.5 9a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm7 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM7.2 14h9.6a4.8 4.8 0 0 1-9.6 0Z"/>
+            </symbol>
+
+            <symbol id="ic-coffee" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Zm13 1.5h2a2 2 0 0 1 0 4h-2v-4Z"/>
+                <path stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" d="M8 2.6c-.8 1-.8 2 0 3M12 2.6c-.8 1-.8 2 0 3"/>
+            </symbol>
+
+            <symbol id="ic-box" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M3 7.5 12 3l9 4.5-9 4.5-9-4.5Zm0 2.3 8 4v7.4l-8-4V9.8Zm18 0v7.4l-8 4v-7.4l8-4Z"/>
+            </symbol>
+
+            <symbol id="ic-sun" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="5" fill="currentColor"/>
+                <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <line x1="12" y1="1.5" x2="12" y2="4"/>
+                    <line x1="12" y1="20" x2="12" y2="22.5"/>
+                    <line x1="1.5" y1="12" x2="4" y2="12"/>
+                    <line x1="20" y1="12" x2="22.5" y2="12"/>
+                    <line x1="4.2" y1="4.2" x2="6" y2="6"/>
+                    <line x1="18" y1="18" x2="19.8" y2="19.8"/>
+                    <line x1="19.8" y1="4.2" x2="18" y2="6"/>
+                    <line x1="6" y1="18" x2="4.2" y2="19.8"/>
+                </g>
+            </symbol>
+        </defs>
+    </svg>
+
+    <div id="app">
+        <div class="brandbar">
+            <div class="kk-logo">
+                <img class="brand-logo" src="logo.png" alt="Krispy Kreme"
+                     onerror="if(this.dataset.s!=='1'){this.dataset.s='1'; this.src='https://logo.clearbit.com/krispykreme.com?size=200';}else{this.style.visibility='hidden';}">
+            </div>
+        </div>
+
+        <!-- INTRO -->
+        <section id="screen-intro" class="screen active">
+            <div class="hero-donut">
+                <svg viewBox="0 0 24 24" width="120" height="120"><use href="#ic-donut"/></svg>
+                <span class="cam-badge"><svg class="ic"><use href="#ic-camera"/></svg></span>
+            </div>
+            <h1 class="title headline-font"><span class="small">The</span>Donut Hole Cam</h1>
+            <p class="tagline">You know the move &mdash; frame your face <strong>in the hole</strong>. Pick a doughnut, snap a selfie through it, save the pic, and we'll glaze you with a reward.</p>
+            <button class="btn btn-primary" id="startBtn"><svg class="ic"><use href="#ic-donut"/></svg> Pick My Doughnut</button>
+            <p class="fine">One reward per customer, per day · camera access required to snap.</p>
+        </section>
+
+        <!-- CHOOSE -->
+        <section id="screen-choose" class="screen">
+            <p class="step-head headline-font"><span class="num">1</span> Pick your doughnut</p>
+            <p class="step-sub">This becomes your photo frame.</p>
+            <div class="donut-grid" id="donutGrid"></div>
+            <button class="btn btn-primary" id="toCameraBtn" disabled><svg class="ic"><use href="#ic-camera"/></svg> Open Camera</button>
+        </section>
+
+        <!-- CAMERA -->
+        <section id="screen-camera" class="screen">
+            <p class="step-head headline-font"><span class="num">2</span> Get in the hole</p>
+            <div class="cam-stage">
+                <video id="video" playsinline autoplay muted></video>
+                <div class="donut-overlay" id="donutOverlay"></div>
+                <div class="cam-tip"><svg class="ic"><use href="#ic-donut"/></svg> Line your face up inside the hole</div>
+                <div class="cam-fallback" id="camFallback">
+                    <svg class="fb-emoji" viewBox="0 0 24 24" width="40" height="40"><use href="#ic-camera"/></svg>
+                    <div class="fb-text" id="fbText">We couldn't open the live camera here. You can still upload a selfie to drop into the hole.</div>
+                    <label><svg class="ic"><use href="#ic-camera"/></svg> Choose / take a photo
+                        <input type="file" accept="image/*" capture="user" id="fileInput">
+                    </label>
+                </div>
+            </div>
+            <div class="cam-controls">
+                <button class="cam-mini" id="backToChoose"><svg class="ic"><use href="#ic-chevron-left"/></svg> Doughnut</button>
+                <button class="shutter" id="shutterBtn" title="Snap"><svg class="ic"><use href="#ic-camera"/></svg></button>
+                <button class="cam-mini" id="flipBtn"><svg class="ic"><use href="#ic-flip"/></svg> Flip</button>
+            </div>
+        </section>
+
+        <!-- RESULT -->
+        <section id="screen-result" class="screen">
+            <p class="step-head headline-font"><span class="num">3</span> Hole new you</p>
+            <div class="photo-frame" id="photoFrame">
+                <img id="resultImg" alt="Your donut hole selfie">
+            </div>
+            <div class="result-actions">
+                <button class="btn btn-primary" id="saveBtn"><svg class="ic"><use href="#ic-download"/></svg> Save Photo</button>
+                <button class="btn btn-line" id="retakeBtn"><svg class="ic"><use href="#ic-refresh"/></svg> Retake</button>
+            </div>
+
+            <div class="reward-card" id="rewardCard">
+                <span id="wIcon"></span>
+                <div class="won-reward headline-font" id="wReward">&mdash;</div>
+                <div class="won-detail" id="wDetail">&mdash;</div>
+                <div class="code-box">
+                    <div class="label">Show in-store or scan in app</div>
+                    <div class="code" id="wCode">KK-0000</div>
+                    <div class="expires" id="wExpires">Expires soon</div>
+                </div>
+                <button class="btn btn-primary" id="claimBtn"><svg class="ic"><use href="#ic-star"/></svg> Add to Rewards</button>
+            </div>
+            <button class="btn btn-primary red" id="revealBtn"><svg class="ic"><use href="#ic-gift"/></svg> Reveal My Reward</button>
+            <button class="restart" id="resultReset">Reset (demo)</button>
+        </section>
+
+        <!-- LOCKED -->
+        <section id="screen-locked" class="screen">
+            <svg class="locked-mark" viewBox="0 0 24 24"><use href="#ic-check-badge"/></svg>
+            <h2 class="title headline-font" style="font-size:26px;">You're glazed for today</h2>
+            <p class="tagline">You've already grabbed today's reward. It's saved in <strong>Rewards</strong> &mdash; come back tomorrow for another hole-in-one.</p>
+            <button class="btn btn-line" id="seeRewardBtn">See today's reward</button>
+            <button class="restart" id="lockReset">Reset (demo)</button>
+        </section>
+    </div>
+
+    <script>
+        "use strict";
+
+        const STORAGE_KEY = "donutHole.reward.v1";
+
+        /* ---- Doughnut catalogue (Krispy Kreme menu + a promoted seasonal) ---- */
+        const DONUTS = [
+            {
+                id: "original",
+                name: "Original Glazed",
+                dough: "#e6ad62",
+                icing: "#f7e6b4",
+                icingOpacity: 0.55,
+                sprinkles: false
+            },
+            {
+                id: "chocolate",
+                name: "Chocolate Iced + Sprinkles",
+                dough: "#e6ad62",
+                icing: "#4a2c1c",
+                icingOpacity: 1,
+                sprinkles: true,
+                sprinkleColors: [ "#ff5d8f", "#ffd24d", "#5ec2ff", "#7ed957", "#ffffff" ]
+            },
+            {
+                id: "strawberry",
+                name: "Strawberry Iced + Sprinkles",
+                dough: "#e6ad62",
+                icing: "#f49ac1",
+                icingOpacity: 1,
+                sprinkles: true,
+                sprinkleColors: [ "#ffffff", "#d12027", "#ffd24d" ]
+            },
+            {
+                id: "seasonal",
+                name: "Strawberry Lemonade",
+                tag: "New",
+                seasonal: true,
+                dough: "#e6ad62",
+                gradient: [ "#ff7eb0", "#ffd84d" ],
+                icingOpacity: 1,
+                sprinkles: true,
+                sprinkleColors: [ "#ffffff", "#ff4d88", "#fff2a8" ]
+            }
+        ];
+
+        const REWARDS = [
+            { weight: 30, icon: "ic-donut", reward: "FREE Original Glazed", detail: "One free Original Glazed doughnut, just for playing.", prefix: "OG" },
+            { weight: 28, icon: "ic-sun", reward: "BOGO Strawberry Lemonade", detail: "Buy one NEW Strawberry Lemonade doughnut, get one free.", prefix: "SL" },
+            { weight: 20, icon: "ic-box", reward: "$3 OFF a Dozen", detail: "$3 off any dozen. Share the hole-in-ones.", prefix: "DZ" },
+            { weight: 15, icon: "ic-coffee", reward: "FREE Brewed Coffee", detail: "Any size brewed coffee on the house.", prefix: "CF" },
+            { weight: 7, icon: "ic-star", reward: "FREE Original Dozen", detail: "A full free dozen Original Glazed. Hole-in-one jackpot!", prefix: "JKP" }
+        ];
+
+        let selectedDonut = null;
+        let stream = null;
+        let facing = "user";
+        let donutImg = null;
+
+        function $( id ) {
+            return document.getElementById( id );
+        }
+
+        function showScreen( id ) {
+            document.querySelectorAll( ".screen" ).forEach( function( s ) {
+                s.classList.remove( "active" );
+            } );
+            $( id ).classList.add( "active" );
+        }
+
+        function iconSVG( id ) {
+            return '<svg class="reward-ic-svg" viewBox="0 0 24 24"><use href="#' + id + '"/></svg>';
+        }
+
+        /* ---- Doughnut SVG generator (torus with transparent hole) ---- */
+        function donutSVG( d ) {
+            const cx = 200, cy = 200;
+            const outer = 190, doughHole = 66;
+            const icingOuter = 184, icingHole = 74;
+
+            let defs = "";
+            let icingFill = d.icing || "#f7e6b4";
+            if ( d.gradient ) {
+                defs = '<defs><linearGradient id="g-' + d.id + '" x1="0" y1="0" x2="1" y2="1">' +
+                    '<stop offset="0" stop-color="' + d.gradient[ 0 ] + '"/>' +
+                    '<stop offset="1" stop-color="' + d.gradient[ 1 ] + '"/></linearGradient></defs>';
+                icingFill = "url(#g-" + d.id + ")";
+            }
+
+            const doughRing = '<path fill="' + d.dough + '" fill-rule="evenodd" d="' +
+                ringPath( cx, cy, outer, doughHole ) + '"/>';
+
+            const icingRing = '<path fill="' + icingFill + '" fill-opacity="' + ( d.icingOpacity != null ? d.icingOpacity : 1 ) +
+                '" fill-rule="evenodd" d="' + ringPath( cx, cy, icingOuter, icingHole ) + '"/>';
+
+            const sheen = '<path d="' + arcBand( cx, cy, 150, 120, 200, 250 ) +
+                '" fill="#ffffff" fill-opacity="0.18"/>';
+
+            let sprinkles = "";
+            if ( d.sprinkles ) {
+                const colors = d.sprinkleColors || [ "#fff" ];
+                for ( let i = 0; i < 26; i++ ) {
+                    const ang = Math.random() * Math.PI * 2;
+                    const rad = 96 + Math.random() * 66;
+                    const x = cx + Math.cos( ang ) * rad;
+                    const y = cy + Math.sin( ang ) * rad;
+                    const rot = Math.floor( Math.random() * 180 );
+                    const col = colors[ Math.floor( Math.random() * colors.length ) ];
+                    sprinkles += '<rect x="' + ( x - 2.5 ) + '" y="' + ( y - 7 ) + '" width="5" height="14" rx="2.5" fill="' + col +
+                        '" transform="rotate(' + rot + ' ' + x + ' ' + y + ')"/>';
+                }
+            }
+
+            return '<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">' +
+                defs + doughRing + icingRing + sheen + sprinkles + '</svg>';
+        }
+
+        function ringPath( cx, cy, R, r ) {
+            return "M" + ( cx - R ) + "," + cy +
+                "a" + R + "," + R + " 0 1,0 " + ( R * 2 ) + ",0" +
+                "a" + R + "," + R + " 0 1,0 " + ( -R * 2 ) + ",0 Z" +
+                "M" + ( cx - r ) + "," + cy +
+                "a" + r + "," + r + " 0 1,1 " + ( r * 2 ) + ",0" +
+                "a" + r + "," + r + " 0 1,1 " + ( -r * 2 ) + ",0 Z";
+        }
+
+        function arcBand( cx, cy, rOuter, rInner, degStart, degEnd ) {
+            const a0 = degStart * Math.PI / 180;
+            const a1 = degEnd * Math.PI / 180;
+            const x0o = cx + Math.cos( a0 ) * rOuter, y0o = cy + Math.sin( a0 ) * rOuter;
+            const x1o = cx + Math.cos( a1 ) * rOuter, y1o = cy + Math.sin( a1 ) * rOuter;
+            const x1i = cx + Math.cos( a1 ) * rInner, y1i = cy + Math.sin( a1 ) * rInner;
+            const x0i = cx + Math.cos( a0 ) * rInner, y0i = cy + Math.sin( a0 ) * rInner;
+            return "M" + x0o + "," + y0o +
+                " A" + rOuter + "," + rOuter + " 0 0,1 " + x1o + "," + y1o +
+                " L" + x1i + "," + y1i +
+                " A" + rInner + "," + rInner + " 0 0,0 " + x0i + "," + y0i + " Z";
+        }
+
+        function svgToImage( svg ) {
+            return new Promise( function( resolve ) {
+                const img = new Image();
+                img.onload = function() { resolve( img ); };
+                img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent( svg );
+            } );
+        }
+
+        function pickReward() {
+            const total = REWARDS.reduce( function( s, r ) { return s + r.weight; }, 0 );
+            let roll = Math.random() * total;
+            for ( let i = 0; i < REWARDS.length; i++ ) {
+                roll -= REWARDS[ i ].weight;
+                if ( roll <= 0 ) { return REWARDS[ i ]; }
+            }
+            return REWARDS[ 0 ];
+        }
+
+        function makeCode( prefix ) {
+            const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+            let s = "";
+            for ( let i = 0; i < 4; i++ ) {
+                s += chars.charAt( Math.floor( Math.random() * chars.length ) );
+            }
+            return prefix + "-" + s;
+        }
+
+        function tomorrowLabel() {
+            const d = new Date();
+            d.setDate( d.getDate() + 1 );
+            return d.toLocaleDateString( undefined, { month: "short", day: "numeric" } );
+        }
+
+        function loadReward() {
+            try {
+                const raw = localStorage.getItem( STORAGE_KEY );
+                if ( !raw ) { return null; }
+                const data = JSON.parse( raw );
+                return data.day === new Date().toDateString() ? data : null;
+            } catch ( e ) { return null; }
+        }
+
+        function saveReward( data ) {
+            try { localStorage.setItem( STORAGE_KEY, JSON.stringify( data ) ); } catch ( e ) {}
+        }
+
+        function clearReward() {
+            try { localStorage.removeItem( STORAGE_KEY ); } catch ( e ) {}
+        }
+
+        function burstConfetti() {
+            const colors = [ "#f6c453", "#cf202e", "#1c7a3f", "#ffffff", "#ff7eb0" ];
+            const app = $( "app" );
+            for ( let i = 0; i < 55; i++ ) {
+                const c = document.createElement( "div" );
+                c.className = "confetti";
+                c.style.left = Math.random() * 100 + "%";
+                c.style.background = colors[ Math.floor( Math.random() * colors.length ) ];
+                const dur = 1.6 + Math.random() * 1.6;
+                c.style.animation = "fall " + dur + "s linear forwards";
+                c.style.animationDelay = Math.random() * 0.4 + "s";
+                app.appendChild( c );
+                window.setTimeout( function() { c.remove(); }, ( dur + 0.5 ) * 1000 );
+            }
+        }
+
+        function buildGrid() {
+            const grid = $( "donutGrid" );
+            grid.innerHTML = "";
+            DONUTS.forEach( function( d ) {
+                const card = document.createElement( "div" );
+                card.className = "donut-card";
+                card.innerHTML =
+                    ( d.tag ? '<span class="d-tag">' + d.tag + '</span>' : "" ) +
+                    '<div class="thumb">' + donutSVG( d ) + '</div>' +
+                    '<div class="d-name">' + ( d.seasonal ? '<svg class="ic"><use href="#ic-sun"/></svg> ' : "" ) + d.name + '</div>';
+                card.addEventListener( "click", function() {
+                    document.querySelectorAll( ".donut-card" ).forEach( function( c ) { c.classList.remove( "selected" ); } );
+                    card.classList.add( "selected" );
+                    selectedDonut = d;
+                    $( "toCameraBtn" ).disabled = false;
+                } );
+                grid.appendChild( card );
+            } );
+        }
+
+        /* ---- camera ---- */
+        async function startCamera() {
+            $( "camFallback" ).classList.remove( "show" );
+            stopCamera();
+            try {
+                stream = await navigator.mediaDevices.getUserMedia( {
+                    video: {
+                        facingMode: facing,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
+                    audio: false
+                } );
+                const v = $( "video" );
+                v.srcObject = stream;
+                v.style.display = "block";
+                await v.play();
+            } catch ( e ) {
+                $( "video" ).style.display = "none";
+                $( "camFallback" ).classList.add( "show" );
+                if ( e && e.name === "NotAllowedError" ) {
+                    $( "fbText" ).textContent = "Camera permission was blocked. Allow camera access, or upload a selfie to drop into the hole.";
+                }
+            }
+        }
+
+        function stopCamera() {
+            if ( stream ) {
+                stream.getTracks().forEach( function( t ) { t.stop(); } );
+                stream = null;
+            }
+        }
+
+        function drawCover( ctx, media, mw, mh, cw, ch, mirror ) {
+            const scale = Math.max( cw / mw, ch / mh );
+            const dw = mw * scale, dh = mh * scale;
+            ctx.save();
+            if ( mirror ) {
+                ctx.translate( cw, 0 );
+                ctx.scale( -1, 1 );
+            }
+            ctx.drawImage( media, ( cw - dw ) / 2, ( ch - dh ) / 2, dw, dh );
+            ctx.restore();
+        }
+
+        function drawWatermark( ctx, cw, ch ) {
+            const bandH = Math.round( ch * 0.12 );
+            const grad = ctx.createLinearGradient( 0, ch - bandH, 0, ch );
+            grad.addColorStop( 0, "rgba(0,0,0,0)" );
+            grad.addColorStop( 1, "rgba(0,0,0,0.6)" );
+            ctx.fillStyle = grad;
+            ctx.fillRect( 0, ch - bandH, cw, bandH );
+
+            /* little donut mark drawn as a ring */
+            const r = Math.round( cw * 0.028 );
+            const mx = 18 + r;
+            const my = ch - 14 - r;
+            ctx.beginPath();
+            ctx.arc( mx, my, r, 0, Math.PI * 2 );
+            ctx.arc( mx, my, r * 0.42, 0, Math.PI * 2, true );
+            ctx.fillStyle = "#f49ac1";
+            ctx.fill();
+
+            ctx.fillStyle = "#fff";
+            ctx.textBaseline = "middle";
+            ctx.textAlign = "left";
+            ctx.font = Math.round( cw * 0.06 ) + "px 'Lobster', 'Brush Script MT', cursive";
+            ctx.fillText( "Krispy Kreme", mx + r + 8, my + 1 );
+
+            ctx.textAlign = "right";
+            ctx.textBaseline = "bottom";
+            ctx.fillStyle = "#f6c453";
+            ctx.font = "700 " + Math.round( cw * 0.036 ) + "px 'Jost', 'Trebuchet MS', sans-serif";
+            ctx.fillText( "#DonutHole", cw - 14, ch - 12 );
+        }
+
+        function composite( media, mw, mh, mirror ) {
+            const stage = $( "video" ).parentElement;
+            const aspect = stage.clientWidth / stage.clientHeight;
+
+            let cropW, cropH;
+            if ( mw / mh > aspect ) {
+                cropH = mh;
+                cropW = mh * aspect;
+            } else {
+                cropW = mw;
+                cropH = mw / aspect;
+            }
+
+            const targetW = 1080;
+            let scale = 1;
+            if ( cropW < targetW ) {
+                scale = Math.min( targetW / cropW, 2.5 );
+            }
+
+            const cw = Math.round( cropW * scale );
+            const ch = Math.round( cropH * scale );
+            const canvas = document.createElement( "canvas" );
+            canvas.width = cw;
+            canvas.height = ch;
+            const ctx = canvas.getContext( "2d" );
+            ctx.imageSmoothingQuality = "high";
+
+            drawCover( ctx, media, mw, mh, cw, ch, mirror );
+
+            const dSize = cw * 1.68;
+            ctx.drawImage( donutImg, ( cw - dSize ) / 2, ( ch - dSize ) / 2, dSize, dSize );
+
+            drawWatermark( ctx, cw, ch );
+
+            return canvas.toDataURL( "image/jpeg", 0.92 );
+        }
+
+        function snapFromVideo() {
+            const v = $( "video" );
+            if ( !v.videoWidth ) { return; }
+            const data = composite( v, v.videoWidth, v.videoHeight, true );
+            goToResult( data );
+        }
+
+        function snapFromFile( file ) {
+            const img = new Image();
+            img.onload = function() {
+                const data = composite( img, img.naturalWidth, img.naturalHeight, false );
+                goToResult( data );
+            };
+            img.src = URL.createObjectURL( file );
+        }
+
+        function goToResult( dataUrl ) {
+            stopCamera();
+            $( "resultImg" ).src = dataUrl;
+            $( "photoFrame" ).style.display = "block";
+            $( "photoFrame" ).style.maxWidth = "300px";
+            $( "photoFrame" ).style.margin = "6px auto 0";
+            document.querySelector( ".result-actions" ).style.display = "flex";
+            $( "rewardCard" ).classList.remove( "show" );
+            $( "revealBtn" ).style.display = "flex";
+            showScreen( "screen-result" );
+        }
+
+        function fillReward( data ) {
+            $( "wIcon" ).innerHTML = iconSVG( data.icon );
+            $( "wReward" ).innerHTML = data.reward;
+            $( "wDetail" ).textContent = data.detail;
+            $( "wCode" ).textContent = data.code;
+            $( "wExpires" ).textContent = "Expires " + data.expires;
+        }
+
+        function revealReward() {
+            let data = loadReward();
+            if ( !data ) {
+                const r = pickReward();
+                data = {
+                    day: new Date().toDateString(),
+                    icon: r.icon,
+                    reward: r.reward,
+                    detail: r.detail,
+                    code: makeCode( r.prefix ),
+                    expires: tomorrowLabel()
+                };
+                saveReward( data );
+            }
+            fillReward( data );
+            $( "revealBtn" ).style.display = "none";
+            $( "rewardCard" ).classList.add( "show" );
+            burstConfetti();
+        }
+
+        async function goToCamera() {
+            const svg = donutSVG( selectedDonut );
+            donutImg = await svgToImage( svg );
+            $( "donutOverlay" ).innerHTML = svg;
+            showScreen( "screen-camera" );
+            startCamera();
+        }
+
+        function init() {
+            buildGrid();
+
+            $( "startBtn" ).addEventListener( "click", function() {
+                if ( loadReward() ) {
+                    showScreen( "screen-locked" );
+                } else {
+                    showScreen( "screen-choose" );
+                }
+            } );
+
+            $( "toCameraBtn" ).addEventListener( "click", function() {
+                if ( selectedDonut ) { goToCamera(); }
+            } );
+
+            $( "backToChoose" ).addEventListener( "click", function() {
+                stopCamera();
+                showScreen( "screen-choose" );
+            } );
+
+            $( "flipBtn" ).addEventListener( "click", function() {
+                facing = ( facing === "user" ) ? "environment" : "user";
+                $( "video" ).style.transform = ( facing === "user" ) ? "scaleX(-1)" : "none";
+                startCamera();
+            } );
+
+            $( "shutterBtn" ).addEventListener( "click", snapFromVideo );
+
+            $( "fileInput" ).addEventListener( "change", function( e ) {
+                if ( e.target.files && e.target.files[ 0 ] ) {
+                    snapFromFile( e.target.files[ 0 ] );
+                }
+            } );
+
+            $( "retakeBtn" ).addEventListener( "click", function() {
+                showScreen( "screen-camera" );
+                startCamera();
+            } );
+
+            $( "saveBtn" ).addEventListener( "click", function() {
+                const a = document.createElement( "a" );
+                a.href = $( "resultImg" ).src;
+                a.download = "krispy-kreme-donut-hole.jpg";
+                document.body.appendChild( a );
+                a.click();
+                a.remove();
+            } );
+
+            $( "revealBtn" ).addEventListener( "click", revealReward );
+
+            $( "claimBtn" ).addEventListener( "click", function() {
+                showScreen( "screen-locked" );
+            } );
+
+            $( "seeRewardBtn" ).addEventListener( "click", function() {
+                const data = loadReward();
+                if ( data ) {
+                    fillReward( data );
+                    $( "revealBtn" ).style.display = "none";
+                    $( "rewardCard" ).classList.add( "show" );
+                    $( "photoFrame" ).style.display = "none";
+                    document.querySelector( ".result-actions" ).style.display = "none";
+                    showScreen( "screen-result" );
+                }
+            } );
+
+            $( "resultReset" ).addEventListener( "click", function() {
+                clearReward();
+                stopCamera();
+                showScreen( "screen-intro" );
+            } );
+
+            $( "lockReset" ).addEventListener( "click", function() {
+                clearReward();
+                showScreen( "screen-intro" );
+            } );
+        }
+
+        document.addEventListener( "DOMContentLoaded", init );
+    </script>
+</body>
+</html>

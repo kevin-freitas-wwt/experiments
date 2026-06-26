@@ -1,0 +1,275 @@
+:root {
+    --bg: #0e1118;
+    --grid: #232838;
+    --lane: #161b27;
+    --lane-alt: #131825;
+    --muted: #6b7488;
+    --text: #e7ebf3;
+    --track-label: #aeb6c8;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    margin: 0;
+    padding: 28px 32px 40px;
+}
+
+.masthead h1 {
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    margin: 0;
+}
+
+.masthead__row {
+    align-items: baseline;
+    display: flex;
+    gap: 20px;
+    justify-content: space-between;
+    margin: 0 0 6px;
+}
+
+.picker {
+    align-items: center;
+    color: var(--muted);
+    display: flex;
+    font-size: 13px;
+    gap: 8px;
+}
+
+.picker select {
+    background: var(--lane);
+    border: 1px solid var(--grid);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 13px;
+    padding: 6px 10px;
+}
+
+.masthead p {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0 0 22px;
+    max-width: 680px;
+}
+
+.toolbar {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 0 0 18px;
+}
+
+.toolbar input {
+    background: var(--lane);
+    border: 1px solid var(--grid);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 13px;
+    padding: 6px 10px;
+}
+
+.toolbar__search {
+    flex: 1 1 240px;
+    max-width: 340px;
+}
+
+.toolbar__range {
+    align-items: center;
+    color: var(--muted);
+    display: flex;
+    font-size: 13px;
+    gap: 6px;
+}
+
+.toolbar__year {
+    width: 84px;
+}
+
+.toolbar__clear {
+    background: var(--lane);
+    border: 1px solid var(--grid);
+    border-radius: 6px;
+    color: var(--track-label);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 7px 12px;
+}
+
+.toolbar__clear:hover {
+    background: var(--lane-alt);
+}
+
+.stage {
+    align-items: stretch;
+    border: 1px solid var(--grid);
+    border-radius: 12px;
+    display: flex;
+    overflow: hidden;
+}
+
+.lanes {
+    background: var(--bg);
+    flex: 0 0 150px;
+    position: relative;
+    z-index: 2;
+}
+
+.lanes__row {
+    align-items: center;
+    border-top: 1px solid var(--grid);
+    cursor: pointer;
+    display: flex;
+    gap: 9px;
+    outline: none;
+    padding: 0 12px;
+    transition: background 0.15s ease;
+}
+
+.lanes__row:hover {
+    background: var(--lane);
+}
+
+.lanes__row:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--track-label);
+}
+
+.lanes__row.is-active {
+    background: var(--lane);
+}
+
+.lanes__row.is-active .lanes__name {
+    color: var(--text);
+}
+
+.lanes__bar {
+    border-radius: 2px;
+    flex: 0 0 4px;
+    height: 30px;
+}
+
+.lanes__name {
+    color: var(--track-label);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.15;
+}
+
+.scroller {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.scroller::-webkit-scrollbar {
+    height: 10px;
+}
+
+.scroller::-webkit-scrollbar-thumb {
+    background: var(--grid);
+    border-radius: 6px;
+}
+
+.chart svg {
+    display: block;
+}
+
+.detail {
+    background: var(--lane-alt);
+    border-left: 1px solid var(--grid);
+    display: none;
+    flex: 0 0 230px;
+    font-size: 13px;
+    overflow-y: auto;
+    padding: 18px 18px 24px;
+}
+
+.detail.is-open {
+    display: block;
+}
+
+.detail h3 {
+    align-items: center;
+    display: flex;
+    font-size: 15px;
+    gap: 9px;
+    margin: 0;
+}
+
+.detail__loc {
+    font-size: 11px;
+    margin: 5px 0 0 13px;
+    opacity: 0.5;
+}
+
+.detail__bar {
+    border-radius: 2px;
+    flex: 0 0 4px;
+    height: 18px;
+}
+
+.detail h4 {
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.6px;
+    margin: 20px 0 9px;
+    text-transform: uppercase;
+}
+
+.detail ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.detail li {
+    align-items: center;
+    color: var(--track-label);
+    display: flex;
+    gap: 8px;
+    margin-bottom: 7px;
+}
+
+.detail__count {
+    color: var(--muted);
+    margin-left: auto;
+}
+
+.detail__swatch {
+    border-radius: 2px;
+    flex: 0 0 10px;
+    height: 10px;
+    width: 10px;
+}
+
+.detail__none {
+    color: var(--muted);
+}
+
+.year-line {
+    stroke: var(--grid);
+    stroke-width: 1;
+}
+
+.year-text {
+    fill: var(--muted);
+    font-size: 11px;
+    text-anchor: middle;
+}
+
+.piece {
+    transition: opacity 0.2s ease;
+}
+
+.is-dim {
+    opacity: 0.08;
+}
+

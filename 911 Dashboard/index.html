@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>911 Calls — Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #0f1419;
+            --panel: #1a212b;
+            --panel-2: #222c38;
+            --text: #e6edf3;
+            --muted: #8b98a5;
+            --accent: #d23f3f;
+            --border: #2d3743;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.4;
+        }
+        header {
+            padding: 24px 32px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+        header .sub { color: var(--muted); font-size: 13px; }
+        .src-link { color: inherit; text-decoration: underline; text-decoration-color: rgba(139, 152, 165, 0.5); text-underline-offset: 2px; }
+        .wrap { padding: 24px 32px; max-width: 1400px; margin: 0 auto; }
+        .cards { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px 20px;
+            min-width: 150px;
+            flex: 1;
+        }
+        .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+        .card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+        .grid { display: grid; grid-template-columns: 320px 1fr; gap: 24px; align-items: start; }
+        @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+        }
+        .panel h2 { margin: 0 0 16px; font-size: 15px; font-weight: 600; }
+        .filters { max-height: 520px; overflow-y: auto; }
+        .filter-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+        .btn {
+            background: var(--panel-2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .btn:hover { background: var(--border); }
+        .ftype { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; cursor: pointer; }
+        .ftype input { cursor: pointer; }
+        .swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+        .ftype .cnt { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+        .chart-box { position: relative; height: 460px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); }
+        th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+        td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .type-tbl { max-height: 460px; overflow-y: auto; }
+        .bar-cell { position: relative; }
+        .bar-fill { position: absolute; left: 0; top: 0; bottom: 0; opacity: 0.18; border-radius: 3px; }
+        .mt { margin-top: 24px; }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>911 Call Activity</h1>
+            <div class="sub">Sep 1, 2025 – Jun 1, 2026</div>
+        </div>
+    </header>
+    <div class="wrap">
+
+        <div class="grid">
+            <div class="panel filters">
+                <h2>Filter call types</h2>
+                <div class="filter-actions">
+                    <button class="btn" id="selAll">Select all</button>
+                    <button class="btn" id="selNone">Clear all</button>
+                </div>
+                <div id="filterList"></div>
+            </div>
+
+            <div>
+                <div class="panel">
+                    <h2>Records by month, broken down by type</h2>
+                    <div class="chart-box"><canvas id="monthChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const DATA = [{"datetime":"2026-05-31T23:04:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-05-30T13:50:00.000","type":"Aid Response","address":"4435 35th Ave Sw","lat":47.563869,"lon":-122.376191},{"datetime":"2026-05-29T11:48:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-05-25T16:46:00.000","type":"Aid Response","address":"4500 36TH AVE SW","lat":47.562872,"lon":-122.377451},{"datetime":"2026-05-24T13:19:00.000","type":"Aid Response","address":"4600 36th Ave Sw","lat":47.562035,"lon":-122.377452},{"datetime":"2026-05-21T01:16:00.000","type":"Aid Response","address":"4432 35th Ave Sw","lat":47.563872,"lon":-122.376189},{"datetime":"2026-05-19T12:07:00.000","type":"Aid Response","address":"3622 Sw Snoqualmie St","lat":47.562035,"lon":-122.377735},{"datetime":"2026-05-16T11:15:00.000","type":"Aid Response","address":"3900 Sw Alaska St","lat":47.561107,"lon":-122.381456},{"datetime":"2026-05-15T22:00:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2026-05-14T12:19:00.000","type":"Medic Response","address":"3623 Sw Alaska St","lat":47.561072,"lon":-122.377749},{"datetime":"2026-05-13T14:38:00.000","type":"Aid Response","address":"4600 36th Ave Sw","lat":47.562035,"lon":-122.377452},{"datetime":"2026-05-12T15:39:00.000","type":"Medic Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2026-05-11T19:39:00.000","type":"Aid Response","address":"3622 Sw Snoqualmie St","lat":47.562035,"lon":-122.377735},{"datetime":"2026-05-07T09:33:00.000","type":"Medic Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-05-04T20:41:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2026-05-04T14:04:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-05-02T10:34:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-05-02T07:22:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2026-05-01T17:59:00.000","type":"Medic Response","address":"3900 Sw Alaska St","lat":47.561107,"lon":-122.381456},{"datetime":"2026-05-01T16:23:00.000","type":"Aid Response","address":"4500 36th Ave Sw","lat":47.562872,"lon":-122.377451},{"datetime":"2026-04-29T22:36:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-04-28T12:23:00.000","type":"Medic Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2026-04-26T11:00:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Alaska St","lat":47.561066,"lon":-122.376216},{"datetime":"2026-04-26T09:51:00.000","type":"Aid Response","address":"3512 Sw Alaska St","lat":47.561066,"lon":-122.376355},{"datetime":"2026-04-24T15:14:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-04-22T11:23:00.000","type":"Aid Response","address":"35th Ave Sw / Stadium Access Rd","lat":47.562035,"lon":-122.376202},{"datetime":"2026-04-20T17:05:00.000","type":"Medic Response- Overdose","address":"35th Ave Sw / Sw Alaska St","lat":47.561066,"lon":-122.376216},{"datetime":"2026-04-19T16:30:00.000","type":"Aid Response","address":"3622 Sw Snoqualmie St","lat":47.562035,"lon":-122.377735},{"datetime":"2026-04-18T22:24:00.000","type":"Aid Response","address":"4500 36th Ave Sw","lat":47.562872,"lon":-122.377451},{"datetime":"2026-04-18T22:20:00.000","type":"Medic Response","address":"4500 36th Ave Sw","lat":47.562872,"lon":-122.377451},{"datetime":"2026-04-18T16:09:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2026-04-18T14:41:00.000","type":"Aid Response","address":"Sw Alaska St / 35th Ave Sw","lat":47.561066,"lon":-122.376216},{"datetime":"2026-04-18T10:49:00.000","type":"Medic Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-04-15T12:06:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-04-13T17:02:00.000","type":"Medic Response","address":"4722 Fauntleroy Way Sw","lat":47.560704,"lon":-122.381456},{"datetime":"2026-04-13T05:27:00.000","type":"Aid Response","address":"4722 FAUNTLEROY WAY SW","lat":47.560704,"lon":-122.381456},{"datetime":"2026-04-10T17:08:00.000","type":"Aid Response","address":"4435 35th Ave Sw","lat":47.563869,"lon":-122.376191},{"datetime":"2026-04-09T17:09:00.000","type":"Medic Response- Overdose","address":"4622 35th Ave Sw","lat":47.561817,"lon":-122.376205},{"datetime":"2026-04-08T10:27:00.000","type":"Aid Response Yellow","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2026-04-07T18:49:00.000","type":"Medic Response- Overdose","address":"Sw Alaska St / 35th Ave Sw","lat":47.561066,"lon":-122.376216},{"datetime":"2026-04-07T17:50:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Avalon Way","lat":47.564077,"lon":-122.376189},{"datetime":"2026-04-06T15:25:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Alaska St","lat":47.561066,"lon":-122.376216},{"datetime":"2026-04-03T14:42:00.000","type":"Aid Response Yellow","address":"4600 36TH AVE SW","lat":47.562035,"lon":-122.377452},{"datetime":"2026-04-02T07:13:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-03-30T03:58:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2026-03-29T21:59:00.000","type":"Medic Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-03-29T12:58:00.000","type":"Medic Response","address":"4710 37th Ave Sw","lat":47.560894,"lon":-122.378775},{"datetime":"2026-03-29T09:44:00.000","type":"Aid Response","address":"3620 Sw Alaska St","lat":47.561072,"lon":-122.377709},{"datetime":"2026-03-28T23:52:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2026-03-28T10:29:00.000","type":"Medic Response- Overdose","address":"36th Ave Sw / Sw Alaska St","lat":47.56107,"lon":-122.377453},{"datetime":"2026-03-28T01:12:00.000","type":"Aid Response","address":"4580 FAUNTLEROY WAY SW","lat":47.561627,"lon":-122.380926},{"datetime":"2026-03-27T17:08:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Alaska St","lat":47.561066,"lon":-122.376216},{"datetime":"2026-03-23T10:39:00.000","type":"Aid Response","address":"36th Ave Sw / Sw Alaska St","lat":47.56107,"lon":-122.377453},{"datetime":"2026-03-22T00:39:00.000","type":"Medic Response- Overdose","address":"35th Ave Sw / Sw Avalon Way","lat":47.564077,"lon":-122.376189},{"datetime":"2026-03-21T10:15:00.000","type":"Medic Response","address":"3618 SW ALASKA ST","lat":47.561072,"lon":-122.377682},{"datetime":"2026-03-19T11:08:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-03-17T00:56:00.000","type":"Medic Response","address":"3620 Sw Alaska St","lat":47.561072,"lon":-122.377709},{"datetime":"2026-03-16T23:01:00.000","type":"Medic Response- Overdose","address":"3620 Sw Alaska St","lat":47.561072,"lon":-122.377709},{"datetime":"2026-03-15T22:31:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-03-14T02:21:00.000","type":"Aid Response","address":"4722 Fauntleroy Way Sw","lat":47.560704,"lon":-122.381456},{"datetime":"2026-03-12T13:52:00.000","type":"Medic Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2026-03-12T10:13:00.000","type":"Aid Response","address":"3900 Sw Alaska St","lat":47.561107,"lon":-122.381456},{"datetime":"2026-03-10T02:30:00.000","type":"Aid Response Yellow","address":"4722 Fauntleroy Way Sw","lat":47.560704,"lon":-122.381456},{"datetime":"2026-03-09T23:37:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-03-09T23:04:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-03-09T09:32:00.000","type":"Aid Response","address":"3512 Sw Alaska St","lat":47.561066,"lon":-122.376355},{"datetime":"2026-03-07T14:26:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2026-03-07T11:06:00.000","type":"Aid Response","address":"Fauntleroy Way Sw / Sw Alaska St","lat":47.561107,"lon":-122.381456},{"datetime":"2026-03-05T12:24:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-03-05T11:44:00.000","type":"Aid Response","address":"38TH AVE SW / SW ALASKA ST","lat":47.561082,"lon":-122.380063},{"datetime":"2026-03-04T16:10:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-03-04T11:05:00.000","type":"Medic Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-03-04T07:53:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2026-03-03T15:15:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-03-03T01:05:00.000","type":"Aid Response","address":"3801 Sw Alaska St","lat":47.561082,"lon":-122.380063},{"datetime":"2026-03-02T17:29:00.000","type":"Aid Response","address":"3515 Sw Alaska St","lat":47.561067,"lon":-122.376393},{"datetime":"2026-03-02T08:20:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Oregon St","lat":47.562861,"lon":-122.376191},{"datetime":"2026-03-02T06:37:00.000","type":"Aid Response","address":"36th Ave Sw / Sw Snoqualmie St","lat":47.562035,"lon":-122.377452},{"datetime":"2026-02-27T18:21:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-02-26T15:10:00.000","type":"Aid Response","address":"3512 Sw Alaska St","lat":47.561066,"lon":-122.376355},{"datetime":"2026-02-26T14:21:00.000","type":"Aid Response","address":"3512 Sw Alaska St","lat":47.561066,"lon":-122.376355},{"datetime":"2026-02-25T01:22:00.000","type":"Aid Response","address":"4580 Fauntleroy Way Sw","lat":47.561627,"lon":-122.380926},{"datetime":"2026-02-24T17:04:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-02-24T07:25:00.000","type":"Aid Response Yellow","address":"4600 36th Ave Sw","lat":47.562035,"lon":-122.377452},{"datetime":"2026-02-23T21:26:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-02-23T14:26:00.000","type":"Aid Response","address":"4614 36th Ave Sw","lat":47.561897,"lon":-122.377452},{"datetime":"2026-02-23T10:25:00.000","type":"Aid Response","address":"3500 Sw Snoqualmie St","lat":47.562035,"lon":-122.376202},{"datetime":"2026-02-23T10:06:00.000","type":"Aid Response","address":"3500 Sw Snoqualmie St","lat":47.562035,"lon":-122.376202},{"datetime":"2026-02-23T08:33:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-02-20T18:38:00.000","type":"Aid Response Yellow","address":"4611 35TH AVE SW","lat":47.561926,"lon":-122.376204},{"datetime":"2026-02-20T09:58:00.000","type":"Aid Response","address":"Fauntleroy Way Sw / Sw Alaska St","lat":47.561107,"lon":-122.381456},{"datetime":"2026-02-19T13:18:00.000","type":"Aid Response","address":"38th Ave Sw / Sw Alaska St","lat":47.561082,"lon":-122.380063},{"datetime":"2026-02-18T21:33:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-02-17T10:25:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2026-02-17T02:21:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-02-16T21:27:00.000","type":"Medic Response- Overdose","address":"35th Ave Sw / Sw Avalon Way","lat":47.564077,"lon":-122.376189},{"datetime":"2026-02-16T20:25:00.000","type":"Aid Response","address":"Sw Alaska St / Fauntleroy Way Sw","lat":47.561107,"lon":-122.381456},{"datetime":"2026-02-13T20:05:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-02-13T01:14:00.000","type":"Aid Response","address":"Fauntleroy Way Sw / Sw Alaska St","lat":47.561107,"lon":-122.381456},{"datetime":"2026-02-12T17:43:00.000","type":"Aid Response","address":"36TH AVE SW / SW ALASKA ST","lat":47.56107,"lon":-122.377453},{"datetime":"2026-02-12T17:34:00.000","type":"Aid Response","address":"Sw Alaska St / 36th Ave Sw","lat":47.56107,"lon":-122.377453},{"datetime":"2026-02-12T02:38:00.000","type":"Aid Response","address":"3512 Sw Alaska St","lat":47.561066,"lon":-122.376355},{"datetime":"2026-02-11T09:04:00.000","type":"Aid Response","address":"3620 Sw Alaska St","lat":47.561072,"lon":-122.377709},{"datetime":"2026-02-11T09:03:00.000","type":"Aid Response","address":"3618 SW ALASKA ST","lat":47.561072,"lon":-122.377682},{"datetime":"2026-02-10T20:40:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-02-10T15:51:00.000","type":"Medic Response","address":"35th Ave Sw / Sw Avalon Way","lat":47.564077,"lon":-122.376189},{"datetime":"2026-02-09T14:30:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Snoqualmie St","lat":47.562035,"lon":-122.376202},{"datetime":"2026-02-07T20:09:00.000","type":"Aid Response Yellow","address":"Sw Alaska St / 36th Ave Sw","lat":47.56107,"lon":-122.377453},{"datetime":"2026-02-07T13:49:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-02-02T09:30:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-02-01T16:46:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-01-31T10:18:00.000","type":"Medic Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-01-31T03:51:00.000","type":"Medic Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-01-30T15:20:00.000","type":"Aid Response","address":"FAUNTLEROY WAY SW / SW ALASKA ST","lat":47.561107,"lon":-122.381456},{"datetime":"2026-01-30T10:49:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Alaska St","lat":47.561066,"lon":-122.376216},{"datetime":"2026-01-29T00:38:00.000","type":"Aid Response","address":"4500 36th Ave Sw","lat":47.562872,"lon":-122.377451},{"datetime":"2026-01-28T21:00:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-01-26T23:07:00.000","type":"Aid Response","address":"36th Ave Sw / Sw Alaska St","lat":47.56107,"lon":-122.377453},{"datetime":"2026-01-26T10:19:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-01-26T02:48:00.000","type":"Aid Response","address":"4580 Fauntleroy Way Sw","lat":47.561627,"lon":-122.380926},{"datetime":"2026-01-25T00:34:00.000","type":"Aid Response","address":"4580 Fauntleroy Way Sw","lat":47.561627,"lon":-122.380926},{"datetime":"2026-01-24T08:17:00.000","type":"Aid Response","address":"3900 Sw Alaska St","lat":47.561107,"lon":-122.381456},{"datetime":"2026-01-23T01:08:00.000","type":"Aid Response","address":"4435 35th Ave Sw","lat":47.563869,"lon":-122.376191},{"datetime":"2026-01-20T15:24:00.000","type":"Aid Response","address":"4722 Fauntleroy Way Sw","lat":47.560704,"lon":-122.381456},{"datetime":"2026-01-20T10:57:00.000","type":"Medic Response","address":"4722 Fauntleroy Way Sw","lat":47.560704,"lon":-122.381456},{"datetime":"2026-01-19T11:33:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-01-18T22:15:00.000","type":"Medic Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-01-14T08:16:00.000","type":"Medic Response- Overdose","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-01-13T08:31:00.000","type":"Aid Response","address":"3622 Sw Snoqualmie St","lat":47.562035,"lon":-122.377735},{"datetime":"2026-01-12T21:57:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2026-01-09T21:54:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Alaska St","lat":47.561066,"lon":-122.376216},{"datetime":"2026-01-09T18:28:00.000","type":"Medic Response- Overdose","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-01-07T21:20:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-01-07T15:55:00.000","type":"Aid Response Yellow","address":"4600 36th Ave Sw","lat":47.562035,"lon":-122.377452},{"datetime":"2026-01-06T17:13:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-01-06T09:48:00.000","type":"Aid Response","address":"37th Ave Sw / Sw Snoqualmie St","lat":47.562036,"lon":-122.378773},{"datetime":"2026-01-04T16:08:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2026-01-03T15:43:00.000","type":"Aid Response","address":"4520 36th Ave Sw","lat":47.562701,"lon":-122.377451},{"datetime":"2026-01-03T11:34:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2026-01-02T07:14:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-01-02T06:52:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2026-01-02T03:22:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2025-12-30T17:24:00.000","type":"Aid Response","address":"Sw Oregon St / 36th Ave Sw","lat":47.562872,"lon":-122.377451},{"datetime":"2025-12-30T10:56:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2025-12-29T06:54:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2025-12-29T05:37:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-12-27T15:56:00.000","type":"Aid Response Yellow","address":"4722 Fauntleroy Way Sw","lat":47.560704,"lon":-122.381456},{"datetime":"2025-12-27T02:11:00.000","type":"Medic Response- Overdose","address":"SW AVALON WAY / 35TH AVE SW","lat":47.564077,"lon":-122.376189},{"datetime":"2025-12-26T13:43:00.000","type":"Medic Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-12-21T20:21:00.000","type":"Aid Response","address":"Fauntleroy Way Sw / Sw Alaska St","lat":47.561107,"lon":-122.381456},{"datetime":"2025-12-20T15:34:00.000","type":"Medic Response","address":"4550 38th Ave Sw","lat":47.56207,"lon":-122.380088},{"datetime":"2025-12-19T08:58:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-12-18T22:16:00.000","type":"Aid Response","address":"4580 Fauntleroy Way Sw","lat":47.561627,"lon":-122.380926},{"datetime":"2025-12-18T11:12:00.000","type":"Medic Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-12-17T22:02:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2025-12-17T21:15:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2025-12-15T13:28:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-12-15T10:12:00.000","type":"Aid Response","address":"4545 Fauntleroy Way Sw","lat":47.562067,"lon":-122.380342},{"datetime":"2025-12-14T19:48:00.000","type":"Aid Response","address":"Sw Avalon Way / 35th Ave Sw","lat":47.564077,"lon":-122.376189},{"datetime":"2025-12-10T12:20:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2025-12-10T11:49:00.000","type":"Aid Response","address":"Sw Alaska St / Fauntleroy Way Sw","lat":47.561107,"lon":-122.381456},{"datetime":"2025-12-10T11:48:00.000","type":"Aid Response","address":"3801 Sw Alaska St","lat":47.561082,"lon":-122.380063},{"datetime":"2025-12-09T19:54:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Alaska St","lat":47.561066,"lon":-122.376216},{"datetime":"2025-12-08T18:52:00.000","type":"Aid Response Yellow","address":"3620 Sw Alaska St","lat":47.561072,"lon":-122.377709},{"datetime":"2025-12-08T14:34:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-12-07T10:39:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-12-07T01:08:00.000","type":"Medic Response","address":"4580 Fauntleroy Way Sw","lat":47.561627,"lon":-122.380926},{"datetime":"2025-12-06T23:13:00.000","type":"Aid Response","address":"Fauntleroy Way Sw / Sw Alaska St","lat":47.561107,"lon":-122.381456},{"datetime":"2025-12-06T15:51:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-12-06T12:16:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-12-04T14:14:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Avalon Way","lat":47.564077,"lon":-122.376189},{"datetime":"2025-12-04T13:00:00.000","type":"Medic Response","address":"4480 Fauntleroy Way Sw","lat":47.563452,"lon":-122.378525},{"datetime":"2025-12-02T19:52:00.000","type":"Aid Response","address":"4550 38th Ave Sw","lat":47.56207,"lon":-122.380088},{"datetime":"2025-12-02T08:09:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-12-02T04:24:00.000","type":"Aid Response","address":"4435 35th Ave Sw","lat":47.563869,"lon":-122.376191},{"datetime":"2025-12-01T16:48:00.000","type":"Aid Response","address":"3900 SW ALASKA ST","lat":47.561107,"lon":-122.381456},{"datetime":"2025-12-01T13:19:00.000","type":"Aid Response","address":"38th Ave Sw / Sw Alaska St","lat":47.561082,"lon":-122.380063},{"datetime":"2025-12-01T07:09:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Snoqualmie St","lat":47.562035,"lon":-122.376202},{"datetime":"2025-11-30T19:11:00.000","type":"Aid Response","address":"37th Ave Sw / Sw Alaska St","lat":47.561081,"lon":-122.378772},{"datetime":"2025-11-30T11:56:00.000","type":"Medic Response- Overdose","address":"4580 FAUNTLEROY WAY SW","lat":47.561627,"lon":-122.380926},{"datetime":"2025-11-30T11:56:00.000","type":"Medic Response- Overdose","address":"4580 Fauntleroy Way Sw","lat":47.561627,"lon":-122.380926},{"datetime":"2025-11-30T08:15:00.000","type":"Aid Response","address":"4622 35th Ave Sw","lat":47.561817,"lon":-122.376205},{"datetime":"2025-11-30T06:03:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-11-29T22:26:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2025-11-29T21:29:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-11-29T15:46:00.000","type":"Medic Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-11-27T18:44:00.000","type":"Aid Response","address":"4600 35TH AVE SW","lat":47.562035,"lon":-122.376202},{"datetime":"2025-11-26T05:23:00.000","type":"Aid Response Yellow","address":"4600 36th Ave Sw","lat":47.562035,"lon":-122.377452},{"datetime":"2025-11-25T22:55:00.000","type":"Aid Response","address":"3507 Sw Alaska St","lat":47.561066,"lon":-122.376292},{"datetime":"2025-11-25T11:58:00.000","type":"Aid Response","address":"4550 38th Ave Sw","lat":47.56207,"lon":-122.380088},{"datetime":"2025-11-23T15:46:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-11-22T19:02:00.000","type":"Aid Response","address":"4435 35th Ave Sw","lat":47.563869,"lon":-122.376191},{"datetime":"2025-11-22T16:42:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-11-22T12:06:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2025-11-21T05:28:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-11-19T20:01:00.000","type":"Aid Response","address":"4422 35TH AVE SW","lat":47.564077,"lon":-122.376189},{"datetime":"2025-11-19T17:02:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-11-17T15:49:00.000","type":"Aid Response","address":"35TH AVE SW / SW ALASKA ST","lat":47.561066,"lon":-122.376216},{"datetime":"2025-11-16T19:22:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-11-16T15:33:00.000","type":"Aid Response","address":"4500 36th Ave Sw","lat":47.562872,"lon":-122.377451},{"datetime":"2025-11-15T18:06:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Avalon Way","lat":47.564077,"lon":-122.376189},{"datetime":"2025-11-15T13:03:00.000","type":"Aid Response","address":"4617 36TH AVE SW","lat":47.561868,"lon":-122.377452},{"datetime":"2025-11-14T22:59:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-11-13T08:59:00.000","type":"Medic Response- Overdose","address":"4580 Fauntleroy Way Sw","lat":47.561627,"lon":-122.380926},{"datetime":"2025-11-11T08:48:00.000","type":"Aid Response","address":"4722 Fauntleroy Way Sw","lat":47.560704,"lon":-122.381456},{"datetime":"2025-11-05T17:33:00.000","type":"Aid Response","address":"3620 Sw Alaska St","lat":47.561072,"lon":-122.377709},{"datetime":"2025-11-05T12:21:00.000","type":"Aid Response","address":"3620 Sw Alaska St","lat":47.561072,"lon":-122.377709},{"datetime":"2025-11-01T10:35:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Alaska St","lat":47.561066,"lon":-122.376216},{"datetime":"2025-10-31T15:07:00.000","type":"Medic Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-10-30T20:30:00.000","type":"Aid Response","address":"4435 35TH AVE SW","lat":47.563869,"lon":-122.376191},{"datetime":"2025-10-30T16:52:00.000","type":"Aid Response","address":"4604 37TH AVE SW","lat":47.561997,"lon":-122.378773},{"datetime":"2025-10-30T12:08:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-10-29T06:15:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-10-29T01:02:00.000","type":"Medic Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-10-28T11:10:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Alaska St","lat":47.561066,"lon":-122.376216},{"datetime":"2025-10-28T07:11:00.000","type":"Aid Response","address":"4722 Fauntleroy Way Sw","lat":47.560704,"lon":-122.381456},{"datetime":"2025-10-24T19:19:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Alaska St","lat":47.561066,"lon":-122.376216},{"datetime":"2025-10-22T20:57:00.000","type":"Aid Response","address":"4432 35th Ave Sw","lat":47.563872,"lon":-122.376189},{"datetime":"2025-10-22T19:36:00.000","type":"Medic Response","address":"4722 Fauntleroy Way Sw","lat":47.560704,"lon":-122.381456},{"datetime":"2025-10-22T17:20:00.000","type":"Aid Response","address":"4432 35th Ave Sw","lat":47.563872,"lon":-122.376189},{"datetime":"2025-10-22T07:18:00.000","type":"Aid Response Yellow","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-10-21T21:16:00.000","type":"Medic Response","address":"35th Ave Sw / Sw Avalon Way","lat":47.564077,"lon":-122.376189},{"datetime":"2025-10-21T17:29:00.000","type":"Medic Response","address":"3622 Sw Snoqualmie St","lat":47.562035,"lon":-122.377735},{"datetime":"2025-10-21T10:12:00.000","type":"Medic Response","address":"36th Ave Sw / Sw Alaska St","lat":47.56107,"lon":-122.377453},{"datetime":"2025-10-19T15:26:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Avalon Way","lat":47.564077,"lon":-122.376189},{"datetime":"2025-10-19T14:21:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Avalon Way","lat":47.564077,"lon":-122.376189},{"datetime":"2025-10-19T09:47:00.000","type":"Medic Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-10-19T00:09:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-10-18T19:02:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Snoqualmie St","lat":47.562035,"lon":-122.376202},{"datetime":"2025-10-18T09:08:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Alaska St","lat":47.561066,"lon":-122.376216},{"datetime":"2025-10-18T01:41:00.000","type":"Aid Response","address":"4435 35th Ave Sw","lat":47.563869,"lon":-122.376191},{"datetime":"2025-10-13T13:16:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-10-12T14:47:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-10-12T09:15:00.000","type":"Aid Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2025-10-09T19:07:00.000","type":"Aid Response","address":"37th Ave Sw / Sw Alaska St","lat":47.561081,"lon":-122.378772},{"datetime":"2025-10-09T15:54:00.000","type":"Aid Response","address":"4432 35th Ave Sw","lat":47.563872,"lon":-122.376189},{"datetime":"2025-10-07T18:23:00.000","type":"Aid Response Yellow","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-10-07T07:28:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-10-06T08:42:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-10-06T08:31:00.000","type":"Aid Response","address":"4432 35th Ave Sw","lat":47.563872,"lon":-122.376189},{"datetime":"2025-10-05T13:21:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-10-04T12:00:00.000","type":"Aid Response","address":"Sw Alaska St / Fauntleroy Way Sw","lat":47.561107,"lon":-122.381456},{"datetime":"2025-10-03T13:48:00.000","type":"Medic Response","address":"38th Ave Sw / Sw Alaska St","lat":47.561082,"lon":-122.380063},{"datetime":"2025-09-30T18:23:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Avalon Way","lat":47.564077,"lon":-122.376189},{"datetime":"2025-09-29T22:23:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-09-29T14:57:00.000","type":"Aid Response","address":"4700 38TH AVE SW","lat":47.561082,"lon":-122.380063},{"datetime":"2025-09-29T14:24:00.000","type":"Aid Response","address":"3602 Sw Alaska St","lat":47.56107,"lon":-122.377453},{"datetime":"2025-09-28T10:21:00.000","type":"Aid Response","address":"3622 Sw Snoqualmie St","lat":47.562035,"lon":-122.377735},{"datetime":"2025-09-28T09:17:00.000","type":"Aid Response","address":"4580 Fauntleroy Way Sw","lat":47.561627,"lon":-122.380926},{"datetime":"2025-09-28T01:11:00.000","type":"Aid Response","address":"4435 35TH AVE SW","lat":47.563869,"lon":-122.376191},{"datetime":"2025-09-27T06:03:00.000","type":"Aid Response Yellow","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-09-26T14:54:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-09-26T13:31:00.000","type":"Aid Response","address":"Sw Alaska St / 35th Ave Sw","lat":47.561066,"lon":-122.376216},{"datetime":"2025-09-23T15:42:00.000","type":"Aid Response","address":"3512 Sw Alaska St","lat":47.561066,"lon":-122.376355},{"datetime":"2025-09-23T13:58:00.000","type":"Aid Response","address":"3512 SW ALASKA ST","lat":47.561066,"lon":-122.376355},{"datetime":"2025-09-22T18:11:00.000","type":"Medic Response","address":"4600 36th Ave Sw","lat":47.562035,"lon":-122.377452},{"datetime":"2025-09-22T11:55:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-09-18T18:02:00.000","type":"Aid Response","address":"4600 35th Ave Sw","lat":47.562035,"lon":-122.376202},{"datetime":"2025-09-18T09:23:00.000","type":"Aid Response","address":"Sw Alaska St / Fauntleroy Way Sw","lat":47.561107,"lon":-122.381456},{"datetime":"2025-09-16T21:24:00.000","type":"Aid Response","address":"35TH AVE SW / SW AVALON WAY","lat":47.564077,"lon":-122.376189},{"datetime":"2025-09-16T17:01:00.000","type":"Aid Response","address":"4432 35TH AVE SW","lat":47.563872,"lon":-122.376189},{"datetime":"2025-09-15T05:30:00.000","type":"Medic Response","address":"4435 35th Ave Sw","lat":47.563869,"lon":-122.376191},{"datetime":"2025-09-14T06:54:00.000","type":"Aid Response","address":"Fauntleroy Way Sw / Sw Alaska St","lat":47.561107,"lon":-122.381456},{"datetime":"2025-09-13T01:19:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-09-12T20:42:00.000","type":"Aid Response","address":"35th Ave Sw / Sw Avalon Way","lat":47.564077,"lon":-122.376189},{"datetime":"2025-09-11T20:53:00.000","type":"Aid Response Yellow","address":"4722 Fauntleroy Way Sw","lat":47.560704,"lon":-122.381456},{"datetime":"2025-09-09T12:46:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-09-09T08:34:00.000","type":"Aid Response","address":"3500 Sw Alaska St","lat":47.561066,"lon":-122.376216},{"datetime":"2025-09-08T14:25:00.000","type":"Medic Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-09-08T12:40:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-09-06T19:27:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-09-04T13:16:00.000","type":"Medic Response","address":"3618 Sw Alaska St","lat":47.561072,"lon":-122.377682},{"datetime":"2025-09-02T16:39:00.000","type":"Aid Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-09-02T15:16:00.000","type":"Aid Response","address":"4611 35th Ave Sw","lat":47.561926,"lon":-122.376204},{"datetime":"2025-09-01T13:29:00.000","type":"Medic Response","address":"4700 38th Ave Sw","lat":47.561082,"lon":-122.380063},{"datetime":"2025-09-01T01:08:00.000","type":"Aid Response","address":"4432 35th Ave Sw","lat":47.563872,"lon":-122.376189}];
+
+        // ---- derive dimensions ----
+        const allTypes = [ ...new Set( DATA.map( d => d.type ) ) ].sort();
+        const allMonths = [ ...new Set( DATA.map( d => ( d.datetime || "" ).slice( 0, 7 ) ).filter( Boolean ) ) ].sort();
+
+        const monthLabel = ( m ) => {
+            const [ y, mo ] = m.split( "-" );
+            const names = [ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" ];
+            return names[ parseInt( mo, 10 ) - 1 ] + " " + y;
+        };
+
+        // stable color per type via golden-angle hue spread
+        const colorFor = ( i ) => {
+            const hue = ( i * 137.508 ) % 360;
+            return "hsl(" + hue.toFixed( 1 ) + " 62% 55%)";
+        };
+        const typeColor = {};
+        allTypes.forEach( ( t, i ) => { typeColor[ t ] = colorFor( i ); } );
+
+        const active = new Set( allTypes );
+
+        // ---- chart ----
+        const ctx = document.getElementById( "monthChart" ).getContext( "2d" );
+        Chart.defaults.color = "#8b98a5";
+        Chart.defaults.borderColor = "#2d3743";
+
+        const seriesFor = ( t ) => allMonths.map( m =>
+            DATA.filter( d => d.type === t && ( d.datetime || "" ).slice( 0, 7 ) === m ).length );
+
+        // total calls per month across the active types (top of each stack)
+        const monthlyTotals = () => allMonths.map( ( m, i ) =>
+            allTypes.filter( t => active.has( t ) ).reduce( ( s, t ) => s + seriesFor( t )[ i ], 0 ) );
+
+        const buildDatasets = () => {
+            const bars = allTypes.filter( t => active.has( t ) ).map( t => ( {
+                label: t,
+                data: seriesFor( t ),
+                backgroundColor: typeColor[ t ],
+                borderWidth: 0,
+                yAxisID: "y",
+                order: 1
+            } ) );
+            const totalLine = {
+                type: "line",
+                label: "Total",
+                data: monthlyTotals(),
+                borderColor: "#ffffff",
+                backgroundColor: "#ffffff",
+                borderWidth: 2,
+                tension: 0,
+                fill: false,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                yAxisID: "yLine",
+                order: 0
+            };
+            return bars.concat( totalLine );
+        };
+
+        const chart = new Chart( ctx, {
+            type: "bar",
+            data: { labels: allMonths.map( monthLabel ), datasets: buildDatasets() },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                scales: {
+                    x: { stacked: true, grid: { display: false } },
+                    y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } },
+                    yLine: { display: false, stacked: false, beginAtZero: true, position: "right" }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        // the white line mirrors the stacked total; keep it out of the per-type list
+                        filter: ( item ) => item.dataset.type !== "line",
+                        callbacks: {
+                            footer: ( items ) => "Total: " + items.reduce( ( s, i ) => s + i.parsed.y, 0 )
+                        }
+                    }
+                }
+            }
+        } );
+
+        // ---- filter UI ----
+        const filterList = document.getElementById( "filterList" );
+        const typeCounts = {};
+        allTypes.forEach( t => { typeCounts[ t ] = DATA.filter( d => d.type === t ).length; } );
+
+        allTypes.slice().sort( ( a, b ) => typeCounts[ b ] - typeCounts[ a ] ).forEach( t => {
+            const row = document.createElement( "label" );
+            row.className = "ftype";
+            row.innerHTML =
+                '<input type="checkbox" checked data-type="' + t.replace( /"/g, "&quot;" ) + '">' +
+                '<span class="swatch" style="background:' + typeColor[ t ] + '"></span>' +
+                '<span>' + t + '</span>' +
+                '<span class="cnt">' + typeCounts[ t ] + '</span>';
+            filterList.appendChild( row );
+        } );
+
+        filterList.addEventListener( "change", ( e ) => {
+            const cb = e.target;
+            if ( cb.tagName !== "INPUT" ) return;
+            const t = cb.getAttribute( "data-type" );
+            if ( cb.checked ) active.add( t ); else active.delete( t );
+            refresh();
+        } );
+
+        const setAll = ( on ) => {
+            filterList.querySelectorAll( "input" ).forEach( cb => { cb.checked = on; } );
+            active.clear();
+            if ( on ) allTypes.forEach( t => active.add( t ) );
+            refresh();
+        };
+        document.getElementById( "selAll" ).addEventListener( "click", () => setAll( true ) );
+        document.getElementById( "selNone" ).addEventListener( "click", () => setAll( false ) );
+
+        // ---- refresh all views from active set ----
+        const refresh = () => {
+            chart.data.datasets = buildDatasets();
+            const m = Math.max( 1, ...monthlyTotals() );
+            chart.options.scales.y.max = m;
+            chart.options.scales.yLine.max = m;
+            chart.update();
+        };
+
+        refresh();
+    </script>
+</body>
+</html>

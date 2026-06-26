@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timeline Branches — Team Movement</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="masthead">
+        <div class="masthead__row">
+            <h1 id="title"></h1>
+            <label class="picker">Dataset
+                <select id="dataset"></select>
+            </label>
+        </div>
+        <p id="caption"></p>
+    </header>
+
+    <section class="toolbar">
+        <input id="search" class="toolbar__search" type="search" placeholder="Search team or location">
+        <label class="toolbar__range">From <input id="from" class="toolbar__year" type="number" step="1"></label>
+        <label class="toolbar__range">To <input id="to" class="toolbar__year" type="number" step="1"></label>
+        <button id="clear" class="toolbar__clear" type="button">Reset</button>
+    </section>
+
+    <main class="stage">
+        <div id="lanes" class="lanes"></div>
+        <div id="scroller" class="scroller">
+            <div id="chart" class="chart"></div>
+        </div>
+        <aside id="detail" class="detail"></aside>
+    </main>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

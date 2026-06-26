@@ -50,17 +50,29 @@
         }
         .grid {
             display: grid;
-            grid-template-columns: repeat( 2, 1fr );
             gap: 1rem;
             width: 100%;
+        }
+        .grid--shots {
+            grid-template-columns: repeat( 3, 1fr );
+            max-width: 1040px;
+        }
+        .grid--plain {
+            grid-template-columns: repeat( 2, 1fr );
             max-width: 800px;
         }
+        .grid + .grid {
+            margin-top: 1rem;
+        }
+        @media ( max-width: 760px ) {
+            .grid--shots { grid-template-columns: repeat( 2, 1fr ); max-width: 800px; }
+        }
         @media ( max-width: 480px ) {
-            .grid { grid-template-columns: 1fr; }
+            .grid--shots, .grid--plain { grid-template-columns: 1fr; }
         }
         a.card {
             display: block;
-            padding: 1.25rem 1.5rem;
+            overflow: hidden;
             border: 1px solid var( --border );
             border-radius: 12px;
             text-decoration: none;
@@ -70,6 +82,18 @@
         a.card:hover {
             transform: translateY( -2px );
             border-color: var( --accent );
+        }
+        a.card .thumb {
+            display: block;
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+            object-position: top left;
+            background: #0b0e12;
+            border-bottom: 1px solid rgba( 0, 0, 0, 0.25 );
+        }
+        a.card .body {
+            padding: 1.25rem 1.5rem;
         }
         a.card h2 {
             margin: 0 0 0.25rem;
@@ -93,22 +117,75 @@
     <h1>experiments by Kevin</h1>
     <p class="tagline">A small collection of standalone web things.</p>
 
-    <div class="grid">
+    <div class="grid grid--shots">
+        <a class="card" href="Idea%20Garden/" style="background: #4a2a14;">
+            <img class="thumb" src="Idea%20Garden/thumb.png" alt="Idea Garden screenshot">
+            <div class="body">
+                <h2>Idea Garden</h2>
+                <p>First-person 3D garden where ideas hang as cards from a lit pergola</p>
+            </div>
+        </a>
+        <a class="card" href="Waymarker/" style="background: #2f4863;">
+            <img class="thumb" src="Waymarker/thumb.png" alt="Waymarker screenshot">
+            <div class="body">
+                <h2>Waymarker</h2>
+                <p>Browser-based AR peak-finder that labels the mountains around you</p>
+            </div>
+        </a>
+        <a class="card" href="Rapid%20Brand%20Interactives/" style="background: #6e1f3a;">
+            <img class="thumb" src="Rapid%20Brand%20Interactives/thumb.png" alt="Rapid Brand Interactives screenshot">
+            <div class="body">
+                <h2>Rapid Brand Interactives</h2>
+                <p>Concept mini-games for brand loyalty programs</p>
+            </div>
+        </a>
+        <a class="card" href="Water%20Temps/" style="background: #1b5e8a;">
+            <img class="thumb" src="Water%20Temps/thumb.png" alt="Water Temps screenshot">
+            <div class="body">
+                <h2>Water Temps</h2>
+                <p>Crowd and public water-temperature readings on an interactive map</p>
+            </div>
+        </a>
+        <a class="card" href="911%20Dashboard/" style="background: #7d1d1d;">
+            <img class="thumb" src="911%20Dashboard/thumb.png" alt="911 Dashboard screenshot">
+            <div class="body">
+                <h2>911 Dashboard</h2>
+                <p>Monthly 911 call patterns broken down by type</p>
+            </div>
+        </a>
+        <a class="card" href="Timeline%20Branches/" style="background: #3b2f6b;">
+            <img class="thumb" src="Timeline%20Branches/thumb.png" alt="Timeline Branches screenshot">
+            <div class="body">
+                <h2>Timeline Branches</h2>
+                <p>Branching timeline of people moving between groups over time</p>
+            </div>
+        </a>
+    </div>
+
+    <div class="grid grid--plain">
         <a class="card" href="Pop%20o'Clock/" style="background: #0d3d6b;">
-            <h2>Pop o'Clock</h2>
-            <p>Test your hand-eye-mouse coordination with this simple game</p>
+            <div class="body">
+                <h2>Pop o'Clock</h2>
+                <p>Test your hand-eye-mouse coordination with this simple game</p>
+            </div>
         </a>
         <a class="card" href="Pic%20Shop/" style="background: #1a4a28;">
-            <h2>Pic Shop</h2>
-            <p>Basic layer-based image editor</p>
+            <div class="body">
+                <h2>Pic Shop</h2>
+                <p>Basic layer-based image editor</p>
+            </div>
         </a>
         <a class="card" href="Pixel%20Pics/" style="background: #3b1f6b;">
-            <h2>Pixel Pics</h2>
-            <p>Pixel art converstion tool</p>
+            <div class="body">
+                <h2>Pixel Pics</h2>
+                <p>Pixel art converstion tool</p>
+            </div>
         </a>
         <a class="card" href="Vid%20Stacker%20Web/" style="background: #7a3410;">
-            <h2>Vid Stacker</h2>
-            <p>Video frame stacker</p>
+            <div class="body">
+                <h2>Vid Stacker</h2>
+                <p>Video frame stacker</p>
+            </div>
         </a>
     </div>
 
