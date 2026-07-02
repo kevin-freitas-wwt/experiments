@@ -1021,25 +1021,60 @@ function setBtnProgress(btn, frac){ const pct=Math.max(0,Math.min(100,Math.round
 //» Restore an export button to its normal label.
 function clearBtnProgress(btn, label){ btn.style.backgroundImage=""; btn.textContent=label; }
 
-//» Render → 256 kbps MP3 via inlined lamejs, encoded in chunks (with yields) so the UI stays responsive.
+//» Lazily build a Web Worker that runs the lamejs encoder off the main thread (null if Workers unavailable).
+let mp3Worker;
+function getMp3Worker(){
+    if(mp3Worker!==undefined) return mp3Worker;
+    try{
+        const lib=document.getElementById('lamejs-lib'); if(!lib) throw new Error('no lib');
+        const glue = "self.onmessage=function(e){var d=e.data,Lf=d.L,Rf=d.R,n=Lf.length,i;"
+            + "var L=new Int16Array(n),R=new Int16Array(n);"
+            + "for(i=0;i<n;i++){var a=Lf[i];a=a<-1?-1:a>1?1:a;L[i]=a<0?a*0x8000:a*0x7fff;"
+            + "var b=Rf[i];b=b<-1?-1:b>1?1:b;R[i]=b<0?b*0x8000:b*0x7fff;}"
+            + "var enc=new lamejs.Mp3Encoder(2,d.sr,d.br),block=1152,chunks=[],len=0,j,k;"
+            + "for(j=0;j<n;j+=block){var mp3=enc.encodeBuffer(L.subarray(j,j+block),R.subarray(j,j+block));"
+            + "if(mp3.length){chunks.push(mp3);len+=mp3.length;} if((j/block)%64===0)self.postMessage({p:j/n});}"
+            + "var tail=enc.flush(); if(tail.length){chunks.push(tail);len+=tail.length;}"
+            + "var out=new Uint8Array(len),off=0; for(k=0;k<chunks.length;k++){out.set(chunks[k],off);off+=chunks[k].length;}"
+            + "self.postMessage({done:1,mp3:out.buffer},[out.buffer]);};";
+        mp3Worker=new Worker(URL.createObjectURL(new Blob([lib.textContent+"\n"+glue],{type:'application/javascript'})));
+    }catch(e){ console.warn('MP3 worker unavailable, using main thread', e); mp3Worker=null; }
+    return mp3Worker;
+}
+//» Main-thread fallback encoder: chunked with yields so the UI stays responsive when Workers aren't available.
+async function encodeMp3Main(cl, cr, sr, onProg){
+    const L=new Int16Array(cl.length), R=new Int16Array(cr.length);
+    for(let i=0;i<cl.length;i++){ let l=Math.max(-1,Math.min(1,cl[i])); L[i]=l<0?l*0x8000:l*0x7fff;
+        let r=Math.max(-1,Math.min(1,cr[i])); R[i]=r<0?r*0x8000:r*0x7fff; }
+    const enc=new lamejs.Mp3Encoder(2,sr,256), block=1152, batch=block*40, data=[], total=L.length;
+    for(let i=0;i<total;i+=batch){ const end=Math.min(i+batch,total);
+        for(let j=i;j<end;j+=block){ const mp3=enc.encodeBuffer(L.subarray(j,j+block),R.subarray(j,j+block)); if(mp3.length) data.push(new Int8Array(mp3)); }
+        if(onProg) onProg(end/total); await new Promise(r=>setTimeout(r,0)); }
+    const tail=enc.flush(); if(tail.length) data.push(new Int8Array(tail));
+    return new Blob(data,{type:'audio/mpeg'});
+}
+//» Render → 256 kbps MP3. Encoding runs in a Web Worker (off the main thread) for speed on slow hardware; falls back to the main thread if needed.
 async function exportMp3(){ const seconds=Math.max(5,Math.min(600,Number(lenInput.value)||60));
     if(typeof lamejs==='undefined'){ alert('MP3 encoder failed to load.'); return; }
     const btn=document.getElementById("mp3Btn"); btn.disabled=true; const lbl=btn.textContent; setBtnProgress(btn,0);
     try{
-        const buf=await renderWav(seconds, f=>setBtnProgress(btn, f*0.5)), sr=buf.sampleRate;
-        const cl=buf.getChannelData(0), cr=buf.numberOfChannels>1?buf.getChannelData(1):cl;
-        const L=new Int16Array(cl.length), R=new Int16Array(cr.length);
-        for(let i=0;i<cl.length;i++){ let l=Math.max(-1,Math.min(1,cl[i])); L[i]=l<0?l*0x8000:l*0x7fff;
-            let r=Math.max(-1,Math.min(1,cr[i])); R[i]=r<0?r*0x8000:r*0x7fff; }
-        const enc=new lamejs.Mp3Encoder(2, sr, 256), block=1152, batch=block*40, data=[], total=L.length;
-        for(let i=0;i<total;i+=batch){
-            const end=Math.min(i+batch,total);
-            for(let j=i;j<end;j+=block){ const mp3=enc.encodeBuffer(L.subarray(j,j+block), R.subarray(j,j+block)); if(mp3.length) data.push(new Int8Array(mp3)); }
-            setBtnProgress(btn, 0.5 + 0.5*end/total);
-            await new Promise(r=>setTimeout(r,0));   // yield so the UI stays responsive
+        const buf=await renderWav(seconds, f=>setBtnProgress(btn, f*0.4));   // render = first 40% of the bar
+        const cl=buf.getChannelData(0), cr=buf.numberOfChannels>1?buf.getChannelData(1):buf.getChannelData(0);
+        const w=getMp3Worker(); let blob=null;
+        if(w){
+            try{
+                const Lf=Float32Array.from(cl), Rf=Float32Array.from(cr);   // copies we can transfer to the worker
+                blob=await new Promise((resolve,reject)=>{
+                    w.onmessage=(e)=>{ if(e.data.p!=null) setBtnProgress(btn, 0.4+0.6*e.data.p);
+                        else if(e.data.done) resolve(new Blob([e.data.mp3],{type:'audio/mpeg'})); };
+                    w.onerror=(err)=>reject(err);
+                    w.postMessage({L:Lf,R:Rf,sr:buf.sampleRate,br:256},[Lf.buffer,Rf.buffer]);
+                });
+            }catch(err){ console.warn('worker encode failed, falling back', err); mp3Worker=null; blob=null; }
         }
-        const tail=enc.flush(); if(tail.length) data.push(new Int8Array(tail));
-        const url=URL.createObjectURL(new Blob(data,{type:'audio/mpeg'}));
+        if(!blob) blob=await encodeMp3Main(cl,cr,buf.sampleRate, f=>setBtnProgress(btn,0.4+0.6*f));
+        setBtnProgress(btn,1);
+        const url=URL.createObjectURL(blob);
         const a=document.createElement("a"); a.href=url; a.download=`web-audio-synth-${params.style.toLowerCase()}-${seconds}s.mp3`;
         document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000);
     }catch(e){ console.error(e); alert("MP3 render failed: "+e.message); }
