@@ -99,6 +99,7 @@
             <button class="btn" id="collapseBtn" title="Hide/show the controls">▾</button>
             <button class="btn" id="toggleBtn">Pause</button>
             <button class="btn" id="shuffleBtn" title="Randomize all voices &amp; settings">⚄ Shuffle</button>
+            <button class="btn" id="vizBtn" title="Toggle the background visuals">Visuals: On</button>
             <div class="field"><label>Groove</label><select class="sel" id="style"></select></div>
             <div class="field"><label>Harmony</label><select class="sel" id="harmony"></select></div>
             <div class="field"><label>Scale</label><select class="sel" id="scale"></select></div>
@@ -546,7 +547,7 @@ const choice = (a)=> a[(Math.random()*a.length)|0];
 //» Single source of truth for all settings (global + per-voice). Mirrored to the URL and read by the engine.
 const params = {
     style:"Lo-fi", harmony:"Lo-fi descending", scale:"Minor", tempo:80, leadMode:"Walk",
-    key:"A", meter:"4/4", reverbSize:0.5, width:0.7, varyEvery:0,
+    key:"A", meter:"4/4", reverbSize:0.5, width:0.7, varyEvery:0, viz:true,
     voices:{
         chords:{ synth:"Strings (ensemble)", density:0.3, bright:0.5, space:0.6, vol:0.8, rnd:0.2, dly:0.1, mute:false },
         bass:  { synth:"Velour (warm saw)", density:0.8, bright:0.4, space:0.18, vol:0.9, rnd:0.25, dly:0.0, mute:false },
@@ -1112,11 +1113,18 @@ addEventListener("resize",resize); resize();
 function initOrbs(){ orbs.length=0; for(let i=0;i<6;i++) orbs.push({x:Math.random()*W,y:Math.random()*H,
     r:rand(.25,.55)*Math.min(W,H),vx:rand(-.06,.06)*DPR,vy:rand(-.06,.06)*DPR,hue:rand(200,300),a:rand(.05,.12)}); }
 //» Spawn an expanding ring at a random spot when a note plays (hue from pitch).
-function spawnRipple(m,delaySec,scale){ ripples.push({x:rand(.15,.85)*W,y:rand(.2,.8)*H,t:performance.now()+delaySec*1000,
-    life:0,max:rand(.18,.42)*Math.min(W,H)*scale,hue:(m*9)%360}); }
+function spawnRipple(m,delaySec,scale){
+    // Don't queue ripples when visuals are off or the tab is hidden — otherwise
+    // they pile up (rAF is paused in the background) and burst on return.
+    if(!params.viz || document.hidden) return;
+    ripples.push({x:rand(.15,.85)*W,y:rand(.2,.8)*H,t:performance.now()+delaySec*1000,
+        life:0,max:rand(.18,.42)*Math.min(W,H)*scale,hue:(m*9)%360});
+    if(ripples.length>200) ripples.splice(0, ripples.length-200);   // safety cap
+}
 let energy=0;
 //» Animation loop: fade, draw orbs (reacting to audio energy) and note ripples.
 function draw(){ requestAnimationFrame(draw);
+    if(!params.viz || document.hidden) return;   // idle when visuals off / tab backgrounded
     if(analyser){ const b=new Uint8Array(analyser.frequencyBinCount); analyser.getByteFrequencyData(b);
         let s=0; for(let i=0;i<48;i++) s+=b[i]; energy+=((s/48/255)-energy)*0.18; }
     g.globalCompositeOperation="source-over"; g.fillStyle="rgba(5,7,13,0.20)"; g.fillRect(0,0,W,H);
@@ -1228,6 +1236,13 @@ function syncUI(){
         engine.convolver.buffer=makeImpulse(engine.ac, 2+params.reverbSize*4, 2+params.reverbSize*2.5); }
 }
 document.getElementById("shuffleBtn").addEventListener("click",()=>{ randomizeParams(); syncUI(); updateURL(); for(const o of orbs) o.hue=rand(200,300); });
+
+// Visuals toggle: reflect params.viz on the button + canvas, drop any backlog.
+const vizBtn=document.getElementById("vizBtn");
+function updateViz(){ vizBtn.textContent="Visuals: "+(params.viz?"On":"Off"); canvas.style.display=params.viz?"":"none"; if(!params.viz) ripples.length=0; }
+vizBtn.addEventListener("click",()=>{ params.viz=!params.viz; if(params.viz){ ripples.length=0; energy=0; } updateViz(); updateURL(); });
+// Coming back to the tab: discard the backlog so nothing bursts on the first frame.
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ ripples.length=0; energy=0; } });
 document.getElementById("midiBtn").addEventListener("click", exportMidi);
 document.getElementById("mp3Btn").addEventListener("click", exportMp3);
 const collapseBtn=document.getElementById("collapseBtn");
@@ -1240,7 +1255,7 @@ copyBtn.addEventListener("click", ()=>{ updateURL(); const link=location.href;
 /* ---- shareable state in the URL hash ---- */
 //» Serialize the current patch to a compact base64 string for the URL hash.
 function encodeState(){ const s={ st:params.style, h:params.harmony, sc:params.scale, lm:params.leadMode, tp:params.tempo,
-        ky:params.key, mt:params.meter, rv:params.reverbSize, wd:params.width, ve:params.varyEvery, v:{} };
+        ky:params.key, mt:params.meter, rv:params.reverbSize, wd:params.width, ve:params.varyEvery, vz:params.viz?1:0, v:{} };
     for(const k in params.voices){ const o=params.voices[k]; s.v[k]=[o.synth,o.density,o.bright,o.space,o.vol,o.rnd,o.mute?1:0,o.dly]; }
     return btoa(unescape(encodeURIComponent(JSON.stringify(s)))); }
 //» Restore a patch from a URL-hash string (validated).
@@ -1249,6 +1264,7 @@ function applyState(str){ try{ const s=JSON.parse(decodeURIComponent(escape(atob
     if(s.lm&&LEAD_MODES.includes(s.lm))params.leadMode=s.lm; if(s.tp)params.tempo=Math.max(50,Math.min(180,+s.tp));
     if(s.ky&&NOTE_NAMES.includes(s.ky))params.key=s.ky; if(s.mt&&METERS[s.mt])params.meter=s.mt;
     if(s.rv!=null)params.reverbSize=+s.rv; if(s.wd!=null)params.width=+s.wd; if(s.ve!=null)params.varyEvery=+s.ve;
+    if(s.vz!=null)params.viz=!!s.vz;
     if(s.v) for(const k in s.v){ const o=params.voices[k]; if(!o)continue; const a=s.v[k];
         if(a[0]&&(SYNTHS[a[0]]||KITS[a[0]]))o.synth=a[0]; o.density=+a[1]; o.bright=+a[2]; o.space=+a[3]; o.vol=+a[4]; o.rnd=+a[5]; o.mute=!!a[6];
         if(a[7]!=null)o.dly=+a[7]; }
@@ -1287,6 +1303,7 @@ document.querySelectorAll('.panel label').forEach(l=>{ const d=LABEL_DESC[l.text
 const _h=location.hash;
 if(_h.indexOf('#p=')===0 && applyState(_h.slice(3))){ syncUI(); }
 else { randomizeParams(); syncUI(); updateURL(); }
+updateViz();   // reflect the (possibly restored) visuals toggle
 </script>
 </body>
 </html>
