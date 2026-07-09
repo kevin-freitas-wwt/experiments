@@ -1253,12 +1253,36 @@ copyBtn.addEventListener("click", ()=>{ updateURL(); const link=location.href;
     copyBtn.textContent="Copied!"; setTimeout(()=>copyBtn.textContent="Copy Link",1200); });
 
 /* ---- shareable state in the URL hash ---- */
-//» Serialize the current patch to a compact base64 string for the URL hash.
-function encodeState(){ const s={ st:params.style, h:params.harmony, sc:params.scale, lm:params.leadMode, tp:params.tempo,
-        ky:params.key, mt:params.meter, rv:params.reverbSize, wd:params.width, ve:params.varyEvery, vz:params.viz?1:0, v:{} };
-    for(const k in params.voices){ const o=params.voices[k]; s.v[k]=[o.synth,o.density,o.bright,o.space,o.vol,o.rnd,o.mute?1:0,o.dly]; }
-    return btoa(unescape(encodeURIComponent(JSON.stringify(s)))); }
-//» Restore a patch from a URL-hash string (validated).
+// Fixed voice order used by the compact codec (must never be reordered).
+const VOICE_ORDER=['chords','lead','bass','drums'];
+// base64url helpers (URL-safe, no padding).
+function bytesToB64u(bytes){ let s=''; for(let i=0;i<bytes.length;i++) s+=String.fromCharCode(bytes[i]);
+    return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function b64uToBytes(str){ str=str.replace(/-/g,'+').replace(/_/g,'/'); while(str.length%4) str+='=';
+    const bin=atob(str), a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i); return a; }
+const q255=(x)=>Math.max(0,Math.min(255,Math.round(x*255)));    // 0..1 float -> byte
+const idxOf=(arr,v)=>{ const i=arr.indexOf(v); return i<0?0:i; };
+
+//» Serialize the current patch to a compact base64url string (format v1).
+//  Layout: [ver, style, harmony, scale, leadMode, key, meter, tempo-50,
+//           reverb, width, varyEvery, flags] + per-voice[synth,dens,bri,spc,vol,rnd,dly].
+//  `flags` bit0 = visuals on; bits1..4 = mute for chords/lead/bass/drums.
+function encodeState(){
+    const KS=Object.keys(STYLES),KH=Object.keys(HARMONIES),KSC=Object.keys(SCALES),KM=Object.keys(METERS),
+          SY=Object.keys(SYNTHS),KI=Object.keys(KITS);
+    const b=[1,
+        idxOf(KS,params.style), idxOf(KH,params.harmony), idxOf(KSC,params.scale), idxOf(LEAD_MODES,params.leadMode),
+        Math.max(0,NOTE_NAMES.indexOf(params.key)), idxOf(KM,params.meter),
+        Math.max(0,Math.min(255,Math.round(params.tempo)-50)), q255(params.reverbSize), q255(params.width),
+        Math.max(0,Math.min(255,params.varyEvery|0)) ];
+    let flags=params.viz?1:0;
+    VOICE_ORDER.forEach((k,i)=>{ if(params.voices[k].mute) flags|=(1<<(i+1)); });
+    b.push(flags);
+    VOICE_ORDER.forEach(k=>{ const o=params.voices[k], list=(k==='drums'?KI:SY);
+        b.push(idxOf(list,o.synth), q255(o.density), q255(o.bright), q255(o.space), q255(o.vol), q255(o.rnd), q255(o.dly)); });
+    return bytesToB64u(b);
+}
+//» LEGACY: restore a patch from the old JSON base64 format (#p=…) so old links still work.
 function applyState(str){ try{ const s=JSON.parse(decodeURIComponent(escape(atob(str))));
     if(s.st&&STYLES[s.st])params.style=s.st; if(s.h&&HARMONIES[s.h])params.harmony=s.h; if(s.sc&&SCALES[s.sc])params.scale=s.sc;
     if(s.lm&&LEAD_MODES.includes(s.lm))params.leadMode=s.lm; if(s.tp)params.tempo=Math.max(50,Math.min(180,+s.tp));
@@ -1269,9 +1293,31 @@ function applyState(str){ try{ const s=JSON.parse(decodeURIComponent(escape(atob
         if(a[0]&&(SYNTHS[a[0]]||KITS[a[0]]))o.synth=a[0]; o.density=+a[1]; o.bright=+a[2]; o.space=+a[3]; o.vol=+a[4]; o.rnd=+a[5]; o.mute=!!a[6];
         if(a[7]!=null)o.dly=+a[7]; }
     return true; }catch(e){ return false; } }
+
+//» Restore a patch from the compact base64url format (#c=…). Returns false if invalid.
+function applyCompact(str){ try{
+    const b=b64uToBytes(str);
+    if(b.length<40 || b[0]!==1) return false;                       // version / length guard
+    const KS=Object.keys(STYLES),KH=Object.keys(HARMONIES),KSC=Object.keys(SCALES),KM=Object.keys(METERS),
+          SY=Object.keys(SYNTHS),KI=Object.keys(KITS);
+    const pick=(arr,i)=>(i>=0&&i<arr.length)?arr[i]:arr[0];
+    let p=1;
+    params.style=pick(KS,b[p++]); params.harmony=pick(KH,b[p++]); params.scale=pick(KSC,b[p++]);
+    params.leadMode=pick(LEAD_MODES,b[p++]); params.key=pick(NOTE_NAMES,b[p++]); params.meter=pick(KM,b[p++]);
+    params.tempo=Math.max(50,Math.min(180,b[p++]+50));
+    params.reverbSize=b[p++]/255; params.width=b[p++]/255; params.varyEvery=b[p++];
+    const flags=b[p++]; params.viz=!!(flags&1);
+    VOICE_ORDER.forEach((k,i)=>{ const o=params.voices[k]; if(!o){ p+=7; return; }
+        const list=(k==='drums'?KI:SY);
+        o.synth=pick(list,b[p++]); o.density=b[p++]/255; o.bright=b[p++]/255; o.space=b[p++]/255;
+        o.vol=b[p++]/255; o.rnd=b[p++]/255; o.dly=b[p++]/255; o.mute=!!(flags&(1<<(i+1)));
+    });
+    return true;
+}catch(e){ return false; } }
+
 let _urlT=null;
-//» Debounced write of the current patch into the URL (#p=…) so links are shareable.
-function updateURL(){ clearTimeout(_urlT); _urlT=setTimeout(()=>{ try{ history.replaceState(null,'','#p='+encodeState()); }catch(e){} }, 250); }
+//» Debounced write of the current patch into the URL (#c=…) so links are shareable.
+function updateURL(){ clearTimeout(_urlT); _urlT=setTimeout(()=>{ try{ history.replaceState(null,'','#c='+encodeState()); }catch(e){} }, 250); }
 
 // changes anywhere update the URL
 panel.addEventListener("input", updateURL); panel.addEventListener("change", updateURL);
@@ -1299,11 +1345,14 @@ const LABEL_DESC={
 };
 document.querySelectorAll('.panel label').forEach(l=>{ const d=LABEL_DESC[l.textContent.trim()]; if(d) l.title=d; });
 
-// load: restore from URL if present, else randomize
+// load: restore from URL (compact #c= or legacy #p=), else randomize.
 const _h=location.hash;
-if(_h.indexOf('#p=')===0 && applyState(_h.slice(3))){ syncUI(); }
-else { randomizeParams(); syncUI(); updateURL(); }
-updateViz();   // reflect the (possibly restored) visuals toggle
+let _ok=false;
+if(_h.indexOf('#c=')===0) _ok=applyCompact(_h.slice(3));
+else if(_h.indexOf('#p=')===0) _ok=applyState(_h.slice(3));   // legacy links still work
+if(!_ok) randomizeParams();
+syncUI(); updateViz();
+updateURL();   // normalize the hash to the short compact form (upgrades legacy links)
 </script>
 </body>
 </html>
