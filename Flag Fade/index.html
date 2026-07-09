@@ -7,26 +7,32 @@
 <meta name="theme-color" content="#0e1116">
 <title>Flag Fade</title>
 <style>
-    /* ---------- Theme tokens ---------- */
+    /* ---------- Metro theme tokens ----------
+       Windows Phone 7/8 "Metro": pure-black canvas, flat solid tiles with hard
+       corners, no gradients/shadows, thin Segoe type, vivid accent colors. */
     :root{
-        --bg:#0e1116;            /* app background            */
-        --panel:#171b22;         /* cards / surfaces          */
-        --panel-2:#1f2530;       /* raised surfaces           */
-        --fg:#f2f4f8;            /* primary text              */
-        --muted:#9aa4b2;         /* secondary text            */
-        --accent:#4c8dff;        /* brand / progress          */
-        --good:#31c56a;          /* correct answer            */
-        --bad:#f0506b;           /* wrong answer              */
-        --line:#2a323d;          /* borders                   */
-        --flag-outline:#c7ced8;  /* SVG line-art stroke       */
+        --bg:#000000;            /* pure-black canvas                     */
+        --panel:#141414;         /* flat tile surface                     */
+        --panel-2:#1f1f1f;       /* raised flat surface                   */
+        --fg:#ffffff;            /* primary text                          */
+        --muted:#a6a6a6;         /* secondary text                        */
+        --accent:#1ba1e2;        /* Metro cyan — brand / progress         */
+        --lime:#a4c400;          /* Metro lime  (option tile)             */
+        --magenta:#d80073;       /* Metro magenta (option tile)           */
+        --good:#60a917;          /* Metro green — correct                 */
+        --bad:#e51400;           /* Metro red — wrong                     */
+        --line:#2a2a2a;          /* hairline borders                      */
+        --flag-outline:#d0d0d0;  /* SVG line-art stroke                   */
     }
 
     *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
     html,body{ height:100%; }
     body{
         margin:0;
-        font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-        background:radial-gradient(120% 90% at 50% 0%, #1a2230 0%, var(--bg) 60%);
+        /* Segoe is the Metro typeface; fall back to other humanist sans faces. */
+        font-family:"Segoe UI","Segoe WP","Segoe UI Light",Frutiger,"Helvetica Neue",Arial,sans-serif;
+        font-weight:300;
+        background:var(--bg);
         color:var(--fg);
         display:flex;
         justify-content:center;
@@ -38,49 +44,56 @@
     /* The whole game lives in a phone-width column, centered on larger screens. */
     .app{
         width:100%;
-        max-width:440px;
+        max-width:460px;
         min-height:100dvh;
         display:flex;
         flex-direction:column;
-        padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 16px);
+        padding:calc(env(safe-area-inset-top) + 18px) 20px calc(env(safe-area-inset-bottom) + 18px);
         position:relative;
     }
 
+    /* Pivot-style app eyebrow, e.g. "FLAG FADE". */
+    .apptitle{
+        font-size:.72rem; letter-spacing:.28em; text-transform:uppercase;
+        color:var(--accent); font-weight:600; margin-bottom:14px;
+    }
+
     /* ---------- Top status row: round + score ---------- */
-    .hud{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
-    .hud .round{ font-size:.85rem; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
-    .hud .score{ font-size:1.15rem; font-weight:700; font-variant-numeric:tabular-nums; }
-    .hud .score small{ font-weight:500; color:var(--muted); font-size:.75rem; margin-left:2px; }
+    .hud{ display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:18px; }
+    .hud .round{ font-size:.72rem; letter-spacing:.22em; text-transform:uppercase; color:var(--muted); }
+    .hud .score{ font-size:2rem; font-weight:200; line-height:1; font-variant-numeric:tabular-nums; }
+    .hud .score small{
+        font-weight:400; color:var(--muted); font-size:.62rem;
+        letter-spacing:.2em; text-transform:uppercase; margin-left:5px;
+    }
 
     /* ---------- Countdown ---------- */
-    .timer{ margin-bottom:14px; }
+    .timer{ margin-bottom:18px; }
     .timer .num{
-        display:flex; align-items:baseline; gap:6px; justify-content:center;
-        font-variant-numeric:tabular-nums; margin-bottom:6px;
+        display:flex; align-items:baseline; gap:8px;
+        font-variant-numeric:tabular-nums; margin-bottom:8px;
     }
-    .timer .num b{ font-size:1.9rem; font-weight:800; letter-spacing:-.02em; }
-    .timer .num span{ font-size:.85rem; color:var(--muted); }
-    .bar{ height:8px; border-radius:99px; background:var(--panel-2); overflow:hidden; }
+    .timer .num b{ font-size:3.2rem; font-weight:200; line-height:.9; letter-spacing:-.01em; }
+    .timer .num span{ font-size:.7rem; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); }
+    .bar{ height:6px; background:#242424; }              /* flat, hard corners, no gradient */
     .bar>i{
         display:block; height:100%; width:100%;
-        background:linear-gradient(90deg,var(--good),var(--accent));
+        background:var(--accent);
         transform-origin:left; /* we scaleX this each frame */
     }
 
     /* ---------- Flag display ---------- */
     .stage{
         background:var(--panel);
-        border:1px solid var(--line);
-        border-radius:18px;
-        padding:18px;
+        padding:20px;
         display:flex; align-items:center; justify-content:center;
-        margin-bottom:10px;
+        margin-bottom:12px;
     }
     .flag{ width:100%; height:auto; display:block; overflow:visible; }
 
     .phase-label{
-        text-align:center; color:var(--muted); font-size:.8rem; letter-spacing:.04em;
-        min-height:1.1em; margin-bottom:14px;
+        color:var(--muted); font-size:.72rem; letter-spacing:.22em; text-transform:uppercase;
+        min-height:1.1em; margin-bottom:20px;
     }
 
     /* ---------- SVG reveal engine ----------
@@ -113,76 +126,84 @@
     /* When the player answers we snap the flag fully open quickly. */
     .flag.snap .sh{ transition:opacity .3s ease, fill .3s ease, stroke .3s ease; }
 
-    /* ---------- Choices ---------- */
-    .choices{ margin-top:auto; display:flex; flex-direction:column; gap:10px; }
+    /* ---------- Choices: flat Metro tiles ---------- */
+    .choices{ margin-top:auto; display:flex; flex-direction:column; gap:8px; }
     .choice{
-        appearance:none; border:1px solid var(--line);
-        background:var(--panel-2); color:var(--fg);
-        font-size:1.1rem; font-weight:600; font-family:inherit;
-        padding:16px 18px; border-radius:14px; text-align:left;
-        display:flex; align-items:center; gap:12px;
-        cursor:pointer; transition:transform .08s ease, background .15s ease, border-color .15s ease;
+        appearance:none; border:none; color:#fff; font-family:inherit;
+        font-size:1.15rem; font-weight:400;
+        padding:18px; text-align:left;
+        display:flex; align-items:center; gap:14px;
+        cursor:pointer;
+        transition:opacity .12s ease, transform .06s ease, background-color .15s ease;
     }
-    .choice .n{ color:var(--muted); font-weight:700; font-variant-numeric:tabular-nums; }
-    .choice:active{ transform:scale(.98); }
+    /* Rotating Metro tile colors for the three options. */
+    .choice:nth-child(3n+1){ background:var(--accent); }
+    .choice:nth-child(3n+2){ background:var(--lime); }
+    .choice:nth-child(3n+3){ background:var(--magenta); }
+    .choice .n{ font-size:1.4rem; font-weight:200; opacity:.85; font-variant-numeric:tabular-nums; min-width:1ch; }
+    .choice:active{ transform:scale(.99); }
     .choice:disabled{ cursor:default; }
-    .choice.correct{ background:rgba(49,197,106,.16); border-color:var(--good); color:#d6ffe6; }
-    .choice.wrong{ background:rgba(240,80,107,.14); border-color:var(--bad); color:#ffdbe2; }
-    .choice.correct .n,.choice.wrong .n{ color:inherit; }
-    /* Shape-based result icons so correct/incorrect is legible without relying on
-       color alone (color-blind friendly): green check badge = correct, red X = wrong. */
+    /* After answering: non-selected tiles dim; the answer + a wrong pick recolor. */
+    .choice:disabled:not(.correct):not(.wrong){ opacity:.35; }
+    .choice.correct{ background:var(--good) !important; }
+    .choice.wrong{ background:var(--bad) !important; }
+    /* Shape-based result badges so correct/incorrect is legible without relying on
+       color alone (color-blind friendly): white square + colored check/X glyph. */
     .choice.correct::after,.choice.wrong::after{
         margin-left:auto; flex:0 0 auto;
-        width:1.5em; height:1.5em; border-radius:50%;
+        width:1.5em; height:1.5em; background:#fff;   /* hard-cornered square = Metro */
         display:inline-flex; align-items:center; justify-content:center;
-        font-size:.95em; font-weight:900; line-height:1; color:#fff;
+        font-size:1em; font-weight:700; line-height:1;
     }
-    .choice.correct::after{ content:"\2713"; background:var(--good); }  /* ✓ */
-    .choice.wrong::after{ content:"\2715"; background:var(--bad); }     /* ✕ */
+    .choice.correct::after{ content:"\2713"; color:var(--good); }  /* ✓ */
+    .choice.wrong::after{ content:"\2715"; color:var(--bad); }     /* ✕ */
 
-    /* Floating "+points" that pops after a correct answer. */
+    /* Floating "+points" that pops after a correct answer (thin, flat). */
     .pop{
-        position:absolute; left:50%; top:44%; transform:translate(-50%,0);
-        font-size:2.2rem; font-weight:800; color:var(--good);
-        pointer-events:none; opacity:0; text-shadow:0 2px 16px rgba(49,197,106,.5);
+        position:absolute; left:20px; top:40%;
+        font-size:3rem; font-weight:200; color:#fff;
+        pointer-events:none; opacity:0;
     }
     .pop.show{ animation:pop 1.1s ease forwards; }
     @keyframes pop{
-        0%{ opacity:0; transform:translate(-50%,10px) scale(.8); }
-        20%{ opacity:1; transform:translate(-50%,-6px) scale(1.05); }
+        0%{ opacity:0; transform:translateY(12px); }
+        20%{ opacity:1; transform:translateY(-4px); }
         70%{ opacity:1; }
-        100%{ opacity:0; transform:translate(-50%,-40px) scale(1); }
+        100%{ opacity:0; transform:translateY(-36px); }
     }
 
-    /* ---------- Overlays (start + final) ---------- */
+    /* ---------- Overlays (start + final): flat black, left-aligned ---------- */
     .overlay{
         position:fixed; inset:0; z-index:20;
-        background:rgba(8,11,16,.82); backdrop-filter:blur(6px);
-        display:flex; align-items:center; justify-content:center; padding:24px;
+        background:#000;
+        display:flex; align-items:center; justify-content:center; padding:28px;
     }
     .overlay.hidden{ display:none; }
-    .sheet{
-        width:100%; max-width:400px; background:var(--panel);
-        border:1px solid var(--line); border-radius:22px; padding:26px 24px;
-        text-align:center;
+    .sheet{ width:100%; max-width:420px; text-align:left; }
+    .sheet .eyebrow{
+        font-size:.72rem; letter-spacing:.28em; text-transform:uppercase;
+        color:var(--accent); font-weight:600; margin-bottom:10px;
     }
-    .sheet h1{ margin:0 0 6px; font-size:1.9rem; letter-spacing:-.02em; }
-    .sheet .sub{ color:var(--muted); margin:0 0 18px; font-size:.95rem; line-height:1.45; }
-    .sheet .big{ font-size:3.2rem; font-weight:800; margin:6px 0 2px; font-variant-numeric:tabular-nums; }
-    .sheet .rank{ color:var(--accent); font-weight:700; margin:0 0 18px; }
+    .sheet h1{ margin:0 0 18px; font-size:3rem; font-weight:200; letter-spacing:-.01em; line-height:1; text-transform:lowercase; }
+    .sheet .sub{ color:var(--muted); margin:0 0 22px; font-size:1rem; font-weight:300; line-height:1.5; }
+    .sheet .big{ font-size:5rem; font-weight:200; line-height:.9; margin:4px 0; color:var(--accent); font-variant-numeric:tabular-nums; }
+    .sheet .rank{ color:var(--fg); font-weight:400; font-size:.8rem; letter-spacing:.22em; text-transform:uppercase; margin:0 0 26px; }
     .btn{
-        appearance:none; border:none; cursor:pointer; font-family:inherit;
-        background:var(--accent); color:#fff; font-size:1.1rem; font-weight:700;
-        padding:15px 22px; border-radius:14px; width:100%;
+        appearance:none; cursor:pointer; font-family:inherit;
+        background:transparent; color:#fff; border:2px solid #fff;
+        font-size:.95rem; font-weight:600; letter-spacing:.18em; text-transform:uppercase;
+        padding:15px 22px; width:100%;
+        transition:background-color .12s ease, color .12s ease;
     }
-    .btn:active{ transform:scale(.98); }
-    .how{ text-align:left; background:var(--panel-2); border-radius:14px; padding:14px 16px; margin:0 0 18px; }
-    .how li{ color:var(--muted); font-size:.9rem; margin:6px 0; line-height:1.4; }
-    .how li b{ color:var(--fg); }
+    .btn:active{ background:#fff; color:#000; }              /* Metro press = invert */
+    .how{ list-style:none; padding:0; margin:0 0 26px; }
+    .how li{ color:var(--muted); font-size:.92rem; font-weight:300; margin:10px 0; line-height:1.45; }
+    .how li b{ color:var(--fg); font-weight:600; }
 </style>
 </head>
 <body>
 <div class="app">
+    <div class="apptitle">flag fade</div>
     <!-- Status row -->
     <div class="hud">
         <div class="round" id="roundLabel">Round 1 / 10</div>
@@ -211,7 +232,8 @@
 <!-- Start screen -->
 <div class="overlay" id="startOverlay">
     <div class="sheet">
-        <h1>Flag Fade</h1>
+        <div class="eyebrow">flag fade</div>
+        <h1>guess the flag</h1>
         <p class="sub">A flag fades in one layer at a time. Name it before it fully appears — the faster you guess, the more points.</p>
         <ul class="how">
             <li><b>1.</b> The flag reveals in three 5-second phases: outline → shapes → colors.</li>
@@ -225,7 +247,8 @@
 <!-- Final score screen -->
 <div class="overlay hidden" id="endOverlay">
     <div class="sheet">
-        <h1>Game over</h1>
+        <div class="eyebrow">flag fade</div>
+        <h1>game over</h1>
         <p class="sub" id="endSub">You named 0 of 10 flags.</p>
         <div class="big" id="endScore">0</div>
         <p class="rank" id="endRank">—</p>
