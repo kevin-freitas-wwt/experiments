@@ -81,59 +81,27 @@
         transform-origin:left; /* we scaleX this each frame */
     }
 
-    /* ---------- Flag display ---------- */
+    /* ---------- Flag display ----------
+       The flag is a real bitmap drawn to a <canvas>. The reveal is done purely on
+       that bitmap: CSS filters animate blur (phase 1) and grayscale (phase 3); JS
+       redraws the canvas at increasing resolution for the un-pixelate (phase 2).
+       filter + transition are set inline from JS, so no per-phase classes here. */
     .stage{
         background:var(--panel);
         padding:20px;
         display:flex; align-items:center; justify-content:center;
         margin-bottom:12px;
-        position:relative;
+        aspect-ratio:3 / 2;          /* fixed box so varying flag ratios don't shift layout */
     }
-    .flag{ width:100%; height:auto; display:block; overflow:visible; }
-    /* The real flag graphic overlays the SVG and cross-fades in for the finished
-       flag. The colored SVG stays underneath as a fallback if the image can't load. */
-    .real{
-        position:absolute; inset:20px;
-        width:calc(100% - 40px); height:calc(100% - 40px);
-        object-fit:contain;
-        opacity:0; pointer-events:none;
+    .flag{
+        max-width:100%; max-height:100%; width:auto; height:auto; display:block;
+        filter:blur(25px) grayscale(1);   /* starting look until JS drives it */
     }
-    /* Transition lives on the active states so resetting a round is instant. */
-    .real.show{ opacity:1; transition:opacity 5s linear; }
-    .real.snap{ transition:opacity .3s ease; }
 
     .phase-label{
         color:var(--muted); font-size:.72rem; letter-spacing:.22em; text-transform:uppercase;
         min-height:1.1em; margin-bottom:20px;
     }
-
-    /* ---------- SVG reveal engine ----------
-       Every drawable is a `.sh` that starts invisible and fades in as an OUTLINE.
-       Phase classes on the .flag root gate each stage:
-         .r1 -> phase-1 shapes (p1) fade in as outlines   (main shapes)
-         .r2 -> phase-2 shapes (p2) fade in as outlines   (remaining shapes)
-         .r3 -> the whole SVG fades OUT while the real flag graphic fades in (colors) */
-    .flag{ opacity:1; }                 /* base state (transition lives on .r3/.snap) */
-    .flag .frame{                       /* constant thin border while the outline shows */
-        fill:none; stroke:var(--flag-outline); stroke-width:1.4;
-        vector-effect:non-scaling-stroke;
-    }
-    .flag .sh{
-        fill:transparent;
-        stroke:var(--flag-outline); stroke-width:1.3;
-        vector-effect:non-scaling-stroke;
-        opacity:0;
-        /* Each phase is a steady 5s fade (matches PHASE_MS). */
-        transition:opacity 5s linear;
-    }
-    .flag.r1 .p1{ opacity:1; }
-    .flag.r2 .p2{ opacity:1; }
-    .flag .carve{ opacity:0; }          /* carve circles never draw (real flag supplies detail) */
-
-    /* Color phase: the line-art SVG fades out (real flag fades in over the top). */
-    .flag.r3{ opacity:0; transition:opacity 5s linear; }
-    /* When the player answers, the crossfade snaps quickly instead. */
-    .flag.snap{ transition:opacity .3s ease; }
 
     /* ---------- Choices: flat Metro tiles ---------- */
     .choices{ margin-top:auto; display:flex; flex-direction:column; gap:8px; }
@@ -220,10 +188,7 @@
     .testhead .count{ color:var(--accent); font-size:.72rem; letter-spacing:.22em; text-transform:uppercase; }
     .testhead .btn{ width:auto; margin-left:auto; padding:11px 22px; }
     .testgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:18px 16px; }
-    .testcell .tflag{ position:relative; display:block; }
-    .testcell .flag{ width:100%; height:auto; display:block; background:var(--panel); padding:10px; }
-    /* Real-flag overlay for test cells (smaller padding than the game stage). */
-    .testcell .treal{ inset:10px; width:calc(100% - 20px); height:calc(100% - 20px); }
+    .testcell .stage{ aspect-ratio:3 / 2; padding:8px; margin:0; }
     .testcell .lbl{ margin-top:7px; font-size:.7rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
 </style>
 </head>
@@ -242,10 +207,9 @@
         <div class="bar"><i id="timeBar"></i></div>
     </div>
 
-    <!-- Flag -->
+    <!-- Flag (drawn to a canvas so we can pixelate/unpixelate the real graphic) -->
     <div class="stage">
-        <svg class="flag" id="flag" viewBox="-1 -1 92 62" xmlns="http://www.w3.org/2000/svg" aria-label="flag"></svg>
-        <img class="real" id="realFlag" alt="">
+        <canvas class="flag" id="flag" width="640" height="427" aria-label="flag"></canvas>
     </div>
     <div class="phase-label" id="phaseLabel">Outline</div>
 
@@ -321,294 +285,101 @@ var ROUNDS     = 10;     // flags per game
 var MAX_POINTS = 1000;   // points for an instantaneous (theoretical) correct guess
 var FEEDBACK_MS= 1700;   // pause on the answer before the next round
 
-/* ---------- SVG shape builders ----------
-   Each returns an SVG markup string. `p` is the reveal phase (1 or 2); `c` is
-   the fill color applied during the color phase. Before that phase the shape is
-   drawn as a thin outline only. */
-function rect(x,y,w,h,c,p){
-    return '<rect class="sh p'+p+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" style="--c:'+c+'"/>';
-}
-function circ(cx,cy,r,c,p,cls){
-    return '<circle class="sh p'+p+(cls?' '+cls:'')+'" cx="'+cx+'" cy="'+cy+'" r="'+r+'" style="--c:'+c+'"/>';
-}
-function poly(points,c,p){
-    return '<polygon class="sh p'+p+'" points="'+points+'" style="--c:'+c+'"/>';
-}
-function path(d,c,p){
-    return '<path class="sh p'+p+'" d="'+d+'" style="--c:'+c+'"/>';
-}
-var FRAME = '<rect class="frame" x="0" y="0" width="90" height="60"/>'; // always-visible border
-
-/* Build N horizontal stripes alternating between two colors (used by Greece/USA). */
-function stripesH(n,colA,colB,phase){
-    var h = 60/n, s = '';
-    for(var i=0;i<n;i++){
-        s += rect(0, +(i*h).toFixed(3), 90, +h.toFixed(3), (i%2===0?colA:colB), phase);
-    }
-    return s;
-}
-
-/* A five-pointed star centered at (cx,cy) with outer radius R, pointing up. */
-function star(cx,cy,R,c,p){
-    var pts = [], inner = R*0.382;
-    for(var i=0;i<5;i++){
-        var ao = (-90 + i*72) * Math.PI/180;          // outer vertex
-        pts.push([cx+Math.cos(ao)*R, cy+Math.sin(ao)*R]);
-        var ai = (-90 + i*72 + 36) * Math.PI/180;      // inner vertex
-        pts.push([cx+Math.cos(ai)*inner, cy+Math.sin(ai)*inner]);
-    }
-    return poly(pts.map(function(pt){ return pt[0].toFixed(2)+','+pt[1].toFixed(2); }).join(' '), c, p);
-}
-
-/* Equal-size color bands. Outer bands reveal in phase 1, inner bands in phase 2,
-   which gives even simple tricolors a staged reveal. */
-function bandP(i,n){ return n===2 ? (i===0?1:2) : ((i===0||i===n-1)?1:2); }
-function hbands(cols){ var n=cols.length,h=60/n,s=""; for(var i=0;i<n;i++) s+=rect(0,+(i*h).toFixed(3),90,+h.toFixed(3),cols[i],bandP(i,n)); return s; }
-function vbands(cols){ var n=cols.length,w=90/n,s=""; for(var i=0;i<n;i++) s+=rect(+(i*w).toFixed(3),0,+w.toFixed(3),60,cols[i],bandP(i,n)); return s; }
-
-/* Nordic cross (bar offset toward the hoist): field in phase 1, cross in phase 2. */
-function nordic(field,cross){ return rect(0,0,90,60,field,1)+rect(22,0,12,60,cross,2)+rect(0,24,90,12,cross,2); }
-/* Nordic cross with an inner colored cross layered on top (Norway, Iceland). */
-function nordic2(field,outer,inner){ return nordic(field,outer)+rect(25,0,6,60,inner,2)+rect(0,27,90,6,inner,2); }
-
-/* Triangle growing from the hoist (left) edge, apex at (w,30). */
-function triHoist(color,phase,w){ w=w||34; return poly("0,0 "+w+",30 0,60",color,phase); }
-
-/* Crescent: a disc of `cresCol` carved by a field-colored disc offset to its right. */
-function crescent(cx,cy,r,cresCol,field,phase){
-    return circ(cx,cy,r,cresCol,phase)+circ(cx+r*0.34,cy,r*0.82,field,phase,"carve");
-}
-
-/* ---------- Custom emblem shapes ---------- */
-
-/* Sun with triangular rays (Sol de Mayo, simplified) — disc + nRays spikes. */
-function sun(cx,cy,r,c,phase,nRays){
-    nRays=nRays||16; var s="", tip=r*1.75;
-    for(var i=0;i<nRays;i++){
-        var a0=i*2*Math.PI/nRays, a1=a0+Math.PI/nRays, a2=a0+2*Math.PI/nRays;
-        s+=poly((cx+Math.cos(a0)*r).toFixed(2)+","+(cy+Math.sin(a0)*r).toFixed(2)+" "
-              + (cx+Math.cos(a1)*tip).toFixed(2)+","+(cy+Math.sin(a1)*tip).toFixed(2)+" "
-              + (cx+Math.cos(a2)*r).toFixed(2)+","+(cy+Math.sin(a2)*r).toFixed(2), c, phase);
-    }
-    return s+circ(cx,cy,r,c,phase);
-}
-
-/* Ashoka Chakra: a ring with 24 spokes and a hub (India). `bg` is the band color
-   shown through the ring's centre. */
-function chakra(cx,cy,r,c,bg,phase){
-    var s=circ(cx,cy,r,c,phase)+circ(cx,cy,r*0.8,bg,phase);   // navy rim + band-colored inner
-    for(var i=0;i<24;i++){
-        s+='<rect class="sh p'+phase+'" x="'+(cx-0.22)+'" y="'+(cy-r*0.8)+'" width="0.44" height="'+(r*0.8).toFixed(2)+'" '
-         + 'transform="rotate('+(i*15)+' '+cx+' '+cy+')" style="--c:'+c+'"/>';
-    }
-    return s+circ(cx,cy,r*0.16,c,phase);                       // hub
-}
-
-/* Hollow triangle (outline band) via an even-odd path — outer minus a shrunk inner
-   copy. `t` is how far each vertex moves toward the centroid (band thickness). */
-function triRing(pts,t,c,phase){
-    var gx=(pts[0][0]+pts[1][0]+pts[2][0])/3, gy=(pts[0][1]+pts[1][1]+pts[2][1])/3;
-    var inner=pts.map(function(p){ return [(p[0]+(gx-p[0])*t), (p[1]+(gy-p[1])*t)]; });
-    function d(a){ return "M"+a.map(function(p){ return p[0].toFixed(2)+","+p[1].toFixed(2); }).join("L")+"Z"; }
-    return '<path class="sh p'+phase+'" fill-rule="evenodd" d="'+d(pts)+d(inner)+'" style="--c:'+c+'"/>';
-}
-
-/* Taegeuk (yin-yang without the eyes): blue disc + red S-curve half, red on top. */
-function taegeuk(cx,cy,R,phase){
-    var r=R/2;
-    var red="M"+(cx-R)+","+cy
-          + "A"+R+","+R+" 0 0 1 "+(cx+R)+","+cy       // big top semicircle (left -> right)
-          + "A"+r+","+r+" 0 0 1 "+cx+","+cy            // small arc curving down
-          + "A"+r+","+r+" 0 0 0 "+(cx-R)+","+cy        // small arc curving up (forms the S)
-          + "Z";
-    return circ(cx,cy,R,"#0047a0",phase)
-         + '<path class="sh p'+phase+'" d="'+red+'" style="--c:#cd2e3a"/>';
-}
-
-/* One I Ching trigram: three bars (solid = true, broken = false), stacked and
-   rotated by `angle` so the bars sit perpendicular to the flag's diagonal. */
-function trigram(cx,cy,angle,pat,phase){
-    var bw=15,bh=1.8,gap=2.3,brk=2.6;
-    var out='<g transform="rotate('+angle.toFixed(2)+' '+cx+' '+cy+')">';
-    for(var i=0;i<3;i++){
-        var y=cy+(i-1)*(bh+gap)-bh/2;
-        if(pat[i]){ out+=rect(cx-bw/2,y,bw,bh,"#000000",phase); }
-        else{ var h=(bw-brk)/2; out+=rect(cx-bw/2,y,h,bh,"#000000",phase)+rect(cx+brk/2,y,h,bh,"#000000",phase); }
-    }
-    return out+"</g>";
-}
-
 /* ---------- Flag catalogue ----------
-   `group` clusters look-alikes so the wrong choices can be plausible.
-   `svg()` returns the inner SVG (frame is appended automatically).           */
+   `group` clusters look-alikes so the wrong choices stay plausible; the flag
+   graphics themselves live in flags/ (keyed by the ISO map below). */
 var FLAGS = [
-    { name:"Hungary", group:"htri", svg:function(){
-        return rect(0,0,90,20,"#cd2a3e",1) + rect(0,40,90,20,"#436f4d",1) + rect(0,20,90,20,"#ffffff",2); } },
-    { name:"Germany", group:"htri", svg:function(){
-        return rect(0,0,90,20,"#000000",1) + rect(0,40,90,20,"#ffce00",1) + rect(0,20,90,20,"#dd0000",2); } },
-    { name:"Netherlands", group:"htri", svg:function(){
-        return rect(0,0,90,20,"#ae1c28",1) + rect(0,40,90,20,"#21468b",1) + rect(0,20,90,20,"#ffffff",2); } },
-    { name:"Italy", group:"vtri", svg:function(){
-        return rect(0,0,30,60,"#009246",1) + rect(60,0,30,60,"#ce2b37",1) + rect(30,0,30,60,"#ffffff",2); } },
-    { name:"France", group:"vtri", svg:function(){
-        return rect(0,0,30,60,"#0055a4",1) + rect(60,0,30,60,"#ef4135",1) + rect(30,0,30,60,"#ffffff",2); } },
-    { name:"Ireland", group:"vtri", svg:function(){
-        return rect(0,0,30,60,"#169b62",1) + rect(60,0,30,60,"#ff883e",1) + rect(30,0,30,60,"#ffffff",2); } },
-    { name:"Japan", group:"disc", svg:function(){
-        return rect(0,0,90,60,"#ffffff",1) + circ(45,30,15,"#bc002d",2); } },
-    { name:"Bangladesh", group:"disc", svg:function(){
-        return rect(0,0,90,60,"#006a4e",1) + circ(41,30,14,"#f42a41",2); } },
-    { name:"Switzerland", group:"cross", svg:function(){
-        return rect(0,0,90,60,"#d52b1e",1) + rect(40,18,10,24,"#ffffff",2) + rect(33,25,24,10,"#ffffff",2); } },
-    { name:"Denmark", group:"cross", svg:function(){
-        return rect(0,0,90,60,"#c8102e",1) + rect(22,0,10,60,"#ffffff",2) + rect(0,25,90,10,"#ffffff",2); } },
-    { name:"Turkey", group:"crescent", svg:function(){
-        return rect(0,0,90,60,"#e30a17",1)
-             + circ(40,30,13,"#ffffff",1)
-             + circ(44,30,10.5,"#e30a17",1,"carve")   // carves the crescent using the field color
-             + star(57,30,6.5,"#ffffff",2); } },
-    { name:"Greece", group:"canton", svg:function(){
-        var s = stripesH(9,"#0d5eaf","#ffffff",1);     // 9 blue/white stripes
-        s += rect(0,0,33.33,33.33,"#0d5eaf",2);        // blue canton
-        s += rect(13.33,0,6.67,33.33,"#ffffff",2);     // white cross (vertical)
-        s += rect(0,13.33,33.33,6.67,"#ffffff",2);     // white cross (horizontal)
-        return s; } },
-    { name:"United States", group:"canton", svg:function(){
-        var s = stripesH(13,"#b22234","#ffffff",1);    // 13 red/white stripes
-        s += rect(0,0,36,32.31,"#3c3b6e",1);           // blue canton (7 stripes tall)
-        for(var r=0;r<9;r++){                          // 50 five-point stars (rows of 6 & 5)
-            var six=(r%2===0), n=six?6:5, x0=six?3.6:6.5, y=2.7+r*3.35;
-            for(var c=0;c<n;c++) s += star(x0+c*5.8, y, 1.5, "#ffffff", 2);
-        }
-        return s; } },
-    { name:"Brazil", group:"misc", svg:function(){
-        var s = rect(0,0,90,60,"#009c3b",1)            // green field
-              + poly("45,7 83,30 45,53 7,30","#ffdf00",1)  // yellow diamond
-              + circ(45,30,13,"#002776",2)             // blue disc
-              + path("M34.2,32.8 Q45,26.4 55.8,32.8 Q45,29.2 34.2,32.8 Z","#ffffff",2);  // "Ordem e Progresso" band
-        var dots = [[45,20],[40,26],[50,27],[43,33],[52,34],[47,40],[38,36]];  // constellation stars
-        for(var i=0;i<dots.length;i++) s += circ(dots[i][0],dots[i][1],1,"#ffffff",2);
-        return s; } },
-    { name:"Canada", group:"misc", svg:function(){
-        // 11-point maple leaf, symmetric about x=45 (top tip -> clockwise -> stem).
-        var leaf = "45,13 46.3,19.5 51.8,18.4 50.4,23.7 56.3,24.9 53.4,28.2 62,31.3 "
-                 + "55.7,33.6 57.3,37.4 51,36.4 51.7,44.8 47.4,42.4 45,47.5 42.6,42.4 "
-                 + "38.3,44.8 39,36.4 32.7,37.4 34.3,33.6 28,31.3 36.6,28.2 33.7,24.9 "
-                 + "39.6,23.7 38.2,18.4 43.7,19.5";
-        return rect(0,0,90,60,"#ffffff",1)             // white center field
-             + rect(0,0,22.5,60,"#d52b1e",1)           // left red bar
-             + rect(67.5,0,22.5,60,"#d52b1e",1)        // right red bar
-             + poly(leaf,"#d52b1e",2); } },            // maple leaf
-    { name:"Argentina", group:"htri", svg:function(){
-        return rect(0,0,90,20,"#74acdf",1) + rect(0,40,90,20,"#74acdf",1) + rect(0,20,90,20,"#ffffff",1)
-             + sun(45,30,4.6,"#f6b40e",2,16); } },       // Sol de Mayo (rayed sun)
-
-    /* ---- Horizontal tricolors / bicolors ---- */
-    { name:"Russia",       group:"htri", svg:function(){ return hbands(["#ffffff","#0039a6","#d52b1e"]); } },
-    { name:"Bulgaria",     group:"htri", svg:function(){ return hbands(["#ffffff","#00966e","#d62612"]); } },
-    { name:"Lithuania",    group:"htri", svg:function(){ return hbands(["#fdb913","#006a44","#c1272d"]); } },
-    { name:"Estonia",      group:"htri", svg:function(){ return hbands(["#0072ce","#000000","#ffffff"]); } },
-    { name:"Austria",      group:"htri", svg:function(){ return hbands(["#ed2939","#ffffff","#ed2939"]); } },
-    { name:"Luxembourg",   group:"htri", svg:function(){ return hbands(["#ed2939","#ffffff","#00a1de"]); } },
-    { name:"Armenia",      group:"htri", svg:function(){ return hbands(["#d90012","#0033a0","#f2a800"]); } },
-    { name:"Gabon",        group:"htri", svg:function(){ return hbands(["#009e60","#fcd116","#3a75c4"]); } },
-    { name:"Bolivia",      group:"htri", svg:function(){ return hbands(["#d52b1e","#f9e300","#007a33"]); } },
-    { name:"Sierra Leone", group:"htri", svg:function(){ return hbands(["#1eb53a","#ffffff","#0072c6"]); } },
-    { name:"Yemen",        group:"htri", svg:function(){ return hbands(["#ce1126","#ffffff","#000000"]); } },
-    { name:"Indonesia",    group:"htri", svg:function(){ return hbands(["#ce1126","#ffffff"]); } },
-    { name:"Poland",       group:"htri", svg:function(){ return hbands(["#ffffff","#dc143c"]); } },
-    { name:"Monaco",       group:"htri", svg:function(){ return hbands(["#ce1126","#ffffff"]); } },
-    { name:"Ukraine",      group:"htri", svg:function(){ return hbands(["#0057b7","#ffd700"]); } },
-    { name:"Spain",        group:"htri", svg:function(){ return rect(0,0,90,15,"#c60b1e",1)+rect(0,45,90,15,"#c60b1e",1)+rect(0,15,90,30,"#ffc400",2); } },
-    { name:"Latvia",       group:"htri", svg:function(){ return rect(0,0,90,24,"#9e3039",1)+rect(0,36,90,24,"#9e3039",1)+rect(0,24,90,12,"#ffffff",2); } },
-    { name:"Colombia",     group:"htri", svg:function(){ return rect(0,0,90,30,"#fcd116",1)+rect(0,30,90,15,"#003893",2)+rect(0,45,90,15,"#ce1126",1); } },
-    { name:"Thailand",     group:"htri", svg:function(){ return rect(0,0,90,10,"#a51931",1)+rect(0,50,90,10,"#a51931",1)+rect(0,10,90,10,"#ffffff",2)+rect(0,40,90,10,"#ffffff",2)+rect(0,20,90,20,"#2d2a4a",1); } },
-    { name:"Costa Rica",   group:"htri", svg:function(){ return rect(0,0,90,10,"#002b7f",1)+rect(0,50,90,10,"#002b7f",1)+rect(0,10,90,10,"#ffffff",2)+rect(0,40,90,10,"#ffffff",2)+rect(0,20,90,20,"#ce1126",1); } },
-    { name:"India",        group:"htri", svg:function(){ return hbands(["#ff9933","#ffffff","#138808"])+chakra(45,30,6.6,"#000080","#ffffff",2); } },
-    { name:"Niger",        group:"htri", svg:function(){ return hbands(["#e05206","#ffffff","#0db02b"])+circ(45,30,6.5,"#e05206",2); } },
-    { name:"Ghana",        group:"htri", svg:function(){ return hbands(["#ce1126","#fcd116","#006b3f"])+star(45,30,7,"#000000",2); } },
-    { name:"Egypt",        group:"htri", svg:function(){ return hbands(["#ce1126","#ffffff","#000000"])+circ(45,30,5,"#c09300",2); } },
-    { name:"Syria",        group:"htri", svg:function(){ return hbands(["#ce1126","#ffffff","#000000"])+star(36,30,4,"#007a3b",2)+star(54,30,4,"#007a3b",2); } },
-    { name:"Venezuela",    group:"htri", svg:function(){ var s=hbands(["#ffcc00","#00247d","#cf142b"]); for(var i=0;i<8;i++){ var a=(202+i*19.4)*Math.PI/180; s+=star(45+Math.cos(a)*9,40+Math.sin(a)*9,1.7,"#ffffff",2);} return s; } },
-    { name:"United Arab Emirates", group:"htri", svg:function(){ return rect(0,0,22.5,60,"#ce1126",1)+rect(22.5,0,67.5,20,"#009639",1)+rect(22.5,20,67.5,20,"#ffffff",2)+rect(22.5,40,67.5,20,"#000000",1); } },
-    { name:"Kuwait",       group:"htri", svg:function(){ return hbands(["#007a3d","#ffffff","#ce1126"])+poly("0,0 20,15 20,45 0,60","#000000",2); } },
-
-    /* ---- Vertical tricolors ---- */
-    { name:"Belgium",      group:"vtri", svg:function(){ return vbands(["#000000","#fdda24","#ef3340"]); } },
-    { name:"Romania",      group:"vtri", svg:function(){ return vbands(["#002b7f","#fcd116","#ce1126"]); } },
-    { name:"Chad",         group:"vtri", svg:function(){ return vbands(["#002664","#fecb00","#c60c30"]); } },
-    { name:"Mali",         group:"vtri", svg:function(){ return vbands(["#14b53a","#fcd116","#ce1126"]); } },
-    { name:"Guinea",       group:"vtri", svg:function(){ return vbands(["#ce1126","#fcd116","#009460"]); } },
-    { name:"Nigeria",      group:"vtri", svg:function(){ return vbands(["#008751","#ffffff","#008751"]); } },
-    { name:"Ivory Coast",  group:"vtri", svg:function(){ return vbands(["#f77f00","#ffffff","#009e60"]); } },
-    { name:"Peru",         group:"vtri", svg:function(){ return vbands(["#d91023","#ffffff","#d91023"]); } },
-    { name:"Senegal",      group:"vtri", svg:function(){ return vbands(["#00853f","#fdef42","#e31b23"])+star(45,30,8,"#00853f",2); } },
-    { name:"Cameroon",     group:"vtri", svg:function(){ return vbands(["#007a5e","#ce1126","#fcd116"])+star(45,30,7,"#fcd116",2); } },
-    { name:"Portugal",     group:"vtri", svg:function(){ return rect(0,0,36,60,"#006600",1)+rect(36,0,54,60,"#da291c",1)+circ(36,30,7,"#fff100",2)+circ(36,30,3.5,"#ffffff",2); } },
-
-    /* ---- Nordic crosses ---- */
-    { name:"Sweden",  group:"nordic", svg:function(){ return nordic("#006aa7","#fecc00"); } },
-    { name:"Finland", group:"nordic", svg:function(){ return nordic("#ffffff","#003580"); } },
-    { name:"Norway",  group:"nordic", svg:function(){ return nordic2("#ba0c2f","#ffffff","#00205b"); } },
-    { name:"Iceland", group:"nordic", svg:function(){ return nordic2("#02529c","#ffffff","#dc1e35"); } },
-
-    /* ---- Other crosses ---- */
-    { name:"England", group:"cross", svg:function(){ return rect(0,0,90,60,"#ffffff",1)+rect(38,0,14,60,"#ce1124",2)+rect(0,23,90,14,"#ce1124",2); } },
-    { name:"Georgia", group:"cross", svg:function(){ var s=rect(0,0,90,60,"#ffffff",1)+rect(38,0,14,60,"#ff0000",2)+rect(0,23,90,14,"#ff0000",2); var q=[[20,11],[70,11],[20,49],[70,49]]; for(var i=0;i<4;i++){ s+=rect(q[i][0]-1.2,q[i][1]-4,2.4,8,"#ff0000",2)+rect(q[i][0]-4,q[i][1]-1.2,8,2.4,"#ff0000",2);} return s; } },
-    { name:"Tonga",   group:"cross", svg:function(){ return rect(0,0,90,60,"#c10000",1)+rect(0,0,34,28,"#ffffff",1)+rect(13,4,8,20,"#c10000",2)+rect(5,10,24,8,"#c10000",2); } },
-
-    /* ---- Discs ---- */
-    { name:"Palau",      group:"disc", svg:function(){ return rect(0,0,90,60,"#4aadd6",1)+circ(41,30,15,"#ffde00",2); } },
-    { name:"Laos",       group:"disc", svg:function(){ return rect(0,0,90,15,"#ce1126",1)+rect(0,45,90,15,"#ce1126",1)+rect(0,15,90,30,"#002868",1)+circ(45,30,10,"#ffffff",2); } },
-    { name:"Kazakhstan", group:"disc", svg:function(){ return rect(0,0,90,60,"#00afca",1)+circ(45,27,7,"#fec50c",2); } },
-
-    /* ---- Crescent + star ---- */
-    { name:"Tunisia",   group:"crescent", svg:function(){ return rect(0,0,90,60,"#e70013",1)+circ(45,30,14,"#ffffff",1)+crescent(45,30,8,"#e70013","#ffffff",2)+star(48,30,4,"#e70013",2); } },
-    { name:"Pakistan",  group:"crescent", svg:function(){ return rect(0,0,22.5,60,"#ffffff",1)+rect(22.5,0,67.5,60,"#01411c",1)+crescent(52,32,10,"#ffffff","#01411c",2)+star(64,24,4.5,"#ffffff",2); } },
-    { name:"Malaysia",  group:"crescent", svg:function(){ var s=stripesH(14,"#cc0001","#ffffff",1)+rect(0,0,45,30,"#010066",1); s+=crescent(20,17,8,"#ffcc00","#010066",2)+star(33,17,4,"#ffcc00",2); return s; } },
-    { name:"Singapore", group:"crescent", svg:function(){ var s=rect(0,0,90,30,"#ef3340",1)+rect(0,30,90,30,"#ffffff",1)+crescent(20,17,8,"#ffffff","#ef3340",2); var st=[[30,9],[34,15],[34,23],[27,20],[27,12]]; for(var i=0;i<5;i++) s+=star(st[i][0],st[i][1],2.2,"#ffffff",2); return s; } },
-
-    /* ---- Stars in a canton / single-star canton ---- */
-    { name:"Liberia",     group:"canton", svg:function(){ return stripesH(11,"#bf0a30","#ffffff",1)+rect(0,0,32.7,32.7,"#002868",1)+star(16,16,8,"#ffffff",2); } },
-    { name:"Chile",       group:"canton", svg:function(){ return rect(0,0,90,30,"#ffffff",1)+rect(0,30,90,30,"#d52b1e",1)+rect(0,0,30,30,"#0039a6",1)+star(15,15,9,"#ffffff",2); } },
-    { name:"Togo",        group:"canton", svg:function(){ return stripesH(5,"#006a4e","#ffce00",1)+rect(0,0,24,24,"#d21034",1)+star(12,12,7,"#ffffff",2); } },
-    { name:"North Korea", group:"canton", svg:function(){ return rect(0,0,90,12,"#024fa2",1)+rect(0,48,90,12,"#024fa2",1)+rect(0,10,90,4,"#ffffff",2)+rect(0,46,90,4,"#ffffff",2)+rect(0,14,90,32,"#ed1c27",1)+circ(30,30,9,"#ffffff",2)+star(30,30,5,"#ed1c27",2); } },
-    { name:"Uruguay",     group:"canton", svg:function(){ return stripesH(9,"#ffffff","#0038a8",1)+rect(0,0,36,26.67,"#ffffff",1)+sun(18,13,4.4,"#f4c430",2,16); } },
-    { name:"Taiwan",      group:"canton", svg:function(){ return rect(0,0,90,60,"#fe0000",1)+rect(0,0,45,30,"#000095",1)+circ(22,15,8,"#ffffff",2)+circ(22,15,5,"#000095",2); } },
-    { name:"Panama",      group:"canton", svg:function(){ return rect(0,0,90,60,"#ffffff",1)+rect(45,0,45,30,"#d21034",1)+rect(0,30,45,30,"#005293",1)+star(22,15,7,"#005293",2)+star(67,45,7,"#d21034",2); } },
-
-    /* ---- Single / multiple star on a solid field ---- */
-    { name:"Vietnam", group:"star", svg:function(){ return rect(0,0,90,60,"#da251d",1)+star(45,30,14,"#ffff00",2); } },
-    { name:"China",   group:"star", svg:function(){ return rect(0,0,90,60,"#de2910",1)+star(20,17,9,"#ffde00",1)+star(37,9,3,"#ffde00",2)+star(43,15,3,"#ffde00",2)+star(43,24,3,"#ffde00",2)+star(37,31,3,"#ffde00",2); } },
-    { name:"Morocco", group:"star", svg:function(){ return rect(0,0,90,60,"#c1272d",1)+star(45,30,13,"#006233",2); } },
-    { name:"Somalia", group:"star", svg:function(){ return rect(0,0,90,60,"#4189dd",1)+star(45,30,13,"#ffffff",2); } },
-    { name:"Israel",  group:"star", svg:function(){
-        var up=[[45,18],[55.4,36],[34.6,36]], dn=[[45,42],[34.6,24],[55.4,24]];   // interlaced triangles
-        return rect(0,0,90,60,"#ffffff",1)+rect(0,9,90,7,"#0038b8",1)+rect(0,44,90,7,"#0038b8",1)
-             + triRing(up,0.30,"#0038b8",2)+triRing(dn,0.30,"#0038b8",2); } },       // hollow Star of David
-
-    /* ---- Triangle at the hoist ---- */
-    { name:"Czech Republic", group:"triangle", svg:function(){ return rect(0,0,90,30,"#ffffff",1)+rect(0,30,90,30,"#d7141a",1)+triHoist("#11457e",2,40); } },
-    { name:"Jordan",         group:"triangle", svg:function(){ return hbands(["#000000","#ffffff","#007a3b"])+triHoist("#ce1126",1,34)+star(11,30,4,"#ffffff",2); } },
-    { name:"Sudan",          group:"triangle", svg:function(){ return hbands(["#d21034","#ffffff","#000000"])+triHoist("#007229",1,34); } },
-    { name:"Palestine",      group:"triangle", svg:function(){ return hbands(["#000000","#ffffff","#007a3b"])+triHoist("#ce1126",1,34); } },
-    { name:"Bahamas",        group:"triangle", svg:function(){ return hbands(["#00778b","#ffc72c","#00778b"])+triHoist("#000000",1,34); } },
-    { name:"Djibouti",       group:"triangle", svg:function(){ return rect(0,0,90,30,"#6ab2e7",1)+rect(0,30,90,30,"#12ad2b",1)+triHoist("#ffffff",1,40)+star(11,30,5,"#d7141a",2); } },
-    { name:"Cuba",           group:"triangle", svg:function(){ return stripesH(5,"#002a8f","#ffffff",1)+triHoist("#cf142b",1,34)+star(11,30,6,"#ffffff",2); } },
-    { name:"Philippines",    group:"triangle", svg:function(){ return rect(0,0,90,30,"#0038a8",1)+rect(0,30,90,30,"#ce1126",1)+triHoist("#ffffff",1,40)+circ(13,30,4,"#fcd116",2)+star(4,7,1.6,"#fcd116",2)+star(4,53,1.6,"#fcd116",2)+star(30,30,1.6,"#fcd116",2); } },
-
-    /* ---- Distinctive one-offs ---- */
-    { name:"Jamaica",     group:"misc", svg:function(){ return rect(0,0,90,60,"#fcd116",1)+poly("7,0 83,0 45,26","#009b3a",1)+poly("7,60 83,60 45,34","#009b3a",1)+poly("0,4 41,30 0,56","#000000",1)+poly("90,4 49,30 90,56","#000000",1); } },
-    { name:"South Korea", group:"misc", svg:function(){
-        var s=rect(0,0,90,60,"#ffffff",1)+taegeuk(45,30,11,1);                       // real S-curve taegeuk
-        var C=[45,30], tg=[                                                          // four trigrams at the corners
-            {p:[17,14],pat:[true,true,true]},     // Geon ☰
-            {p:[73,14],pat:[false,true,false]},   // Gam ☵
-            {p:[17,46],pat:[true,false,true]},    // Ri  ☲
-            {p:[73,46],pat:[false,false,false]}   // Gon ☷
-        ];
-        tg.forEach(function(t){ var a=Math.atan2(C[1]-t.p[1],C[0]-t.p[0])*180/Math.PI-90; s+=trigram(t.p[0],t.p[1],a,t.pat,2); });
-        return s; } }
+    {name:"Hungary",group:"htri"},
+    {name:"Germany",group:"htri"},
+    {name:"Netherlands",group:"htri"},
+    {name:"Italy",group:"vtri"},
+    {name:"France",group:"vtri"},
+    {name:"Ireland",group:"vtri"},
+    {name:"Japan",group:"disc"},
+    {name:"Bangladesh",group:"disc"},
+    {name:"Switzerland",group:"cross"},
+    {name:"Denmark",group:"nordic"},
+    {name:"Turkey",group:"crescent"},
+    {name:"Greece",group:"canton"},
+    {name:"United States",group:"canton"},
+    {name:"Brazil",group:"misc"},
+    {name:"Canada",group:"misc"},
+    {name:"Argentina",group:"htri"},
+    {name:"Russia",group:"htri"},
+    {name:"Bulgaria",group:"htri"},
+    {name:"Lithuania",group:"htri"},
+    {name:"Estonia",group:"htri"},
+    {name:"Austria",group:"htri"},
+    {name:"Luxembourg",group:"htri"},
+    {name:"Armenia",group:"htri"},
+    {name:"Gabon",group:"htri"},
+    {name:"Bolivia",group:"htri"},
+    {name:"Sierra Leone",group:"htri"},
+    {name:"Yemen",group:"htri"},
+    {name:"Indonesia",group:"htri"},
+    {name:"Poland",group:"htri"},
+    {name:"Monaco",group:"htri"},
+    {name:"Ukraine",group:"htri"},
+    {name:"Spain",group:"htri"},
+    {name:"Latvia",group:"htri"},
+    {name:"Colombia",group:"htri"},
+    {name:"Thailand",group:"htri"},
+    {name:"Costa Rica",group:"htri"},
+    {name:"India",group:"htri"},
+    {name:"Niger",group:"htri"},
+    {name:"Ghana",group:"htri"},
+    {name:"Egypt",group:"htri"},
+    {name:"Syria",group:"htri"},
+    {name:"Venezuela",group:"htri"},
+    {name:"United Arab Emirates",group:"htri"},
+    {name:"Kuwait",group:"htri"},
+    {name:"Belgium",group:"vtri"},
+    {name:"Romania",group:"vtri"},
+    {name:"Chad",group:"vtri"},
+    {name:"Mali",group:"vtri"},
+    {name:"Guinea",group:"vtri"},
+    {name:"Nigeria",group:"vtri"},
+    {name:"Ivory Coast",group:"vtri"},
+    {name:"Peru",group:"vtri"},
+    {name:"Senegal",group:"vtri"},
+    {name:"Cameroon",group:"vtri"},
+    {name:"Portugal",group:"vtri"},
+    {name:"Sweden",group:"nordic"},
+    {name:"Finland",group:"nordic"},
+    {name:"Norway",group:"nordic"},
+    {name:"Iceland",group:"nordic"},
+    {name:"England",group:"cross"},
+    {name:"Georgia",group:"cross"},
+    {name:"Tonga",group:"cross"},
+    {name:"Palau",group:"disc"},
+    {name:"Laos",group:"disc"},
+    {name:"Kazakhstan",group:"disc"},
+    {name:"Tunisia",group:"crescent"},
+    {name:"Pakistan",group:"crescent"},
+    {name:"Malaysia",group:"crescent"},
+    {name:"Singapore",group:"crescent"},
+    {name:"Liberia",group:"canton"},
+    {name:"Chile",group:"canton"},
+    {name:"Togo",group:"canton"},
+    {name:"North Korea",group:"canton"},
+    {name:"Uruguay",group:"canton"},
+    {name:"Taiwan",group:"canton"},
+    {name:"Panama",group:"canton"},
+    {name:"Vietnam",group:"star"},
+    {name:"China",group:"star"},
+    {name:"Morocco",group:"star"},
+    {name:"Somalia",group:"star"},
+    {name:"Israel",group:"star"},
+    {name:"Czech Republic",group:"triangle"},
+    {name:"Jordan",group:"triangle"},
+    {name:"Sudan",group:"triangle"},
+    {name:"Palestine",group:"triangle"},
+    {name:"Bahamas",group:"triangle"},
+    {name:"Djibouti",group:"triangle"},
+    {name:"Cuba",group:"triangle"},
+    {name:"Philippines",group:"triangle"},
+    {name:"Jamaica",group:"misc"},
+    {name:"South Korea",group:"misc"}
 ];
 
 /* ISO 3166-1 codes (plus gb-eng) mapping each flag to its local graphic in
@@ -633,6 +404,77 @@ var ISO = {
 };
 function flagImgUrl(name){ var c=ISO[name]; return c ? "flags/"+c+".png" : ""; }
 
+/* ---------- Reveal engine (canvas + CSS filters) ----------
+   Operates purely on the real flag bitmap:
+     Phase 1: B&W + heavily pixelated, blurred 25px -> unblur over 5s.
+     Phase 2: un-pixelate (canvas redrawn at rising resolution) over 5s.
+     Phase 3: B&W -> full saturation (grayscale 1 -> 0) over 5s.                 */
+var imgCache = {};
+function getImg(url){ var im=imgCache[url]; if(!im){ im=new Image(); im.src=url; imgCache[url]=im; } return im; }
+
+function createReveal(canvas, onPhase){
+    var ctx = canvas.getContext("2d");
+    var tmp = document.createElement("canvas"), tctx = tmp.getContext("2d");
+    var img=null, W=0, H=0, BLOCK0=1, raf=0, timers=[];
+
+    function clear(){ timers.forEach(clearTimeout); timers=[]; cancelAnimationFrame(raf); }
+    function label(t){ if(onPhase) onPhase(t); }
+
+    // Draw the image with `block`-pixel blocks (block=1 -> full resolution).
+    function drawPixel(block){
+        if(!img || !img.complete || !img.naturalWidth) return;
+        var cols=Math.max(1,Math.round(W/block)), rows=Math.max(1,Math.round(H/block));
+        tmp.width=cols; tmp.height=rows;
+        tctx.imageSmoothingEnabled=true;
+        tctx.drawImage(img,0,0,cols,rows);              // downsample small
+        ctx.imageSmoothingEnabled=false;
+        ctx.clearRect(0,0,W,H);
+        ctx.drawImage(tmp,0,0,cols,rows,0,0,W,H);       // upscale blocky
+    }
+    function setFilter(f,dur){ canvas.style.transition = dur ? ("filter "+dur+"s linear") : "none"; canvas.style.filter=f; }
+
+    // Phase 2: animate the block size from BLOCK0 down to 1 over the phase.
+    function unpixelate(){
+        label("Sharpening");
+        var t0=performance.now();
+        (function step(){
+            var p=Math.min(1,(performance.now()-t0)/PHASE_MS);
+            drawPixel(BLOCK0*(1-p)+1*p);
+            if(p<1) raf=requestAnimationFrame(step); else drawPixel(1);
+        })();
+    }
+    // Phase 3: full resolution, fade grayscale away to reveal color.
+    function colorize(){ cancelAnimationFrame(raf); drawPixel(1); label("Colorizing"); setFilter("blur(0px) grayscale(0)", PHASE_MS/1000); }
+
+    function begin(){
+        setFilter("blur(25px) grayscale(1)", 0);        // phase 1 start: blurred, B&W, pixelated
+        drawPixel(BLOCK0);
+        void canvas.offsetWidth;                        // reflow so the next change animates
+        label("Focusing");
+        requestAnimationFrame(function(){ setFilter("blur(0px) grayscale(1)", PHASE_MS/1000); });  // unblur
+        timers.push(setTimeout(unpixelate, PHASE_MS));
+        timers.push(setTimeout(colorize,   PHASE_MS*2));
+    }
+
+    return {
+        load:function(url,cb){
+            clear();
+            img=getImg(url);
+            function ready(){
+                var nW=img.naturalWidth||3, nH=img.naturalHeight||2;
+                W=640; H=Math.round(640*nH/nW); canvas.width=W; canvas.height=H;
+                BLOCK0=W/14;                             // ~14 blocks across at the start
+                if(cb) cb();
+            }
+            if(img.complete && img.naturalWidth) ready();
+            else { img.onload=ready; img.onerror=ready; }
+        },
+        start:begin,
+        snap:function(){ clear(); drawPixel(1); setFilter("blur(0px) grayscale(0)", 0.3); },   // jump to finished flag
+        reset:function(){ clear(); setFilter("blur(25px) grayscale(1)", 0); }
+    };
+}
+
 /* ---------- Small helpers ---------- */
 function shuffle(a){ a=a.slice(); for(var i=a.length-1;i>0;i--){ var j=(Math.random()*(i+1))|0; var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
 function sample(arr,n,exclude){                 // pick n items from arr not in `exclude`
@@ -649,12 +491,13 @@ var scoreVal = document.getElementById("scoreVal");
 var roundLbl = document.getElementById("roundLabel");
 var phaseLbl = document.getElementById("phaseLabel");
 var popEl    = document.getElementById("pop");
-var realFlag = document.getElementById("realFlag");
+
+/* The game's single reveal instance drives the flag canvas; label -> phase text. */
+var gameReveal = createReveal(flagEl, function(t){ phaseLbl.textContent = t; });
 
 /* ---------- Game state ---------- */
 var deck=[], roundIdx=0, score=0, correctCount=0;
 var answered=false, startTime=0, rafId=0;
-var phaseTimers=[];   // timeouts that add r1/r2/r3
 
 /* Build the 3 choices for a flag: prefer same-group look-alikes, fill with randoms. */
 function buildChoices(flag){
@@ -666,22 +509,12 @@ function buildChoices(flag){
     return shuffle([flag].concat(distractors));
 }
 
-/* Render a round: draw the flag as outline, wire up choices, kick off timers. */
+/* Render a round: wire up choices, load the flag, then run reveal + countdown. */
 function startRound(){
     answered=false;
     var flag = deck[roundIdx];
-
-    // Draw flag shapes (all start invisible via CSS) + constant frame.
-    flagEl.setAttribute("class","flag");     // clear any reveal classes from last round (SVG: use setAttribute)
-    flagEl.innerHTML = flag.svg() + FRAME;
-    phaseLbl.textContent = "Outline";
-
-    // Reset + preload the real flag graphic (crossfades in for the finished flag).
-    realFlag.className = "real";              // hidden again
-    realFlag.src = flagImgUrl(flag.name);
-
-    // HUD
     roundLbl.textContent = "Round " + (roundIdx+1) + " / " + ROUNDS;
+    phaseLbl.textContent = "";
 
     // Choices
     var opts = buildChoices(flag);
@@ -694,21 +527,13 @@ function startRound(){
         choicesEl.appendChild(b);
     });
 
-    // Schedule the reveal phases. A forced reflow ensures the opacity transition
-    // actually runs when we add `r1` on the next tick.
-    void flagEl.offsetWidth;
-    phaseTimers = [
-        setTimeout(function(){ flagEl.classList.add("r1"); phaseLbl.textContent = "Main shapes"; }, 30),
-        setTimeout(function(){ flagEl.classList.add("r2"); phaseLbl.textContent = "All shapes"; }, PHASE_MS),
-        setTimeout(function(){                                    // color phase: fill SVG + fade in the real flag
-            flagEl.classList.add("r3"); realFlag.classList.add("show"); phaseLbl.textContent = "Colors";
-        }, PHASE_MS*2)
-    ];
-
-    // Start the countdown clock.
-    startTime = performance.now();
-    cancelAnimationFrame(rafId);
-    tick();
+    // Load the flag graphic, then start the reveal and countdown together.
+    gameReveal.load(flagImgUrl(flag.name), function(){
+        gameReveal.start();
+        startTime = performance.now();
+        cancelAnimationFrame(rafId);
+        tick();
+    });
 }
 
 /* Countdown loop: updates the number + bar, and auto-ends the round at 0. */
@@ -735,11 +560,9 @@ function answer(choice, flag, btn){
     if(answered) return;
     answered = true;
     cancelAnimationFrame(rafId);
-    phaseTimers.forEach(clearTimeout);
 
-    // Snap the flag fully open (SVG + real graphic) so the player sees the full answer.
-    flagEl.classList.add("r1","r2","r3","snap");
-    realFlag.classList.add("snap","show");
+    // Snap the flag to its finished (full-color, sharp) state.
+    gameReveal.snap();
     phaseLbl.textContent = flag.name;
 
     var correct = choice === flag;
@@ -812,21 +635,19 @@ document.addEventListener("keydown", function(e){
 
 /* ============================================================================
    TEST MODE  (URL hash = #test)
-   Shows a full-screen desktop grid of every flag, each labeled, all running the
-   same three-phase reveal as the game (outline -> main shapes -> all shapes ->
-   colors over ~15s) so each flag can be eyeballed for correctness.
+   Full-screen desktop grid of every flag, each labeled, all running the same
+   three-phase reveal as the game (blur -> pixelate -> color over ~15s) so each
+   flag graphic can be eyeballed.
    ========================================================================== */
-var testTimers = [];
+var testReveals = [];   // one reveal instance per cell
+var testTimers  = [];
 
-/* Build the grid once, hide the normal UI, and start the reveal. */
+/* Build the grid once, hide the normal UI, and start all reveals in sync. */
 function enterTestMode(){
     var grid = document.getElementById("testGrid");
     grid.innerHTML = FLAGS.map(function(f){
         return '<div class="testcell">'
-             +   '<div class="tflag">'
-             +     '<svg class="flag" viewBox="-1 -1 92 62" xmlns="http://www.w3.org/2000/svg">' + f.svg() + FRAME + '</svg>'
-             +     '<img class="real treal" src="' + flagImgUrl(f.name) + '" alt="">'   // real flag, fades in at color phase
-             +   '</div>'
+             +   '<div class="stage"><canvas class="flag"></canvas></div>'
              +   '<div class="lbl">' + f.name + '</div>'
              + '</div>';
     }).join("");
@@ -838,28 +659,26 @@ function enterTestMode(){
     document.getElementById("endOverlay").classList.add("hidden");
     document.getElementById("testWrap").classList.add("on");
 
-    runTestReveal();
+    // One reveal per canvas; start them together once every graphic has loaded.
+    var canvases = document.querySelectorAll("#testGrid .flag");
+    var pending = FLAGS.length;
+    testReveals = FLAGS.map(function(f,i){
+        var rv = createReveal(canvases[i]);
+        rv.load(flagImgUrl(f.name), function(){ if(--pending===0) setTimeout(runTestReveal,0); });
+        return rv;
+    });
 }
 
-/* Reset every flag to outline, then step all of them through r1/r2/r3 together. */
+/* Kick every cell's reveal at once and drive the shared phase label. */
 function runTestReveal(){
     testTimers.forEach(clearTimeout);
-    var flags = Array.prototype.slice.call(document.querySelectorAll("#testGrid .flag"));
-    var reals = Array.prototype.slice.call(document.querySelectorAll("#testGrid .treal"));
-    flags.forEach(function(fl){ fl.setAttribute("class","flag"); });   // back to outline
-    reals.forEach(function(im){ im.classList.remove("show"); });       // hide real flags
     var phase = document.getElementById("testPhase");
-    phase.textContent = "Outline";
-    void document.getElementById("testGrid").offsetWidth;              // force reflow so transitions run
-
-    function step(cls,label){ flags.forEach(function(fl){ fl.classList.add(cls); }); phase.textContent = label; }
+    testReveals.forEach(function(rv){ rv.reset(); rv.start(); });   // each labels itself; we override the header below
     testTimers = [
-        setTimeout(function(){ step("r1","Main shapes"); }, 30),
-        setTimeout(function(){ step("r2","All shapes");  }, PHASE_MS),
-        setTimeout(function(){                                          // color phase: SVG fills + real flag fades in
-            step("r3","Colors"); reals.forEach(function(im){ im.classList.add("show"); });
-        }, PHASE_MS*2),
-        setTimeout(function(){ phase.textContent = "Done"; }, PHASE_MS*3)
+        setTimeout(function(){ phase.textContent = "Focusing";   }, 40),
+        setTimeout(function(){ phase.textContent = "Sharpening"; }, PHASE_MS),
+        setTimeout(function(){ phase.textContent = "Colorizing"; }, PHASE_MS*2),
+        setTimeout(function(){ phase.textContent = "Done";       }, PHASE_MS*3)
     ];
 }
 
