@@ -17,8 +17,7 @@
         --fg:#ffffff;            /* primary text                          */
         --muted:#a6a6a6;         /* secondary text                        */
         --accent:#1ba1e2;        /* Metro cyan — brand / progress         */
-        --lime:#a4c400;          /* Metro lime  (option tile)             */
-        --magenta:#d80073;       /* Metro magenta (option tile)           */
+        --tile:#4d4d4d;          /* neutral mid-gray option tile          */
         --good:#60a917;          /* Metro green — correct                 */
         --bad:#e51400;           /* Metro red — wrong                     */
         --line:#2a2a2a;          /* hairline borders                      */
@@ -136,11 +135,9 @@
         cursor:pointer;
         transition:opacity .12s ease, transform .06s ease, background-color .15s ease;
     }
-    /* Rotating Metro tile colors for the three options. */
-    .choice:nth-child(3n+1){ background:var(--accent); }
-    .choice:nth-child(3n+2){ background:var(--lime); }
-    .choice:nth-child(3n+3){ background:var(--magenta); }
-    .choice .n{ font-size:1.4rem; font-weight:200; opacity:.85; font-variant-numeric:tabular-nums; min-width:1ch; }
+    /* All option tiles share one neutral mid-gray so color carries no hint. */
+    .choice{ background:var(--tile); }
+    .choice .n{ font-size:1.4rem; font-weight:200; color:var(--accent); font-variant-numeric:tabular-nums; min-width:1ch; }
     .choice:active{ transform:scale(.99); }
     .choice:disabled{ cursor:default; }
     /* After answering: non-selected tiles dim; the answer + a wrong pick recolor. */
