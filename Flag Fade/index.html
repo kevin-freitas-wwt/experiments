@@ -87,8 +87,20 @@
         padding:20px;
         display:flex; align-items:center; justify-content:center;
         margin-bottom:12px;
+        position:relative;
     }
     .flag{ width:100%; height:auto; display:block; overflow:visible; }
+    /* The real flag graphic overlays the SVG and cross-fades in for the finished
+       flag. The colored SVG stays underneath as a fallback if the image can't load. */
+    .real{
+        position:absolute; inset:20px;
+        width:calc(100% - 40px); height:calc(100% - 40px);
+        object-fit:contain;
+        opacity:0; pointer-events:none;
+        transition:opacity 5s linear;
+    }
+    .real.show{ opacity:1; }
+    .real.snap{ transition:opacity .3s ease; }
 
     .phase-label{
         color:var(--muted); font-size:.72rem; letter-spacing:.22em; text-transform:uppercase;
@@ -234,6 +246,7 @@
     <!-- Flag -->
     <div class="stage">
         <svg class="flag" id="flag" viewBox="-1 -1 92 62" xmlns="http://www.w3.org/2000/svg" aria-label="flag"></svg>
+        <img class="real" id="realFlag" alt="">
     </div>
     <div class="phase-label" id="phaseLabel">Outline</div>
 
@@ -599,6 +612,28 @@ var FLAGS = [
         return s; } }
 ];
 
+/* ISO 3166-1 codes (plus gb-eng) used to fetch the real flag graphic for the
+   finished-flag reveal. Sourced from flagcdn.com. */
+var ISO = {
+    "Hungary":"hu","Germany":"de","Netherlands":"nl","Italy":"it","France":"fr","Ireland":"ie",
+    "Japan":"jp","Bangladesh":"bd","Switzerland":"ch","Denmark":"dk","Turkey":"tr","Greece":"gr",
+    "United States":"us","Brazil":"br","Canada":"ca","Argentina":"ar","Russia":"ru","Bulgaria":"bg",
+    "Lithuania":"lt","Estonia":"ee","Austria":"at","Luxembourg":"lu","Armenia":"am","Gabon":"ga",
+    "Bolivia":"bo","Sierra Leone":"sl","Yemen":"ye","Indonesia":"id","Poland":"pl","Monaco":"mc",
+    "Ukraine":"ua","Spain":"es","Latvia":"lv","Colombia":"co","Thailand":"th","Costa Rica":"cr",
+    "India":"in","Niger":"ne","Ghana":"gh","Egypt":"eg","Syria":"sy","Venezuela":"ve",
+    "United Arab Emirates":"ae","Kuwait":"kw","Belgium":"be","Romania":"ro","Chad":"td","Mali":"ml",
+    "Guinea":"gn","Nigeria":"ng","Ivory Coast":"ci","Peru":"pe","Senegal":"sn","Cameroon":"cm",
+    "Portugal":"pt","Sweden":"se","Finland":"fi","Norway":"no","Iceland":"is","England":"gb-eng",
+    "Georgia":"ge","Tonga":"to","Palau":"pw","Laos":"la","Kazakhstan":"kz","Tunisia":"tn",
+    "Pakistan":"pk","Malaysia":"my","Singapore":"sg","Liberia":"lr","Chile":"cl","Togo":"tg",
+    "North Korea":"kp","Uruguay":"uy","Taiwan":"tw","Panama":"pa","Vietnam":"vn","China":"cn",
+    "Morocco":"ma","Somalia":"so","Israel":"il","Czech Republic":"cz","Jordan":"jo","Sudan":"sd",
+    "Palestine":"ps","Bahamas":"bs","Djibouti":"dj","Cuba":"cu","Philippines":"ph","Jamaica":"jm",
+    "South Korea":"kr"
+};
+function flagImgUrl(name){ var c=ISO[name]; return c ? "https://flagcdn.com/w640/"+c+".png" : ""; }
+
 /* ---------- Small helpers ---------- */
 function shuffle(a){ a=a.slice(); for(var i=a.length-1;i>0;i--){ var j=(Math.random()*(i+1))|0; var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
 function sample(arr,n,exclude){                 // pick n items from arr not in `exclude`
@@ -615,6 +650,7 @@ var scoreVal = document.getElementById("scoreVal");
 var roundLbl = document.getElementById("roundLabel");
 var phaseLbl = document.getElementById("phaseLabel");
 var popEl    = document.getElementById("pop");
+var realFlag = document.getElementById("realFlag");
 
 /* ---------- Game state ---------- */
 var deck=[], roundIdx=0, score=0, correctCount=0;
@@ -641,6 +677,11 @@ function startRound(){
     flagEl.innerHTML = flag.svg() + FRAME;
     phaseLbl.textContent = "Outline";
 
+    // Reset + preload the real flag graphic (shown for the finished flag).
+    realFlag.className = "real";              // hidden again
+    realFlag.onerror = function(){ realFlag.classList.remove("show"); };  // fall back to colored SVG
+    realFlag.src = flagImgUrl(flag.name);
+
     // HUD
     roundLbl.textContent = "Round " + (roundIdx+1) + " / " + ROUNDS;
 
@@ -661,7 +702,9 @@ function startRound(){
     phaseTimers = [
         setTimeout(function(){ flagEl.classList.add("r1"); phaseLbl.textContent = "Main shapes"; }, 30),
         setTimeout(function(){ flagEl.classList.add("r2"); phaseLbl.textContent = "All shapes"; }, PHASE_MS),
-        setTimeout(function(){ flagEl.classList.add("r3"); phaseLbl.textContent = "Colors"; }, PHASE_MS*2)
+        setTimeout(function(){                                    // color phase: fill SVG + fade in the real flag
+            flagEl.classList.add("r3"); realFlag.classList.add("show"); phaseLbl.textContent = "Colors";
+        }, PHASE_MS*2)
     ];
 
     // Start the countdown clock.
@@ -696,8 +739,9 @@ function answer(choice, flag, btn){
     cancelAnimationFrame(rafId);
     phaseTimers.forEach(clearTimeout);
 
-    // Snap the flag fully open so the player sees the full answer.
+    // Snap the flag fully open (SVG + real graphic) so the player sees the full answer.
     flagEl.classList.add("r1","r2","r3","snap");
+    realFlag.classList.add("snap","show");
     phaseLbl.textContent = flag.name;
 
     var correct = choice === flag;
