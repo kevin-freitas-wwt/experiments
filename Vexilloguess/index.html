@@ -5,7 +5,7 @@
 <!-- Mobile-first: lock the viewport, disable pinch/double-tap zoom so taps feel like a native game. -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0e1116">
-<title>Flag Fade</title>
+<title>Vexilloguess</title>
 <style>
     /* ---------- Metro theme tokens ----------
        Windows Phone 7/8 "Metro": pure-black canvas, flat solid tiles with hard
@@ -216,7 +216,7 @@
 </head>
 <body>
 <div class="app">
-    <div class="apptitle">flag fade</div>
+    <div class="apptitle">vexilloguess</div>
     <!-- Status row -->
     <div class="hud">
         <div class="round" id="roundLabel">Round 1 / 10</div>
@@ -245,7 +245,7 @@
 <!-- Start screen -->
 <div class="overlay" id="startOverlay">
     <div class="sheet">
-        <div class="eyebrow">flag fade</div>
+        <div class="eyebrow">vexilloguess</div>
         <h1>guess the flag</h1>
         <p class="sub">A flag fades in one layer at a time. Name it before it fully appears — the faster you guess, the more points.</p>
         <ul class="how">
@@ -260,7 +260,7 @@
 <!-- Final score screen -->
 <div class="overlay hidden" id="endOverlay">
     <div class="sheet">
-        <div class="eyebrow">flag fade</div>
+        <div class="eyebrow">vexilloguess</div>
         <h1>game over</h1>
         <p class="sub" id="endSub">You named 0 of 10 flags.</p>
         <div class="big" id="endScore">0</div>
@@ -274,7 +274,7 @@
 <div class="testwrap" id="testWrap">
     <div class="testhead">
         <div>
-            <div class="apptitle" style="margin-bottom:4px">flag fade</div>
+            <div class="apptitle" style="margin-bottom:4px">vexilloguess</div>
             <div class="t">test — all flags</div>
         </div>
         <div class="info" id="testPhase">Outline</div>
@@ -365,6 +365,65 @@ function crescent(cx,cy,r,cresCol,field,phase){
     return circ(cx,cy,r,cresCol,phase)+circ(cx+r*0.34,cy,r*0.82,field,phase,"carve");
 }
 
+/* ---------- Custom emblem shapes ---------- */
+
+/* Sun with triangular rays (Sol de Mayo, simplified) — disc + nRays spikes. */
+function sun(cx,cy,r,c,phase,nRays){
+    nRays=nRays||16; var s="", tip=r*1.75;
+    for(var i=0;i<nRays;i++){
+        var a0=i*2*Math.PI/nRays, a1=a0+Math.PI/nRays, a2=a0+2*Math.PI/nRays;
+        s+=poly((cx+Math.cos(a0)*r).toFixed(2)+","+(cy+Math.sin(a0)*r).toFixed(2)+" "
+              + (cx+Math.cos(a1)*tip).toFixed(2)+","+(cy+Math.sin(a1)*tip).toFixed(2)+" "
+              + (cx+Math.cos(a2)*r).toFixed(2)+","+(cy+Math.sin(a2)*r).toFixed(2), c, phase);
+    }
+    return s+circ(cx,cy,r,c,phase);
+}
+
+/* Ashoka Chakra: a ring with 24 spokes and a hub (India). `bg` is the band color
+   shown through the ring's centre. */
+function chakra(cx,cy,r,c,bg,phase){
+    var s=circ(cx,cy,r,c,phase)+circ(cx,cy,r*0.8,bg,phase);   // navy rim + band-colored inner
+    for(var i=0;i<24;i++){
+        s+='<rect class="sh p'+phase+'" x="'+(cx-0.22)+'" y="'+(cy-r*0.8)+'" width="0.44" height="'+(r*0.8).toFixed(2)+'" '
+         + 'transform="rotate('+(i*15)+' '+cx+' '+cy+')" style="--c:'+c+'"/>';
+    }
+    return s+circ(cx,cy,r*0.16,c,phase);                       // hub
+}
+
+/* Hollow triangle (outline band) via an even-odd path — outer minus a shrunk inner
+   copy. `t` is how far each vertex moves toward the centroid (band thickness). */
+function triRing(pts,t,c,phase){
+    var gx=(pts[0][0]+pts[1][0]+pts[2][0])/3, gy=(pts[0][1]+pts[1][1]+pts[2][1])/3;
+    var inner=pts.map(function(p){ return [(p[0]+(gx-p[0])*t), (p[1]+(gy-p[1])*t)]; });
+    function d(a){ return "M"+a.map(function(p){ return p[0].toFixed(2)+","+p[1].toFixed(2); }).join("L")+"Z"; }
+    return '<path class="sh p'+phase+'" fill-rule="evenodd" d="'+d(pts)+d(inner)+'" style="--c:'+c+'"/>';
+}
+
+/* Taegeuk (yin-yang without the eyes): blue disc + red S-curve half, red on top. */
+function taegeuk(cx,cy,R,phase){
+    var r=R/2;
+    var red="M"+(cx-R)+","+cy
+          + "A"+R+","+R+" 0 0 1 "+(cx+R)+","+cy       // big top semicircle (left -> right)
+          + "A"+r+","+r+" 0 0 1 "+cx+","+cy            // small arc curving down
+          + "A"+r+","+r+" 0 0 0 "+(cx-R)+","+cy        // small arc curving up (forms the S)
+          + "Z";
+    return circ(cx,cy,R,"#0047a0",phase)
+         + '<path class="sh p'+phase+'" d="'+red+'" style="--c:#cd2e3a"/>';
+}
+
+/* One I Ching trigram: three bars (solid = true, broken = false), stacked and
+   rotated by `angle` so the bars sit perpendicular to the flag's diagonal. */
+function trigram(cx,cy,angle,pat,phase){
+    var bw=15,bh=1.8,gap=2.3,brk=2.6;
+    var out='<g transform="rotate('+angle.toFixed(2)+' '+cx+' '+cy+')">';
+    for(var i=0;i<3;i++){
+        var y=cy+(i-1)*(bh+gap)-bh/2;
+        if(pat[i]){ out+=rect(cx-bw/2,y,bw,bh,"#000000",phase); }
+        else{ var h=(bw-brk)/2; out+=rect(cx-bw/2,y,h,bh,"#000000",phase)+rect(cx+brk/2,y,h,bh,"#000000",phase); }
+    }
+    return out+"</g>";
+}
+
 /* ---------- Flag catalogue ----------
    `group` clusters look-alikes so the wrong choices can be plausible.
    `svg()` returns the inner SVG (frame is appended automatically).           */
@@ -403,28 +462,32 @@ var FLAGS = [
     { name:"United States", group:"canton", svg:function(){
         var s = stripesH(13,"#b22234","#ffffff",1);    // 13 red/white stripes
         s += rect(0,0,36,32.31,"#3c3b6e",1);           // blue canton (7 stripes tall)
-        for(var r=0;r<5;r++){                          // simplified star field (dots)
-            var cols = (r%2===0)?6:5, x0 = (r%2===0)?4:7;
-            for(var c=0;c<cols;c++) s += circ(x0+c*5.6, 4+r*6, 1.1, "#ffffff", 2);
+        for(var r=0;r<9;r++){                          // 50 five-point stars (rows of 6 & 5)
+            var six=(r%2===0), n=six?6:5, x0=six?3.6:6.5, y=2.7+r*3.35;
+            for(var c=0;c<n;c++) s += star(x0+c*5.8, y, 1.5, "#ffffff", 2);
         }
         return s; } },
     { name:"Brazil", group:"misc", svg:function(){
         var s = rect(0,0,90,60,"#009c3b",1)            // green field
               + poly("45,7 83,30 45,53 7,30","#ffdf00",1)  // yellow diamond
-              + circ(45,30,13,"#002776",2);            // blue disc
-        var dots = [[45,20],[40,26],[50,27],[43,33],[52,34],[47,40],[38,36]];  // stars (dots)
+              + circ(45,30,13,"#002776",2)             // blue disc
+              + path("M34.2,32.8 Q45,26.4 55.8,32.8 Q45,29.2 34.2,32.8 Z","#ffffff",2);  // "Ordem e Progresso" band
+        var dots = [[45,20],[40,26],[50,27],[43,33],[52,34],[47,40],[38,36]];  // constellation stars
         for(var i=0;i<dots.length;i++) s += circ(dots[i][0],dots[i][1],1,"#ffffff",2);
         return s; } },
     { name:"Canada", group:"misc", svg:function(){
-        var leaf = "45,12 47.5,22 54,20 51,27 58,29 52,32 55,39 47.5,36 48.5,47 45,42 "
-                 + "41.5,47 42.5,36 35,39 38,32 32,29 39,27 36,20 42.5,22";
+        // 11-point maple leaf, symmetric about x=45 (top tip -> clockwise -> stem).
+        var leaf = "45,13 46.3,19.5 51.8,18.4 50.4,23.7 56.3,24.9 53.4,28.2 62,31.3 "
+                 + "55.7,33.6 57.3,37.4 51,36.4 51.7,44.8 47.4,42.4 45,47.5 42.6,42.4 "
+                 + "38.3,44.8 39,36.4 32.7,37.4 34.3,33.6 28,31.3 36.6,28.2 33.7,24.9 "
+                 + "39.6,23.7 38.2,18.4 43.7,19.5";
         return rect(0,0,90,60,"#ffffff",1)             // white center field
              + rect(0,0,22.5,60,"#d52b1e",1)           // left red bar
              + rect(67.5,0,22.5,60,"#d52b1e",1)        // right red bar
-             + poly(leaf,"#d52b1e",2); } },            // stylized maple leaf
+             + poly(leaf,"#d52b1e",2); } },            // maple leaf
     { name:"Argentina", group:"htri", svg:function(){
         return rect(0,0,90,20,"#74acdf",1) + rect(0,40,90,20,"#74acdf",1) + rect(0,20,90,20,"#ffffff",1)
-             + circ(45,30,6,"#f6b40e",2); } },          // Sol de Mayo (simplified)
+             + sun(45,30,4.6,"#f6b40e",2,16); } },       // Sol de Mayo (rayed sun)
 
     /* ---- Horizontal tricolors / bicolors ---- */
     { name:"Russia",       group:"htri", svg:function(){ return hbands(["#ffffff","#0039a6","#d52b1e"]); } },
@@ -447,7 +510,7 @@ var FLAGS = [
     { name:"Colombia",     group:"htri", svg:function(){ return rect(0,0,90,30,"#fcd116",1)+rect(0,30,90,15,"#003893",2)+rect(0,45,90,15,"#ce1126",1); } },
     { name:"Thailand",     group:"htri", svg:function(){ return rect(0,0,90,10,"#a51931",1)+rect(0,50,90,10,"#a51931",1)+rect(0,10,90,10,"#ffffff",2)+rect(0,40,90,10,"#ffffff",2)+rect(0,20,90,20,"#2d2a4a",1); } },
     { name:"Costa Rica",   group:"htri", svg:function(){ return rect(0,0,90,10,"#002b7f",1)+rect(0,50,90,10,"#002b7f",1)+rect(0,10,90,10,"#ffffff",2)+rect(0,40,90,10,"#ffffff",2)+rect(0,20,90,20,"#ce1126",1); } },
-    { name:"India",        group:"htri", svg:function(){ return hbands(["#ff9933","#ffffff","#138808"])+circ(45,30,6,"#000080",2)+circ(45,30,4.4,"#ffffff",2)+circ(45,30,1.3,"#000080",2); } },
+    { name:"India",        group:"htri", svg:function(){ return hbands(["#ff9933","#ffffff","#138808"])+chakra(45,30,6.6,"#000080","#ffffff",2); } },
     { name:"Niger",        group:"htri", svg:function(){ return hbands(["#e05206","#ffffff","#0db02b"])+circ(45,30,6.5,"#e05206",2); } },
     { name:"Ghana",        group:"htri", svg:function(){ return hbands(["#ce1126","#fcd116","#006b3f"])+star(45,30,7,"#000000",2); } },
     { name:"Egypt",        group:"htri", svg:function(){ return hbands(["#ce1126","#ffffff","#000000"])+circ(45,30,5,"#c09300",2); } },
@@ -496,7 +559,7 @@ var FLAGS = [
     { name:"Chile",       group:"canton", svg:function(){ return rect(0,0,90,30,"#ffffff",1)+rect(0,30,90,30,"#d52b1e",1)+rect(0,0,30,30,"#0039a6",1)+star(15,15,9,"#ffffff",2); } },
     { name:"Togo",        group:"canton", svg:function(){ return stripesH(5,"#006a4e","#ffce00",1)+rect(0,0,24,24,"#d21034",1)+star(12,12,7,"#ffffff",2); } },
     { name:"North Korea", group:"canton", svg:function(){ return rect(0,0,90,12,"#024fa2",1)+rect(0,48,90,12,"#024fa2",1)+rect(0,10,90,4,"#ffffff",2)+rect(0,46,90,4,"#ffffff",2)+rect(0,14,90,32,"#ed1c27",1)+circ(30,30,9,"#ffffff",2)+star(30,30,5,"#ed1c27",2); } },
-    { name:"Uruguay",     group:"canton", svg:function(){ return stripesH(9,"#ffffff","#0038a8",1)+rect(0,0,36,26.67,"#ffffff",1)+circ(18,13,6,"#fcd116",2); } },
+    { name:"Uruguay",     group:"canton", svg:function(){ return stripesH(9,"#ffffff","#0038a8",1)+rect(0,0,36,26.67,"#ffffff",1)+sun(18,13,4.4,"#f4c430",2,16); } },
     { name:"Taiwan",      group:"canton", svg:function(){ return rect(0,0,90,60,"#fe0000",1)+rect(0,0,45,30,"#000095",1)+circ(22,15,8,"#ffffff",2)+circ(22,15,5,"#000095",2); } },
     { name:"Panama",      group:"canton", svg:function(){ return rect(0,0,90,60,"#ffffff",1)+rect(45,0,45,30,"#d21034",1)+rect(0,30,45,30,"#005293",1)+star(22,15,7,"#005293",2)+star(67,45,7,"#d21034",2); } },
 
@@ -505,7 +568,10 @@ var FLAGS = [
     { name:"China",   group:"star", svg:function(){ return rect(0,0,90,60,"#de2910",1)+star(20,17,9,"#ffde00",1)+star(37,9,3,"#ffde00",2)+star(43,15,3,"#ffde00",2)+star(43,24,3,"#ffde00",2)+star(37,31,3,"#ffde00",2); } },
     { name:"Morocco", group:"star", svg:function(){ return rect(0,0,90,60,"#c1272d",1)+star(45,30,13,"#006233",2); } },
     { name:"Somalia", group:"star", svg:function(){ return rect(0,0,90,60,"#4189dd",1)+star(45,30,13,"#ffffff",2); } },
-    { name:"Israel",  group:"star", svg:function(){ return rect(0,0,90,60,"#ffffff",1)+rect(0,10,90,6,"#0038b8",1)+rect(0,44,90,6,"#0038b8",1)+poly("45,19 53,33 37,33","#0038b8",2)+poly("45,41 37,27 53,27","#0038b8",2); } },
+    { name:"Israel",  group:"star", svg:function(){
+        var up=[[45,18],[55.4,36],[34.6,36]], dn=[[45,42],[34.6,24],[55.4,24]];   // interlaced triangles
+        return rect(0,0,90,60,"#ffffff",1)+rect(0,9,90,7,"#0038b8",1)+rect(0,44,90,7,"#0038b8",1)
+             + triRing(up,0.30,"#0038b8",2)+triRing(dn,0.30,"#0038b8",2); } },       // hollow Star of David
 
     /* ---- Triangle at the hoist ---- */
     { name:"Czech Republic", group:"triangle", svg:function(){ return rect(0,0,90,30,"#ffffff",1)+rect(0,30,90,30,"#d7141a",1)+triHoist("#11457e",2,40); } },
@@ -519,7 +585,16 @@ var FLAGS = [
 
     /* ---- Distinctive one-offs ---- */
     { name:"Jamaica",     group:"misc", svg:function(){ return rect(0,0,90,60,"#fcd116",1)+poly("7,0 83,0 45,26","#009b3a",1)+poly("7,60 83,60 45,34","#009b3a",1)+poly("0,4 41,30 0,56","#000000",1)+poly("90,4 49,30 90,56","#000000",1); } },
-    { name:"South Korea", group:"misc", svg:function(){ var s=rect(0,0,90,60,"#ffffff",1)+circ(45,30,11,"#cd2e3a",1)+path("M34,30 A11,11 0 0,0 56,30 Z","#0047a0",2); var tg=[[16,13],[16,47],[74,13],[74,47]]; for(var i=0;i<4;i++){ for(var j=0;j<3;j++){ s+=rect(tg[i][0]-6,tg[i][1]-3+j*3,12,1.6,"#000000",2);} } return s; } }
+    { name:"South Korea", group:"misc", svg:function(){
+        var s=rect(0,0,90,60,"#ffffff",1)+taegeuk(45,30,11,1);                       // real S-curve taegeuk
+        var C=[45,30], tg=[                                                          // four trigrams at the corners
+            {p:[17,14],pat:[true,true,true]},     // Geon ☰
+            {p:[73,14],pat:[false,true,false]},   // Gam ☵
+            {p:[17,46],pat:[true,false,true]},    // Ri  ☲
+            {p:[73,46],pat:[false,false,false]}   // Gon ☷
+        ];
+        tg.forEach(function(t){ var a=Math.atan2(C[1]-t.p[1],C[0]-t.p[0])*180/Math.PI-90; s+=trigram(t.p[0],t.p[1],a,t.pat,2); });
+        return s; } }
 ];
 
 /* ---------- Small helpers ---------- */
