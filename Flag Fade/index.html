@@ -97,9 +97,9 @@
         width:calc(100% - 40px); height:calc(100% - 40px);
         object-fit:contain;
         opacity:0; pointer-events:none;
-        transition:opacity 5s linear;
     }
-    .real.show{ opacity:1; }
+    /* Transition lives on the active states so resetting a round is instant. */
+    .real.show{ opacity:1; transition:opacity 5s linear; }
     .real.snap{ transition:opacity .3s ease; }
 
     .phase-label{
@@ -108,13 +108,13 @@
     }
 
     /* ---------- SVG reveal engine ----------
-       Every drawable is a `.sh` that starts invisible and fades in as an OUTLINE,
-       then fills with its real color (via the per-element --c custom property)
-       once the color phase begins. Phase classes on the .flag root gate each stage:
+       Every drawable is a `.sh` that starts invisible and fades in as an OUTLINE.
+       Phase classes on the .flag root gate each stage:
          .r1 -> phase-1 shapes (p1) fade in as outlines   (main shapes)
          .r2 -> phase-2 shapes (p2) fade in as outlines   (remaining shapes)
-         .r3 -> ALL shapes fill with color                (colors)                       */
-    .flag .frame{                       /* constant thin border so the flag edge is always visible */
+         .r3 -> the whole SVG fades OUT while the real flag graphic fades in (colors) */
+    .flag{ opacity:1; }                 /* base state (transition lives on .r3/.snap) */
+    .flag .frame{                       /* constant thin border while the outline shows */
         fill:none; stroke:var(--flag-outline); stroke-width:1.4;
         vector-effect:non-scaling-stroke;
     }
@@ -123,21 +123,17 @@
         stroke:var(--flag-outline); stroke-width:1.3;
         vector-effect:non-scaling-stroke;
         opacity:0;
-        /* Each phase is a steady 5s fade (matches PHASE_MS), so a shape gradually
-           appears across its whole phase rather than snapping in early. */
-        transition:opacity 5s linear, fill 5s linear, stroke 5s linear;
+        /* Each phase is a steady 5s fade (matches PHASE_MS). */
+        transition:opacity 5s linear;
     }
     .flag.r1 .p1{ opacity:1; }
     .flag.r2 .p2{ opacity:1; }
-    .flag.r3 .sh{ opacity:1; fill:var(--c); stroke:rgba(0,0,0,.10); stroke-width:.5; }
+    .flag .carve{ opacity:0; }          /* carve circles never draw (real flag supplies detail) */
 
-    /* A "carve" shape paints the field color to subtract from a shape below it
-       (used for the crescent). It only appears in the color phase. */
-    .flag .carve{ opacity:0; fill:transparent; stroke:none; }
-    .flag.r3 .carve{ opacity:1; fill:var(--c); }
-
-    /* When the player answers we snap the flag fully open quickly. */
-    .flag.snap .sh{ transition:opacity .3s ease, fill .3s ease, stroke .3s ease; }
+    /* Color phase: the line-art SVG fades out (real flag fades in over the top). */
+    .flag.r3{ opacity:0; transition:opacity 5s linear; }
+    /* When the player answers, the crossfade snaps quickly instead. */
+    .flag.snap{ transition:opacity .3s ease; }
 
     /* ---------- Choices: flat Metro tiles ---------- */
     .choices{ margin-top:auto; display:flex; flex-direction:column; gap:8px; }
@@ -680,9 +676,8 @@ function startRound(){
     flagEl.innerHTML = flag.svg() + FRAME;
     phaseLbl.textContent = "Outline";
 
-    // Reset + preload the real flag graphic (shown for the finished flag).
+    // Reset + preload the real flag graphic (crossfades in for the finished flag).
     realFlag.className = "real";              // hidden again
-    realFlag.onerror = function(){ realFlag.classList.remove("show"); };  // fall back to colored SVG
     realFlag.src = flagImgUrl(flag.name);
 
     // HUD
