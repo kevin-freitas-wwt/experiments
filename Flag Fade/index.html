@@ -196,6 +196,22 @@
     .how{ list-style:none; padding:0; margin:0 0 26px; }
     .how li{ color:var(--muted); font-size:.92rem; font-weight:300; margin:10px 0; line-height:1.45; }
     .how li b{ color:var(--fg); font-weight:600; }
+
+    /* ---------- Test mode (#test): full-screen desktop QA grid ---------- */
+    .testwrap{ display:none; position:fixed; inset:0; overflow:auto; background:#000; padding:16px 24px 48px; z-index:50; }
+    .testwrap.on{ display:block; }
+    .testhead{
+        position:sticky; top:0; background:#000; z-index:2;
+        display:flex; align-items:center; gap:20px; padding:6px 0 16px;
+        border-bottom:1px solid var(--line); margin-bottom:18px;
+    }
+    .testhead .t{ font-size:1.5rem; font-weight:200; }
+    .testhead .info{ color:var(--muted); font-size:.72rem; letter-spacing:.22em; text-transform:uppercase; }
+    .testhead .count{ color:var(--accent); font-size:.72rem; letter-spacing:.22em; text-transform:uppercase; }
+    .testhead .btn{ width:auto; margin-left:auto; padding:11px 22px; }
+    .testgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:18px 16px; }
+    .testcell .flag{ width:100%; height:auto; display:block; background:var(--panel); padding:10px; }
+    .testcell .lbl{ margin-top:7px; font-size:.7rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
 </style>
 </head>
 <body>
@@ -251,6 +267,21 @@
         <p class="rank" id="endRank">—</p>
         <button class="btn" id="againBtn">Play again</button>
     </div>
+</div>
+
+<!-- Test mode: full-screen grid of every flag, all animating on the game's timeline.
+     Activated by adding #test to the URL. -->
+<div class="testwrap" id="testWrap">
+    <div class="testhead">
+        <div>
+            <div class="apptitle" style="margin-bottom:4px">flag fade</div>
+            <div class="t">test — all flags</div>
+        </div>
+        <div class="info" id="testPhase">Outline</div>
+        <div class="count" id="testCount"></div>
+        <button class="btn" id="testReplay">Replay</button>
+    </div>
+    <div class="testgrid" id="testGrid"></div>
 </div>
 
 <script>
@@ -659,6 +690,58 @@ document.addEventListener("keydown", function(e){
         if(b && !b.disabled) b.click();
     }
 });
+
+/* ============================================================================
+   TEST MODE  (URL hash = #test)
+   Shows a full-screen desktop grid of every flag, each labeled, all running the
+   same three-phase reveal as the game (outline -> main shapes -> all shapes ->
+   colors over ~15s) so each flag can be eyeballed for correctness.
+   ========================================================================== */
+var testTimers = [];
+
+/* Build the grid once, hide the normal UI, and start the reveal. */
+function enterTestMode(){
+    var grid = document.getElementById("testGrid");
+    grid.innerHTML = FLAGS.map(function(f){
+        return '<div class="testcell">'
+             +   '<svg class="flag" viewBox="-1 -1 92 62" xmlns="http://www.w3.org/2000/svg">' + f.svg() + FRAME + '</svg>'
+             +   '<div class="lbl">' + f.name + '</div>'
+             + '</div>';
+    }).join("");
+    document.getElementById("testCount").textContent = FLAGS.length + " flags";
+
+    // Hide the game chrome so the grid is truly full-screen.
+    document.querySelector(".app").style.display = "none";
+    document.getElementById("startOverlay").classList.add("hidden");
+    document.getElementById("endOverlay").classList.add("hidden");
+    document.getElementById("testWrap").classList.add("on");
+
+    runTestReveal();
+}
+
+/* Reset every flag to outline, then step all of them through r1/r2/r3 together. */
+function runTestReveal(){
+    testTimers.forEach(clearTimeout);
+    var flags = Array.prototype.slice.call(document.querySelectorAll("#testGrid .flag"));
+    flags.forEach(function(fl){ fl.setAttribute("class","flag"); });   // back to outline
+    var phase = document.getElementById("testPhase");
+    phase.textContent = "Outline";
+    void document.getElementById("testGrid").offsetWidth;              // force reflow so transitions run
+
+    function step(cls,label){ flags.forEach(function(fl){ fl.classList.add(cls); }); phase.textContent = label; }
+    testTimers = [
+        setTimeout(function(){ step("r1","Main shapes"); }, 30),
+        setTimeout(function(){ step("r2","All shapes");  }, PHASE_MS),
+        setTimeout(function(){ step("r3","Colors");      }, PHASE_MS*2),
+        setTimeout(function(){ phase.textContent = "Done"; }, PHASE_MS*3)
+    ];
+}
+
+document.getElementById("testReplay").onclick = runTestReveal;
+
+/* Enter test mode if the page loads with #test; toggling the hash reloads. */
+if(location.hash.toLowerCase() === "#test") enterTestMode();
+window.addEventListener("hashchange", function(){ location.reload(); });
 </script>
 </body>
 </html>
