@@ -1,0 +1,259 @@
+:root {
+    --bg: #030509;
+    --cyan: #4df3ff;
+    --magenta: #ff3ec9;
+    --panel: rgba( 6, 10, 18, 0.86 );
+    --text: #d6fbff;
+    --text-dim: #6e93a0;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    background: var( --bg );
+    color: var( --text );
+    font-family: "Courier New", ui-monospace, "SF Mono", Menlo, monospace;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    touch-action: none;
+}
+
+#scene {
+    display: block;
+    height: 100%;
+    left: 0;
+    position: fixed;
+    top: 0;
+    width: 100%;
+}
+
+/* --- HUD ------------------------------------------------------------- */
+
+#hud {
+    display: flex;
+    justify-content: space-between;
+    left: 0;
+    padding: max( 14px, env( safe-area-inset-top ) ) 18px 0;
+    pointer-events: none;
+    position: fixed;
+    right: 0;
+    top: 0;
+    z-index: 5;
+}
+
+#hud-left {
+    display: flex;
+    gap: 22px;
+}
+
+.stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.label {
+    color: var( --text-dim );
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+}
+
+.stat span:last-child,
+#hud-right #next-grid {
+    color: var( --cyan );
+    font-size: 20px;
+    text-shadow: 0 0 8px rgba( 77, 243, 255, 0.6 );
+}
+
+#hud-right {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#next-grid {
+    display: grid;
+    gap: 3px;
+    grid-template-columns: repeat( 4, 12px );
+    grid-template-rows: repeat( 4, 12px );
+}
+
+#next-grid .cell {
+    background: rgba( 255, 255, 255, 0.04 );
+    border: 1px solid rgba( 255, 255, 255, 0.08 );
+    border-radius: 2px;
+}
+
+#next-grid .cell.on {
+    background: var( --cell-color, var( --cyan ) );
+    border-color: var( --cell-color, var( --cyan ) );
+    box-shadow: 0 0 6px var( --cell-color, var( --cyan ) );
+}
+
+/* --- Overlay ----------------------------------------------------------- */
+
+#overlay {
+    align-items: center;
+    background: radial-gradient( circle at 50% 40%, rgba( 77, 243, 255, 0.08 ), rgba( 3, 5, 9, 0.92 ) );
+    backdrop-filter: blur( 3px );
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    position: fixed;
+    transition: opacity 0.3s ease;
+    z-index: 10;
+}
+
+#overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+#overlay .card {
+    background: var( --panel );
+    border: 1px solid rgba( 77, 243, 255, 0.35 );
+    border-radius: 4px;
+    box-shadow: 0 0 40px rgba( 77, 243, 255, 0.15 ), inset 0 0 30px rgba( 77, 243, 255, 0.05 );
+    padding: 40px 44px;
+    text-align: center;
+    width: min( 420px, 88vw );
+}
+
+#overlay h1 {
+    color: var( --cyan );
+    font-size: 40px;
+    letter-spacing: 0.12em;
+    margin: 0 0 18px;
+    text-shadow: 0 0 6px var( --cyan ), 0 0 22px rgba( 77, 243, 255, 0.6 );
+}
+
+#overlay p#overlay-message {
+    color: var( --text-dim );
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 0 0 26px;
+}
+
+#start-btn {
+    background: transparent;
+    border: 1px solid var( --cyan );
+    border-radius: 2px;
+    color: var( --cyan );
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 15px;
+    letter-spacing: 0.15em;
+    padding: 12px 30px;
+    text-shadow: 0 0 6px rgba( 77, 243, 255, 0.6 );
+    text-transform: uppercase;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+#start-btn:hover {
+    background: rgba( 77, 243, 255, 0.1 );
+    box-shadow: 0 0 20px rgba( 77, 243, 255, 0.4 );
+}
+
+.controls {
+    color: var( --text-dim );
+    display: grid;
+    font-size: 12px;
+    gap: 8px;
+    letter-spacing: 0.03em;
+    list-style: none;
+    margin: 26px 0 0;
+    padding: 0;
+}
+
+kbd {
+    background: rgba( 255, 255, 255, 0.06 );
+    border: 1px solid rgba( 255, 255, 255, 0.18 );
+    border-radius: 3px;
+    color: var( --text );
+    display: inline-block;
+    font-family: inherit;
+    font-size: 11px;
+    min-width: 18px;
+    padding: 1px 5px;
+    text-align: center;
+}
+
+/* --- Minimap --------------------------------------------------------- */
+
+#minimap-wrap {
+    bottom: max( 16px, env( safe-area-inset-bottom ) );
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    left: 18px;
+    position: fixed;
+    z-index: 5;
+}
+
+#minimap {
+    background: #050a10;
+    border: 1px solid rgba( 77, 243, 255, 0.3 );
+    box-shadow: 0 0 14px rgba( 77, 243, 255, 0.12 );
+    image-rendering: pixelated;
+}
+
+/* --- End banner ---------------------------------------------------------- */
+
+#end-banner {
+    background: var( --panel );
+    border: 1px solid rgba( 255, 62, 201, 0.4 );
+    border-radius: 3px;
+    color: var( --text-dim );
+    display: none;
+    font-size: 13px;
+    left: 50%;
+    letter-spacing: 0.03em;
+    padding: 10px 20px;
+    pointer-events: none;
+    position: fixed;
+    text-align: center;
+    top: max( 14px, env( safe-area-inset-top ) );
+    transform: translateX( -50% );
+    z-index: 5;
+}
+
+#end-banner.visible {
+    display: block;
+}
+
+#end-banner strong {
+    color: var( --magenta );
+    text-shadow: 0 0 6px rgba( 255, 62, 201, 0.6 );
+}
+
+/* --- Crosshair --------------------------------------------------------- */
+
+#crosshair {
+    background: rgba( 77, 243, 255, 0.5 );
+    border-radius: 50%;
+    display: none;
+    height: 5px;
+    left: 50%;
+    position: fixed;
+    top: 50%;
+    transform: translate( -50%, -50% );
+    transition: background 0.12s ease, box-shadow 0.12s ease, width 0.12s ease, height 0.12s ease;
+    width: 5px;
+    z-index: 6;
+}
+
+body.locked #crosshair {
+    display: block;
+}
+
+body.locked.in-range #crosshair {
+    background: var( --cyan );
+    box-shadow: 0 0 10px var( --cyan );
+    height: 9px;
+    width: 9px;
+}

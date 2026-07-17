@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Innertris</title>
+    <!-- Open Graph / social preview -->
+    <meta name="description" content="First-person Tetris — fly into the well, bump pieces to move them, fire a laser to spin them.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="experiments by Kevin">
+    <meta property="og:title" content="Innertris">
+    <meta property="og:description" content="First-person Tetris — fly into the well, bump pieces to move them, fire a laser to spin them.">
+    <meta property="og:url" content="https://kevin-freitas-wwt.github.io/experiments/Innertris/">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Innertris">
+    <meta name="twitter:description" content="First-person Tetris — fly into the well, bump pieces to move them, fire a laser to spin them.">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="./src/style.css" />
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.185.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <canvas id="scene"></canvas>
+
+    <div id="hud">
+        <div id="hud-left">
+            <div class="stat"><span class="label">Score</span><span id="score">0</span></div>
+            <div class="stat"><span class="label">Level</span><span id="level">1</span></div>
+            <div class="stat"><span class="label">Lines</span><span id="lines">0</span></div>
+        </div>
+        <div id="hud-right">
+            <span class="label">Next</span>
+            <div id="next-grid"></div>
+        </div>
+    </div>
+
+    <div id="minimap-wrap">
+        <span class="label">Field</span>
+        <canvas id="minimap"></canvas>
+    </div>
+
+    <div id="crosshair"></div>
+
+    <div id="end-banner"></div>
+
+    <div id="overlay">
+        <div class="card">
+            <h1>INNERTRIS</h1>
+            <p id="overlay-message" style="display: none;"></p>
+            <button id="start-btn">Start</button>
+            <ul class="controls">
+                <li>Mouse to look &middot; <kbd>E</kbd><kbd>D</kbd> move &middot; <kbd>S</kbd><kbd>F</kbd> strafe</li>
+                <li>Hold <kbd>Shift</kbd> to fly 2&times; speed</li>
+                <li>Fly forward into a piece: left half shoves right, right half shoves left</li>
+                <li><kbd>LMB</kbd> fires a laser at the piece to spin it</li>
+                <li><kbd>Space</kbd> hard drop &middot; <kbd>P</kbd> / <kbd>Esc</kbd> pause</li>
+            </ul>
+        </div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html>
