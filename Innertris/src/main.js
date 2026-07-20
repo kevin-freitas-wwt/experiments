@@ -9,7 +9,10 @@ import {
     updateBlock,
     easePosition,
     disposeBlockMesh,
+    setWireResolution,
 } from "./blocks.js";
+import * as sfx from "./sfx.js";
+import { createSkybox } from "./skybox.js";
 
 const COLS = 10;
 const ROWS = 20;
@@ -66,6 +69,7 @@ renderer.setPixelRatio( Math.min( window.devicePixelRatio, 2 ) );
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color( 0x030509 );
+scene.add( createSkybox() );
 
 const camera = new THREE.PerspectiveCamera( 72, 1, 0.1, 200 );
 camera.position.set( 0, 0, 14 );
@@ -87,7 +91,7 @@ boardGroup.add( wellEdges );
 // cubes, which sit at z=-0.5..0.5 - overlapping solid geometry there was
 // causing z-fighting on pieces both falling and stacked at the bottom.
 const WELL_FILL_DEPTH = 0.15;
-const wellFill = createGradientPanel( COLS * CELL, ROWS * CELL, WELL_FILL_DEPTH, 0x2f8a99, 0x05090c, 0.14 );
+const wellFill = createGradientPanel( COLS * CELL, ROWS * CELL, WELL_FILL_DEPTH, 0x2f8a99, 0x05090c, 0.5 );
 wellFill.position.z = -WELL_DEPTH + WELL_FILL_DEPTH / 2;
 boardGroup.add( wellFill );
 
@@ -132,6 +136,7 @@ function updateLaserVisual( dt ) {
         if ( hit && active && !active.spin ) {
             spinFromImpact( hit.point, dir );
             spawnSparks( hit.point, COLORS[ active.key ] );
+            sfx.playHit();
         }
     }
 }
@@ -223,7 +228,7 @@ function buildBackGrid() {
     }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute( "position", new THREE.Float32BufferAttribute( points, 3 ) );
-    const material = new THREE.LineBasicMaterial( { color: 0x1f5b66, transparent: true, opacity: 0.22 } );
+    const material = new THREE.LineBasicMaterial( { color: 0xe8f6ff, transparent: true, opacity: 0.45 } );
     return new THREE.LineSegments( geometry, material );
 }
 
@@ -233,6 +238,7 @@ function resize() {
     renderer.setSize( width, height );
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
+    setWireResolution( width, height );
 }
 
 window.addEventListener( "resize", resize );
@@ -380,7 +386,25 @@ startBtn.addEventListener( "click", () => {
     triggerStart();
 } );
 
+const sfxToggleBtn = document.getElementById( "sfx-toggle" );
+
+function syncSfxToggle() {
+    const muted = sfx.isMuted();
+    sfxToggleBtn.textContent = muted ? "SFX: OFF" : "SFX: ON";
+    sfxToggleBtn.classList.toggle( "off", muted );
+}
+
+sfxToggleBtn.addEventListener( "click", () => {
+    sfx.resume();
+    sfx.toggleMuted();
+    syncSfxToggle();
+} );
+
+syncSfxToggle();
+
 function triggerStart() {
+    sfx.resume();
+    sfx.playUiBlip();
     if ( gameState === "paused" ) {
         gameState = "playing";
         hideOverlay();
@@ -481,6 +505,7 @@ function tryRotate( dir ) {
                 toY: to.y,
             };
             lockTimer = null;
+            sfx.playRotate();
             return true;
         }
     }
@@ -526,6 +551,7 @@ function isGrounded() {
 
 function hardDrop() {
     if ( !active ) return;
+    sfx.playHardDrop();
     while ( tryMove( 0, 1 ) ) score += 2;
     updateHud();
 }
@@ -652,6 +678,13 @@ function trySettlingMove( dx ) {
 // a "pull", which isn't a thing here). Rotation is a separate act now - see
 // fireLaser(). Checks the falling piece first, then the settling one, so
 // you can still nudge a piece into place right after it lands.
+// Whether shoving these cells by dx would push any of them past the well's
+// side walls - used to tell "blocked by the wall" apart from "blocked by the
+// stack" so only the former gets the higher-pitched edge-bump sound.
+function pushBlockedByEdge( cells, dx ) {
+    return cells.some( ( [ x ] ) => x + dx < 0 || x + dx >= COLS );
+}
+
 function checkShipPush( now ) {
     if ( !move.forward ) return;
     if ( now - lastPushTime < PUSH_COOLDOWN || Math.abs( shipFront.z ) > PUSH_Z_RANGE ) return;
@@ -663,6 +696,11 @@ function checkShipPush( now ) {
             const pushDir = contact.x < pieceCenter( cells, "x" ) ? 1 : -1;
             if ( tryMove( pushDir, 0 ) ) {
                 lastPushTime = now;
+                sfx.playMove();
+                return;
+            } else if ( pushBlockedByEdge( cells, pushDir ) ) {
+                lastPushTime = now;
+                sfx.playEdgeBump();
                 return;
             }
         }
@@ -674,8 +712,12 @@ function checkShipPush( now ) {
             const pushDir = contact.x < pieceCenter( settling.cells, "x" ) ? 1 : -1;
             if ( trySettlingMove( pushDir ) ) {
                 lastPushTime = now;
+                sfx.playMove();
                 handleLineClears();
                 updateHud();
+            } else if ( pushBlockedByEdge( settling.cells, pushDir ) ) {
+                lastPushTime = now;
+                sfx.playEdgeBump();
             }
         }
     }
@@ -885,6 +927,7 @@ function fireLaser() {
     // and working out which way the piece should spin below.
     const hit = didHit ? { point: origin.clone().addScaledVector( dir, bestT ) } : null;
     fireLaserVisual( origin, dir, bestT, hit );
+    sfx.playLaser();
 }
 
 // Real angular momentum from an off-center hit: torque = r x F, where r is
@@ -904,6 +947,7 @@ function spinFromImpact( point, dir ) {
 }
 
 function lockActive( now ) {
+    sfx.playLock();
     const cells = getCells( active );
     board.lock( cells, active.key );
     cells.forEach( ( [ cx, cy ], i ) => {
@@ -945,6 +989,7 @@ function handleLineClears() {
     finalizeSettling();
     settling = null;
     linesClearing = true;
+    sfx.playLineClear( full.length );
 
     full.forEach( ( row ) => {
         for ( let x = 0; x < COLS; x++ ) {
@@ -959,6 +1004,7 @@ function handleLineClears() {
     if ( newLevel !== level ) {
         level = newLevel;
         baseDropInterval = Math.max( 90, Math.round( BASE_DROP_INTERVAL * Math.pow( 0.86, level - 1 ) ) );
+        sfx.playLevelUp();
     }
 
     setTimeout( () => {
@@ -1021,6 +1067,7 @@ function startGame() {
 }
 
 function togglePauseKey() {
+    sfx.playUiBlip();
     if ( gameState === "playing" ) {
         gameState = "paused";
         setOverlay( "paused" );
@@ -1036,6 +1083,7 @@ function togglePauseKey() {
 // The overlay only reappears if you back out of pointer lock yourself.
 function endGame() {
     gameState = "over";
+    sfx.playGameOver();
     showEndBanner();
 }
 

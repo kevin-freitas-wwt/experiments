@@ -231,6 +231,36 @@ kbd {
     text-shadow: 0 0 6px rgba( 255, 62, 201, 0.6 );
 }
 
+/* --- SFX toggle ---------------------------------------------------------- */
+
+#sfx-toggle {
+    background: transparent;
+    border: 1px solid rgba( 77, 243, 255, 0.35 );
+    border-radius: 2px;
+    bottom: max( 16px, env( safe-area-inset-bottom ) );
+    color: var( --text-dim );
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    padding: 6px 10px;
+    position: fixed;
+    right: 18px;
+    text-transform: uppercase;
+    transition: background 0.15s ease, color 0.15s ease;
+    z-index: 5;
+}
+
+#sfx-toggle:hover {
+    background: rgba( 77, 243, 255, 0.1 );
+    color: var( --text );
+}
+
+#sfx-toggle.off {
+    border-color: rgba( 255, 62, 201, 0.35 );
+    color: rgba( 255, 62, 201, 0.6 );
+}
+
 /* --- Crosshair --------------------------------------------------------- */
 
 #crosshair {

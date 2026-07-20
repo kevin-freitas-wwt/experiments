@@ -1,10 +1,30 @@
 import * as THREE from "three";
+import { LineMaterial } from "three/addons/lines/LineMaterial.js";
+import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
+import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 
 const geometryCache = new Map();
 const edgesCache = new Map();
 
 const POS_EASE = 16;
 const FILL_EASE = 9;
+
+// Plain LineBasicMaterial ignores its linewidth on most platforms - WebGL's
+// core profile caps GL_LINES at 1px in Chrome/ANGLE regardless of the value
+// (the spark shards elsewhere in this project hit the same wall and worked
+// around it with real cylinder geometry). LineSegments2/LineMaterial render
+// each segment as a camera-facing quad instead, so linewidth actually works.
+const WIRE_LINEWIDTH = 2;
+const activeWireMaterials = new Set();
+const wireResolution = new THREE.Vector2( window.innerWidth, window.innerHeight );
+
+// Renderer size changes (see main.js's resize()) have to be pushed into
+// every live wire material's resolution uniform, or fat lines render at the
+// wrong apparent width until each piece happens to get recreated.
+export function setWireResolution( width, height ) {
+    wireResolution.set( width, height );
+    activeWireMaterials.forEach( ( material ) => material.resolution.set( width, height ) );
+}
 
 // A box whose vertex colors fade from frontHex (at +z, facing the camera)
 // to backHex (at -z). Front/back faces read as flat solid color; the four
@@ -36,7 +56,11 @@ function gradientGeometry( sizeX, sizeY, sizeZ, frontHex, backHex ) {
 function sharedEdges( sizeX, sizeY, sizeZ ) {
     const key = `${ sizeX }|${ sizeY }|${ sizeZ }`;
     if ( !edgesCache.has( key ) ) {
-        edgesCache.set( key, new THREE.EdgesGeometry( new THREE.BoxGeometry( sizeX, sizeY, sizeZ ) ) );
+        const edges = new THREE.EdgesGeometry( new THREE.BoxGeometry( sizeX, sizeY, sizeZ ) );
+        const fat = new LineSegmentsGeometry();
+        fat.setPositions( edges.attributes.position.array );
+        edges.dispose();
+        edgesCache.set( key, fat );
     }
     return edgesCache.get( key );
 }
@@ -54,14 +78,17 @@ export function createBlockMesh( colorHex, sizeXY = 0.92, depth = 1 ) {
     const material = new THREE.MeshBasicMaterial( { vertexColors: true, opacity: 0, transparent: true, depthWrite: false } );
     const fill = new THREE.Mesh( geometry, material );
 
-    const wire = new THREE.LineSegments(
-        sharedEdges( sizeXY, sizeXY, depth ),
-        new THREE.LineBasicMaterial( { color: colorHex } )
-    );
+    const wireMaterial = new LineMaterial( {
+        color: colorHex,
+        linewidth: WIRE_LINEWIDTH,
+        resolution: wireResolution,
+    } );
+    activeWireMaterials.add( wireMaterial );
+    const wire = new LineSegments2( sharedEdges( sizeXY, sizeXY, depth ), wireMaterial );
 
     const group = new THREE.Group();
     group.add( fill, wire );
-    group.userData = { fillOpacity: 0, fillTarget: 0, material, wireMaterial: wire.material };
+    group.userData = { fillOpacity: 0, fillTarget: 0, material, wireMaterial };
     return group;
 }
 
@@ -122,4 +149,5 @@ export function updateBlock( group, dt ) {
 export function disposeBlockMesh( group ) {
     group.userData.material.dispose();
     group.userData.wireMaterial.dispose();
+    activeWireMaterials.delete( group.userData.wireMaterial );
 }
