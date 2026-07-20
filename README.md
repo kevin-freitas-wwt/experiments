@@ -7,6 +7,7 @@ locally, or visit the live site at
 
 ## Projects
 
+- **[Airgap](https://kevin-freitas-wwt.github.io/experiments/Airgap/)** — on-device text rewriter using Chrome's built-in Gemini Nano, with a live monitor proving zero network requests
 - **[Pop o'Clock](https://kevin-freitas-wwt.github.io/experiments/Pop%20o'Clock/)** — clock with audible pop ticks
 - **[Pic Shop](https://kevin-freitas-wwt.github.io/experiments/Pic%20Shop/)** — image editor
 - **[Pixel Pics](https://kevin-freitas-wwt.github.io/experiments/Pixel%20Pics/)** — pixel art tool

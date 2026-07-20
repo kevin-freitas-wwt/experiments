@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Airgap</title>
+<meta name="description" content="On-device text rewriting with Chrome's built-in Gemini Nano. No network calls.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%230a0a0a%22/><text x=%2250%22 y=%2266%22 font-size=%2260%22 text-anchor=%22middle%22 fill=%22%2339ff9d%22 font-family=%22monospace%22>&gt;</text></svg>">
+<style>
+    :root {
+        --accent: #39ff9d;
+        --bg: #0a0a0a;
+        --border: #2a2a2a;
+        --dim: #6a6a6a;
+        --fg: #d8d8d8;
+        --panel: #111;
+        --red: #ff5c5c;
+    }
+    * {
+        box-sizing: border-box;
+    }
+    body {
+        background: var( --bg );
+        color: var( --fg );
+        font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        margin: 0;
+        min-height: 100vh;
+        padding: 2.5rem 1.5rem 4rem;
+    }
+    .wrap {
+        margin: 0 auto;
+        max-width: 760px;
+    }
+    header {
+        border-bottom: 1px solid var( --border );
+        margin-bottom: 1.75rem;
+        padding-bottom: 1.25rem;
+    }
+    h1 {
+        color: var( --accent );
+        font-size: 1.4rem;
+        letter-spacing: 0.08em;
+        margin: 0 0 0.4rem;
+    }
+    h1::before {
+        content: "> ";
+    }
+    .tagline {
+        color: var( --dim );
+        font-size: 0.85rem;
+        margin: 0;
+    }
+    .status {
+        align-items: center;
+        display: flex;
+        font-size: 0.78rem;
+        gap: 0.6rem;
+        margin-top: 1rem;
+    }
+    .dot {
+        background: var( --dim );
+        border-radius: 50%;
+        display: inline-block;
+        height: 8px;
+        width: 8px;
+    }
+    .dot.ready {
+        background: var( --accent );
+        box-shadow: 0 0 8px var( --accent );
+    }
+    .dot.busy {
+        animation: pulse 1s infinite;
+        background: #f4c542;
+    }
+    .dot.off {
+        background: var( --red );
+    }
+    @keyframes pulse {
+        50% { opacity: 0.3; }
+    }
+    .status-text {
+        color: var( --dim );
+    }
+    .netmon {
+        border: 1px solid var( --border );
+        border-radius: 6px;
+        font-size: 0.75rem;
+        margin-bottom: 1.75rem;
+        padding: 0.75rem 1rem;
+    }
+    .netmon .label {
+        color: var( --dim );
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+    .netmon .count {
+        color: var( --accent );
+        font-size: 1rem;
+        font-weight: 700;
+        margin-left: 0.5rem;
+    }
+    .netmon .count.leaked {
+        color: var( --red );
+    }
+    textarea {
+        background: var( --panel );
+        border: 1px solid var( --border );
+        border-radius: 6px;
+        color: var( --fg );
+        font-family: inherit;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        min-height: 120px;
+        padding: 0.9rem 1rem;
+        resize: vertical;
+        width: 100%;
+    }
+    textarea:focus {
+        border-color: var( --accent );
+        outline: none;
+    }
+    .tones {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 1rem 0;
+    }
+    .tone {
+        background: none;
+        border: 1px solid var( --border );
+        border-radius: 20px;
+        color: var( --dim );
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.78rem;
+        padding: 0.4rem 0.9rem;
+        transition: border-color 0.15s ease, color 0.15s ease;
+    }
+    .tone:hover {
+        border-color: var( --dim );
+        color: var( --fg );
+    }
+    .tone.active {
+        border-color: var( --accent );
+        color: var( --accent );
+    }
+    .actions {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+    button.primary {
+        background: var( --accent );
+        border: none;
+        border-radius: 6px;
+        color: #06120c;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.85rem;
+        font-weight: 700;
+        padding: 0.65rem 1.4rem;
+    }
+    button.primary:disabled {
+        background: var( --border );
+        color: var( --dim );
+        cursor: not-allowed;
+    }
+    button.ghost {
+        background: none;
+        border: 1px solid var( --border );
+        border-radius: 6px;
+        color: var( --dim );
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.85rem;
+        padding: 0.65rem 1.2rem;
+    }
+    button.ghost:hover {
+        border-color: var( --dim );
+        color: var( --fg );
+    }
+    .output {
+        background: var( --panel );
+        border: 1px solid var( --border );
+        border-radius: 6px;
+        min-height: 100px;
+        padding: 1rem 1.1rem;
+        white-space: pre-wrap;
+    }
+    .output:empty::before {
+        color: var( --dim );
+        content: "// rewrite will stream here";
+    }
+    .cursor {
+        animation: blink 1s step-end infinite;
+        color: var( --accent );
+    }
+    @keyframes blink {
+        50% { opacity: 0; }
+    }
+    .meta {
+        color: var( --dim );
+        font-size: 0.72rem;
+        margin-top: 0.6rem;
+    }
+    .progress {
+        background: var( --border );
+        border-radius: 3px;
+        height: 4px;
+        margin-top: 0.75rem;
+        overflow: hidden;
+    }
+    .progress-bar {
+        background: var( --accent );
+        height: 100%;
+        transition: width 0.2s ease;
+        width: 0%;
+    }
+    footer {
+        border-top: 1px solid var( --border );
+        color: var( --dim );
+        font-size: 0.78rem;
+        margin-top: 2.5rem;
+        padding-top: 1.25rem;
+    }
+    footer a {
+        color: var( --accent );
+    }
+</style>
+</head>
+<body>
+    <div class="wrap">
+        <header>
+            <h1>AIRGAP</h1>
+            <p class="tagline">rewrites your text on-device with Chrome's built-in Gemini Nano — nothing leaves the machine</p>
+            <div class="status">
+                <span class="dot off" id="statusDot"></span>
+                <span class="status-text" id="statusText">checking for on-device model&hellip;</span>
+            </div>
+            <div class="progress" id="progressWrap" hidden>
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+        </header>
+
+        <div class="netmon">
+            <span class="label">network requests since load</span><span class="count" id="netCount">0</span>
+            <span class="label" style="margin-left: 1rem;">during last rewrite</span><span class="count" id="netDuring">&mdash;</span>
+        </div>
+
+        <textarea id="input" placeholder="Paste or type something to rewrite&hellip;">The migration will take approximately three weeks and requires coordination across two teams. Please let me know your availability for a kickoff call.</textarea>
+
+        <div class="tones" id="tones">
+            <button class="tone active" data-tone="Concise">concise</button>
+            <button class="tone" data-tone="Professional">professional</button>
+            <button class="tone" data-tone="Playful">playful</button>
+            <button class="tone" data-tone="Blunt">blunt</button>
+            <button class="tone" data-tone="Poetic">poetic</button>
+        </div>
+
+        <div class="actions">
+            <button class="primary" id="generate">rewrite</button>
+            <button class="ghost" id="stop" hidden>stop</button>
+        </div>
+
+        <div class="output" id="output"></div>
+        <div class="meta" id="contextMeta"></div>
+
+        <footer>
+            <a href="../">&larr; back to experiments</a> &middot;
+            requires Chrome 138+ on desktop with the on-device model downloaded.
+            no server, no API key, no request leaves your browser.
+        </footer>
+    </div>
+
+<script>
+    let session = null;
+    let controller = null;
+    let netSinceLoad = 0;
+    let netDuringRun = 0;
+
+    const statusDot = document.getElementById( "statusDot" );
+    const statusText = document.getElementById( "statusText" );
+    const progressWrap = document.getElementById( "progressWrap" );
+    const progressBar = document.getElementById( "progressBar" );
+    const netCountEl = document.getElementById( "netCount" );
+    const netDuringEl = document.getElementById( "netDuring" );
+    const input = document.getElementById( "input" );
+    const tonesEl = document.getElementById( "tones" );
+    const generateBtn = document.getElementById( "generate" );
+    const stopBtn = document.getElementById( "stop" );
+    const output = document.getElementById( "output" );
+    const contextMeta = document.getElementById( "contextMeta" );
+
+    let activeTone = "Concise";
+
+    tonesEl.addEventListener( "click", ( e ) => {
+        const btn = e.target.closest( ".tone" );
+        if ( !btn ) return;
+        tonesEl.querySelectorAll( ".tone" ).forEach( ( t ) => t.classList.remove( "active" ) );
+        btn.classList.add( "active" );
+        activeTone = btn.dataset.tone;
+    } );
+
+    new PerformanceObserver( ( list ) => {
+        netSinceLoad += list.getEntries().length;
+        netDuringRun += list.getEntries().length;
+        netCountEl.textContent = netSinceLoad;
+        netCountEl.classList.add( "leaked" );
+    } ).observe( { type: "resource", buffered: false } );
+
+    function setStatus( mode, text ) {
+        statusDot.className = "dot " + mode;
+        statusText.textContent = text;
+    }
+
+    async function init() {
+        if ( !( "LanguageModel" in self ) ) {
+            setStatus( "off", "no on-device model in this browser — try Chrome 138+ on desktop" );
+            generateBtn.disabled = true;
+            return;
+        }
+        const availability = await LanguageModel.availability();
+        if ( availability === "unavailable" ) {
+            setStatus( "off", "on-device model unavailable on this device" );
+            generateBtn.disabled = true;
+            return;
+        }
+        setStatus( "ready", availability === "available" ? "model ready — 100% local" : "model will download on first rewrite" );
+    }
+
+    async function ensureSession() {
+        if ( session ) return session;
+        setStatus( "busy", "loading on-device model…" );
+        progressWrap.hidden = false;
+        session = await LanguageModel.create( {
+            initialPrompts: [ {
+                role: "system",
+                content: "You rewrite text in the requested tone. Reply with only the rewritten text, no preamble, no quotes, no explanation."
+            } ],
+            monitor( m ) {
+                m.addEventListener( "downloadprogress", ( e ) => {
+                    progressBar.style.width = ( e.loaded * 100 ) + "%";
+                } );
+            }
+        } );
+        progressWrap.hidden = true;
+        setStatus( "ready", "model ready — 100% local" );
+        return session;
+    }
+
+    async function generate() {
+        const text = input.value.trim();
+        if ( !text ) return;
+
+        generateBtn.disabled = true;
+        stopBtn.hidden = false;
+        output.textContent = "";
+        netDuringRun = 0;
+        netDuringEl.textContent = "…";
+
+        controller = new AbortController();
+
+        try {
+            const s = await ensureSession();
+            setStatus( "busy", "generating…" );
+            const stream = s.promptStreaming(
+                `Tone: ${ activeTone }\n\nText:\n${ text }`,
+                { signal: controller.signal }
+            );
+            for await ( const chunk of stream ) {
+                output.textContent += chunk;
+            }
+            contextMeta.textContent = `context used: ${ s.inputUsage ?? s.contextUsage ?? "?" } / ${ s.inputQuota ?? s.contextWindow ?? "?" } tokens`;
+            setStatus( "ready", "model ready — 100% local" );
+        } catch ( err ) {
+            if ( err.name !== "AbortError" ) {
+                output.textContent = "error: " + err.message;
+            }
+            setStatus( "ready", "model ready — 100% local" );
+        }
+
+        netDuringEl.textContent = netDuringRun;
+        generateBtn.disabled = false;
+        stopBtn.hidden = true;
+    }
+
+    generateBtn.addEventListener( "click", generate );
+    stopBtn.addEventListener( "click", () => controller && controller.abort() );
+
+    init();
+</script>
+</body>
+</html>
