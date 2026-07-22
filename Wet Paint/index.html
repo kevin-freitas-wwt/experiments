@@ -463,10 +463,11 @@ function paintPoint( mx, my ) {
 }
 
 /* ---------- spawning ---------- */
+function strokeSpeed() { return Math.hypot( v3[ 0 ], v3[ 1 ], v3[ 2 ] ); }
 function spawnOrb( b, x, y, z ) {
-    const c = color( b.palette ), sv = sphere( rand( 10, 45 ) );
+    const c = color( b.palette ), sv = sphere( rand( 10, 45 ) + strokeSpeed() * 0.2 );
     active.ents.push( { t: "orb", sid: strokeId, x, y, z,
-        vx: v3[ 0 ] * 0.25 + sv[ 0 ], vy: v3[ 1 ] * 0.25 + sv[ 1 ], vz: v3[ 2 ] * 0.25 + sv[ 2 ],
+        vx: sv[ 0 ], vy: sv[ 1 ], vz: sv[ 2 ],
         r: ( 12 + b.size * 108 ) * rand( 0.6, 1.3 ),
         a: 0.07 + b.intensity * 0.3, fd: 1.2 + b.intensity * 2, visc: b.visc,
         ph: 0, st: rand( 0.3, 0.8 ), alpha: 1, fl: floorA(), ...c } );
@@ -482,9 +483,10 @@ function spawnRipple( b, x, y, z ) {
 }
 function spawnSpark( b, x, y, z ) {
     for( let i = 0; i < 3; i++ ) {
-        const c = color( b.palette ), sv = sphere( rand( 40, 200 ) );
-        active.ents.push( { t: "spark", sid: strokeId, x, y, z,
-            vx: v3[ 0 ] * 0.45 + sv[ 0 ], vy: v3[ 1 ] * 0.45 + sv[ 1 ], vz: v3[ 2 ] * 0.45 + sv[ 2 ],
+        const c = color( b.palette ), sv = sphere( rand( 40, 200 ) + strokeSpeed() * 0.45 );
+        const jp = sphere( rand( 0, 12 ) );
+        active.ents.push( { t: "spark", sid: strokeId, x: x + jp[ 0 ], y: y + jp[ 1 ], z: z + jp[ 2 ],
+            vx: sv[ 0 ], vy: sv[ 1 ], vz: sv[ 2 ],
             sz: ( 1 + b.size * 3.5 ) * rand( 0.5, 1.4 ), tr: [],
             a: 0.35 + b.intensity * 0.6, fd: 0.8 + b.intensity * 1.8, visc: b.visc,
             ph: 0, st: rand( 0.2, 0.6 ), alpha: 1, fl: floorA(), ...c } );
@@ -520,25 +522,20 @@ function extendRibbons() {
     }
 }
 function spawnNebula( b, x, y, z ) {
-    const c = color( b.palette ), blobs = [], sv = sphere( rand( 5, 16 ) );
+    const c = color( b.palette ), blobs = [], sv = sphere( rand( 5, 16 ) + strokeSpeed() * 0.1 );
     for( let i = 0; i < 3; i++ ) {
         const o = sphere( rand( 0.15, 0.55 ) );
         blobs.push( { dx: o[ 0 ], dy: o[ 1 ], dz: o[ 2 ], s: rand( 0.5, 1 ), dh: rand( -20, 20 ) } );
     }
     active.ents.push( { t: "nebula", sid: strokeId, x, y, z,
-        vx: v3[ 0 ] * 0.1 + sv[ 0 ], vy: v3[ 1 ] * 0.1 + sv[ 1 ], vz: v3[ 2 ] * 0.1 + sv[ 2 ],
+        vx: sv[ 0 ], vy: sv[ 1 ], vz: sv[ 2 ],
         r: ( 60 + b.size * 200 ) * rand( 0.7, 1.3 ), blobs,
         a: 0.035 + b.intensity * 0.12, fd: 1.5 + b.intensity * 2.5, visc: b.visc,
         ph: 0, st: rand( 0.4, 1 ), alpha: 1, fl: floorA(), ...c } );
     cap( "nebula" );
 }
 function spawnBolt( b, x, y, z ) {
-    const c = color( b.palette ), sp = Math.hypot( v3[ 0 ], v3[ 1 ], v3[ 2 ] );
-    let d;
-    if( sp > 60 ) {
-        const jj = sphere( 0.35 );
-        d = norm3( [ v3[ 0 ] / sp + jj[ 0 ], v3[ 1 ] / sp + jj[ 1 ], v3[ 2 ] / sp + jj[ 2 ] ] );
-    } else d = sphere( 1 );
+    const c = color( b.palette ), d = sphere( 1 );
     let n1 = cross3( d, sphere( 1 ) );
     if( Math.hypot( n1[ 0 ], n1[ 1 ], n1[ 2 ] ) < 0.01 ) n1 = [ 0, 1, 0 ];
     n1 = norm3( n1 );
@@ -564,9 +561,9 @@ function spawnBurst( b, x, y, z ) {
     cap( "burst" );
 }
 function spawnFirefly( b, x, y, z ) {
-    const c = color( b.palette ), sv = sphere( rand( 25, 70 ) );
+    const c = color( b.palette ), sv = sphere( rand( 25, 70 ) + strokeSpeed() * 0.3 );
     active.ents.push( { t: "firefly", sid: strokeId, x, y, z,
-        vx: v3[ 0 ] * 0.3 + sv[ 0 ], vy: v3[ 1 ] * 0.3 + sv[ 1 ], vz: v3[ 2 ] * 0.3 + sv[ 2 ],
+        vx: sv[ 0 ], vy: sv[ 1 ], vz: sv[ 2 ],
         sz: ( 1 + b.size * 2.8 ) * rand( 0.6, 1.5 ), amp: 90, glow: 1,
         twp: rand( 0, 6.283 ), tws: rand( 2.5, 7 ),
         a: 0.35 + b.intensity * 0.6, fd: 1 + b.intensity * 2, visc: b.visc,
