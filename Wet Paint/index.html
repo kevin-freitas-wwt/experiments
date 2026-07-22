@@ -279,7 +279,7 @@ const BRUSHES = {
     spark: { label: "Sparks", freq: 0.55, size: 0.4, intensity: 0.7, visc: 0.35, palette: "Ember" },
     ribbon: { label: "Ribbons", freq: 0.4, size: 0.5, intensity: 0.65, visc: 0.3, palette: "Ultraviolet" }
 };
-const CAPS = { orb: 500, ripple: 300, spark: 1200, ribbon: 120 };
+const CAPS = { orb: 800, ripple: 500, spark: 2000, ribbon: 200 };
 const ICONS = {
     orb: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/></svg>',
     ripple: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7" opacity="0.6"/><circle cx="12" cy="12" r="10.5" opacity="0.3"/></svg>',
@@ -316,6 +316,10 @@ function color( name ) {
     };
 }
 function drag( visc, dt ) { return Math.pow( 0.998 - visc * 0.09, dt * 60 ); }
+function floorA() {
+    if( Math.random() < 0.15 ) return 0;
+    return Math.max( 0.12, Math.min( 0.95, 0.66 + ( Math.random() + Math.random() - 1 ) * 0.4 ) );
+}
 function cap( type ) {
     let n = 0;
     for( const e of ents ) if( e.t === type ) n++;
@@ -331,7 +335,7 @@ function spawnOrb( b, x, y ) {
         vx: pvx * 0.25 + rand( -30, 30 ), vy: pvy * 0.25 + rand( -30, 30 ),
         r: ( 12 + b.size * 108 ) * rand( 0.6, 1.3 ),
         a: 0.07 + b.intensity * 0.3, fd: 1.2 + b.intensity * 2, visc: b.visc,
-        ph: 0, st: rand( 0.3, 0.8 ), alpha: 1, ...c } );
+        ph: 0, st: rand( 0.3, 0.8 ), alpha: 1, fl: floorA(), ...c } );
     cap( "orb" );
 }
 function spawnRipple( b, x, y ) {
@@ -339,7 +343,7 @@ function spawnRipple( b, x, y ) {
     ents.push( { t: "ripple", sid: strokeId, x, y, r: 2,
         vr: ( 90 + b.size * 420 ) * rand( 0.7, 1.2 ), lw: 1.5 + b.size * 6,
         a: 0.2 + b.intensity * 0.55, fd: 0.8 + b.intensity * 1.6, visc: b.visc,
-        ph: 0, st: rand( 0.2, 0.5 ), alpha: 1, ...c } );
+        ph: 0, st: rand( 0.2, 0.5 ), alpha: 1, fl: floorA(), ...c } );
     cap( "ripple" );
 }
 function spawnSpark( b, x, y ) {
@@ -349,7 +353,7 @@ function spawnSpark( b, x, y ) {
             vx: pvx * 0.45 + Math.cos( ang ) * sp, vy: pvy * 0.45 + Math.sin( ang ) * sp,
             sz: ( 1 + b.size * 3.5 ) * rand( 0.5, 1.4 ), tr: [],
             a: 0.35 + b.intensity * 0.6, fd: 0.8 + b.intensity * 1.8, visc: b.visc,
-            ph: 0, st: rand( 0.2, 0.6 ), alpha: 1, ...c } );
+            ph: 0, st: rand( 0.2, 0.6 ), alpha: 1, fl: floorA(), ...c } );
     }
     cap( "spark" );
 }
@@ -360,7 +364,7 @@ function startRibbons( b, x, y ) {
         const c = color( b.palette );
         const r = { t: "ribbon", sid: strokeId, pts: [], off: ( i - ( n - 1 ) / 2 ) * ( 8 + b.size * 14 ),
             w: 2.5 + b.size * 20, a: 0.18 + b.intensity * 0.55, fd: 1 + b.intensity * 2,
-            visc: b.visc, pal: b.palette, ph: 0, st: rand( 0.3, 0.7 ), alpha: 1, ...c };
+            visc: b.visc, pal: b.palette, ph: 0, st: rand( 0.3, 0.7 ), alpha: 1, fl: floorA(), ...c };
         ents.push( r ); liveRibbons.push( r );
         cap( "ribbon" );
     }
@@ -397,7 +401,11 @@ function spawnTick( dt ) {
 function lifecycle( e, speed, dt ) {
     if( e.ph === 0 && speed < 7 ) e.ph = 1;
     else if( e.ph === 1 ) { e.st -= dt; if( e.st <= 0 ) e.ph = 2; }
-    if( e.ph === 2 ) { e.alpha -= dt / e.fd; return e.alpha > 0; }
+    if( e.ph === 2 ) {
+        e.alpha -= dt / e.fd;
+        if( e.alpha <= e.fl ) { e.alpha = e.fl; e.ph = 3; }
+        return e.alpha > 0;
+    }
     return true;
 }
 function update( dt ) {
