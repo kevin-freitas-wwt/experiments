@@ -357,7 +357,7 @@ let painting = false, spawnAcc = 0, lastMove = 0;
 let p3 = null, v3 = [ 0, 0, 0 ], strokeR = [ 1, 0, 0 ];
 let liveRibbons = [];
 
-const canvas = document.getElementById( "scene" ), ctx = canvas.getContext( "2d" );
+const canvas = document.getElementById( "scene" );
 let W = 0, H = 0, DPR = 1, FL = 900;
 const cam = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 };
 let worldYaw = 0, lastNav = -9999;
@@ -373,6 +373,7 @@ function resetCam() { cam.x = 0; cam.y = 0; cam.z = -FL * 1.05; cam.yaw = 0; cam
 addEventListener( "resize", resize );
 resize();
 resetCam();
+const mainCtx = glSetup( canvas, false );
 
 function layerSig() {
     const b = BRUSHES[ brush ];
@@ -652,76 +653,163 @@ function updateEnts( ents, dt ) {
     }
 }
 
-/* ---------- rendering ---------- */
-function drawScene( c, vw, vh, k ) {
+/* ---------- rendering (WebGL) ---------- */
+function hsl2rgb( h, s, l ) {
+    h = ( ( h % 360 ) + 360 ) % 360; s /= 100; l /= 100;
+    const c = ( 1 - Math.abs( 2 * l - 1 ) ) * s, hp = h / 60, xx = c * ( 1 - Math.abs( hp % 2 - 1 ) ), m = l - c / 2;
+    let r = 0, g = 0, b = 0;
+    if( hp < 1 ) { r = c; g = xx; } else if( hp < 2 ) { r = xx; g = c; }
+    else if( hp < 3 ) { g = c; b = xx; } else if( hp < 4 ) { g = xx; b = c; }
+    else if( hp < 5 ) { r = xx; b = c; } else { r = c; b = xx; }
+    return [ r + m, g + m, b + m ];
+}
+function hex2rgb( hx ) {
+    return [ parseInt( hx.slice( 1, 3 ), 16 ) / 255, parseInt( hx.slice( 3, 5 ), 16 ) / 255, parseInt( hx.slice( 5, 7 ), 16 ) / 255 ];
+}
+function glSetup( cv, preserve ) {
+    const g = cv.getContext( "webgl", { alpha: false, antialias: true, depth: false, preserveDrawingBuffer: !!preserve } );
+    if( !g ) return null;
+    const vs = `attribute vec2 aP; attribute vec2 aL; attribute vec4 aC; attribute vec3 aX;
+        uniform vec2 uRes; varying vec2 vL; varying vec4 vC; varying vec3 vX;
+        void main() { vL = aL; vC = aC; vX = aX;
+            gl_Position = vec4( aP.x / uRes.x * 2.0 - 1.0, 1.0 - aP.y / uRes.y * 2.0, 0.0, 1.0 ); }`;
+    const fs = `precision mediump float; varying vec2 vL; varying vec4 vC; varying vec3 vX;
+        void main() { float d = length( vL ); float a;
+            if( vX.x < 0.5 ) { float t = clamp( 1.0 - d, 0.0, 1.0 ); a = t * t; }
+            else if( vX.x < 1.5 ) { a = 1.0 - smoothstep( 0.55, 1.0, d ); }
+            else if( vX.x < 2.5 ) { a = 1.0 - smoothstep( 0.0, vX.z, abs( d - vX.y ) ); }
+            else { a = 1.0 - smoothstep( 1.0 - vX.y, 1.0, abs( vL.y ) ); }
+            gl_FragColor = vec4( vC.rgb * vC.a * a, 1.0 ); }`;
+    function sh( type, src ) {
+        const s = g.createShader( type );
+        g.shaderSource( s, src );
+        g.compileShader( s );
+        return s;
+    }
+    const prog = g.createProgram();
+    g.attachShader( prog, sh( g.VERTEX_SHADER, vs ) );
+    g.attachShader( prog, sh( g.FRAGMENT_SHADER, fs ) );
+    g.linkProgram( prog );
+    return { canvas: cv, g, prog, buf: g.createBuffer(),
+        uRes: g.getUniformLocation( prog, "uRes" ),
+        aP: g.getAttribLocation( prog, "aP" ), aL: g.getAttribLocation( prog, "aL" ),
+        aC: g.getAttribLocation( prog, "aC" ), aX: g.getAttribLocation( prog, "aX" ) };
+}
+
+const VB = new Float32Array( 1 << 21 );
+let vi = 0, cur = null, expCtx = null;
+function flush() {
+    if( !vi || !cur ) return;
+    const g = cur.g;
+    g.bufferData( g.ARRAY_BUFFER, VB.subarray( 0, vi ), g.DYNAMIC_DRAW );
+    g.drawArrays( g.TRIANGLES, 0, vi / 11 );
+    vi = 0;
+}
+function need( n ) { if( vi + n > VB.length ) flush(); }
+function vput( x, y, lx, ly, c, a, sp, p0, p1 ) {
+    VB[ vi++ ] = x; VB[ vi++ ] = y; VB[ vi++ ] = lx; VB[ vi++ ] = ly;
+    VB[ vi++ ] = c[ 0 ]; VB[ vi++ ] = c[ 1 ]; VB[ vi++ ] = c[ 2 ]; VB[ vi++ ] = a;
+    VB[ vi++ ] = sp; VB[ vi++ ] = p0; VB[ vi++ ] = p1;
+}
+function quad( x, y, h, c, a, sp, p0, p1 ) {
+    need( 66 );
+    vput( x - h, y - h, -1, -1, c, a, sp, p0, p1 );
+    vput( x + h, y - h, 1, -1, c, a, sp, p0, p1 );
+    vput( x - h, y + h, -1, 1, c, a, sp, p0, p1 );
+    vput( x + h, y - h, 1, -1, c, a, sp, p0, p1 );
+    vput( x + h, y + h, 1, 1, c, a, sp, p0, p1 );
+    vput( x - h, y + h, -1, 1, c, a, sp, p0, p1 );
+}
+function seg( x0, y0, x1, y1, hw, c, a ) {
+    need( 66 );
+    const dx = x1 - x0, dy = y1 - y0, m = Math.hypot( dx, dy ) || 1;
+    const nx = -dy / m * hw, ny = dx / m * hw;
+    vput( x0 - nx, y0 - ny, 0, -1, c, a, 3, 0.55, 0 );
+    vput( x0 + nx, y0 + ny, 0, 1, c, a, 3, 0.55, 0 );
+    vput( x1 - nx, y1 - ny, 0, -1, c, a, 3, 0.55, 0 );
+    vput( x0 + nx, y0 + ny, 0, 1, c, a, 3, 0.55, 0 );
+    vput( x1 + nx, y1 + ny, 0, 1, c, a, 3, 0.55, 0 );
+    vput( x1 - nx, y1 - ny, 0, -1, c, a, 3, 0.55, 0 );
+}
+function rseg( x0, y0, w0, c0, x1, y1, w1, c1, a ) {
+    need( 66 );
+    const dx = x1 - x0, dy = y1 - y0, m = Math.hypot( dx, dy ) || 1;
+    const nx = -dy / m, ny = dx / m;
+    vput( x0 - nx * w0, y0 - ny * w0, 0, -1, c0, a, 3, 0.5, 0 );
+    vput( x0 + nx * w0, y0 + ny * w0, 0, 1, c0, a, 3, 0.5, 0 );
+    vput( x1 - nx * w1, y1 - ny * w1, 0, -1, c1, a, 3, 0.5, 0 );
+    vput( x0 + nx * w0, y0 + ny * w0, 0, 1, c0, a, 3, 0.5, 0 );
+    vput( x1 + nx * w1, y1 + ny * w1, 0, 1, c1, a, 3, 0.5, 0 );
+    vput( x1 - nx * w1, y1 - ny * w1, 0, -1, c1, a, 3, 0.5, 0 );
+}
+function rgbOf( e ) { return e.rgb || ( e.rgb = hsl2rgb( e.hue, e.sat, e.lit ) ); }
+
+function renderScene( t, vw, vh, k ) {
+    if( !t ) return;
     basis();
     vcx = vw / 2; vcy = vh / 2; vfl = FL * ( k || 1 );
-    c.fillStyle = bg;
-    c.fillRect( 0, 0, vw, vh );
-    c.globalCompositeOperation = "lighter";
-    c.lineCap = "round"; c.lineJoin = "round";
+    cur = t;
+    const g = t.g, bc = hex2rgb( bg );
+    g.viewport( 0, 0, t.canvas.width, t.canvas.height );
+    g.clearColor( bc[ 0 ], bc[ 1 ], bc[ 2 ], 1 );
+    g.clear( g.COLOR_BUFFER_BIT );
+    g.useProgram( t.prog );
+    g.bindBuffer( g.ARRAY_BUFFER, t.buf );
+    g.enable( g.BLEND );
+    g.blendFunc( g.ONE, g.ONE );
+    const ST = 44;
+    g.enableVertexAttribArray( t.aP ); g.vertexAttribPointer( t.aP, 2, g.FLOAT, false, ST, 0 );
+    g.enableVertexAttribArray( t.aL ); g.vertexAttribPointer( t.aL, 2, g.FLOAT, false, ST, 8 );
+    g.enableVertexAttribArray( t.aC ); g.vertexAttribPointer( t.aC, 4, g.FLOAT, false, ST, 16 );
+    g.enableVertexAttribArray( t.aX ); g.vertexAttribPointer( t.aX, 3, g.FLOAT, false, ST, 32 );
+    g.uniform2f( t.uRes, vw, vh );
+    vi = 0;
     for( const layer of layers ) {
-        if( layer.visible ) drawEnts( c, layer.ents );
+        if( layer.visible ) buildEnts( layer.ents );
     }
-    c.globalCompositeOperation = "source-over";
+    flush();
 }
-function drawEnts( c, ents ) {
+function buildEnts( ents ) {
     for( const e of ents ) {
         if( e.t === "orb" ) {
             const q = project( e.x, e.y, e.z );
             if( !q ) continue;
             const rr = e.r * q[ 2 ];
             if( rr < 0.4 ) continue;
-            const a = e.a * e.alpha * att( q[ 3 ] );
-            const g = c.createRadialGradient( q[ 0 ], q[ 1 ], 0, q[ 0 ], q[ 1 ], rr );
-            g.addColorStop( 0, hsla( e.hue, e.sat, e.lit, a ) );
-            g.addColorStop( 1, hsla( e.hue, e.sat, e.lit, 0 ) );
-            c.fillStyle = g;
-            c.beginPath(); c.arc( q[ 0 ], q[ 1 ], rr, 0, 7 ); c.fill();
+            quad( q[ 0 ], q[ 1 ], rr, rgbOf( e ), e.a * e.alpha * att( q[ 3 ] ), 0, 0, 0 );
         } else if( e.t === "ripple" ) {
             const q = project( e.x, e.y, e.z );
             if( !q ) continue;
-            const rr = e.r * q[ 2 ], a = e.a * e.alpha * att( q[ 3 ] );
+            const rr = e.r * q[ 2 ], lw = Math.max( 0.4, e.lw * q[ 2 ] ), a = e.a * e.alpha * att( q[ 3 ] );
             if( rr < 0.5 ) continue;
-            c.strokeStyle = hsla( e.hue, e.sat, e.lit, a );
-            c.lineWidth = Math.max( 0.3, e.lw * q[ 2 ] );
-            c.beginPath(); c.arc( q[ 0 ], q[ 1 ], rr, 0, 7 ); c.stroke();
-            c.strokeStyle = hsla( e.hue, e.sat, e.lit, a * 0.25 );
-            c.lineWidth = Math.max( 0.3, e.lw * 3.2 * q[ 2 ] );
-            c.beginPath(); c.arc( q[ 0 ], q[ 1 ], rr, 0, 7 ); c.stroke();
+            const c = rgbOf( e );
+            let h = rr + lw;
+            quad( q[ 0 ], q[ 1 ], h, c, a, 2, rr / h, lw / h );
+            h = rr + lw * 3.2;
+            quad( q[ 0 ], q[ 1 ], h, c, a * 0.25, 2, rr / h, lw * 3.2 / h );
         } else if( e.t === "spark" ) {
             const q = project( e.x, e.y, e.z );
             if( !q ) continue;
-            const a = e.a * e.alpha * att( q[ 3 ] ), sz = Math.max( 0.3, e.sz * q[ 2 ] );
-            if( e.tr.length > 1 ) {
-                c.strokeStyle = hsla( e.hue, e.sat, e.lit, a * 0.3 );
-                c.lineWidth = sz;
-                c.beginPath();
-                let started = false;
-                for( const tp of e.tr ) {
-                    const tq = project( tp[ 0 ], tp[ 1 ], tp[ 2 ] );
-                    if( !tq ) { started = false; continue; }
-                    if( started ) c.lineTo( tq[ 0 ], tq[ 1 ] );
-                    else { c.moveTo( tq[ 0 ], tq[ 1 ] ); started = true; }
+            const a = e.a * e.alpha * att( q[ 3 ] ), sz = Math.max( 0.3, e.sz * q[ 2 ] ), c = rgbOf( e );
+            const c2 = e.rgb2 || ( e.rgb2 = hsl2rgb( e.hue, e.sat, Math.min( 95, e.lit + 20 ) ) );
+            if( e.tr.length > 2 ) {
+                let prev = null;
+                for( let i = 0; i < e.tr.length; i += 2 ) {
+                    const tq = project( e.tr[ i ][ 0 ], e.tr[ i ][ 1 ], e.tr[ i ][ 2 ] );
+                    if( tq && prev ) seg( prev[ 0 ], prev[ 1 ], tq[ 0 ], tq[ 1 ], Math.max( 0.3, sz * 0.6 ), c, a * 0.3 );
+                    prev = tq;
                 }
-                c.stroke();
             }
-            c.fillStyle = hsla( e.hue, e.sat, e.lit, a );
-            c.beginPath(); c.arc( q[ 0 ], q[ 1 ], sz, 0, 7 ); c.fill();
-            c.fillStyle = hsla( e.hue, e.sat, Math.min( 95, e.lit + 20 ), a * 0.35 );
-            c.beginPath(); c.arc( q[ 0 ], q[ 1 ], sz * 2.6, 0, 7 ); c.fill();
+            quad( q[ 0 ], q[ 1 ], sz * 1.35, c, a, 1, 0, 0 );
+            quad( q[ 0 ], q[ 1 ], sz * 2.6, c2, a * 0.35, 0, 0, 0 );
         } else if( e.t === "nebula" ) {
             for( const bl of e.blobs ) {
                 const q = project( e.x + bl.dx * e.r, e.y + bl.dy * e.r, e.z + bl.dz * e.r );
                 if( !q ) continue;
                 const br = e.r * bl.s * q[ 2 ];
                 if( br < 0.6 ) continue;
-                const a = e.a * e.alpha * att( q[ 3 ] );
-                const g = c.createRadialGradient( q[ 0 ], q[ 1 ], 0, q[ 0 ], q[ 1 ], br );
-                g.addColorStop( 0, hsla( e.hue + bl.dh, e.sat, e.lit, a ) );
-                g.addColorStop( 1, hsla( e.hue + bl.dh, e.sat, e.lit, 0 ) );
-                c.fillStyle = g;
-                c.beginPath(); c.arc( q[ 0 ], q[ 1 ], br, 0, 7 ); c.fill();
+                const c = bl.rgb || ( bl.rgb = hsl2rgb( e.hue + bl.dh, e.sat, e.lit ) );
+                quad( q[ 0 ], q[ 1 ], br, c, e.a * e.alpha * att( q[ 3 ] ), 0, 0, 0 );
             }
         } else if( e.t === "bolt" ) {
             const proj = [];
@@ -733,78 +821,55 @@ function drawEnts( c, ents ) {
             }
             if( proj.length < 2 ) continue;
             const mid = proj[ Math.floor( proj.length / 2 ) ];
-            const a = e.a * e.alpha * att( mid[ 3 ] ), sAvg = mid[ 2 ];
-            for( let pass = 0; pass < 2; pass++ ) {
-                c.strokeStyle = hsla( e.hue, e.sat, pass ? Math.min( 96, e.lit + 18 ) : e.lit,
-                    a * ( pass ? 1 : 0.22 ) );
-                c.lineWidth = Math.max( 0.3, ( pass ? e.lw : e.lw * 3.4 ) * sAvg );
-                c.beginPath();
-                for( let j = 0; j < proj.length; j++ ) {
-                    if( j === 0 ) c.moveTo( proj[ j ][ 0 ], proj[ j ][ 1 ] );
-                    else c.lineTo( proj[ j ][ 0 ], proj[ j ][ 1 ] );
-                }
-                c.stroke();
+            const a = e.a * e.alpha * att( mid[ 3 ] ), c = rgbOf( e );
+            const c2 = e.rgb2 || ( e.rgb2 = hsl2rgb( e.hue, e.sat, Math.min( 96, e.lit + 18 ) ) );
+            const wCore = Math.max( 0.3, e.lw * mid[ 2 ] * 0.5 ), wGlow = Math.max( 0.5, e.lw * mid[ 2 ] * 1.7 );
+            for( let j = 1; j < proj.length; j++ ) {
+                seg( proj[ j - 1 ][ 0 ], proj[ j - 1 ][ 1 ], proj[ j ][ 0 ], proj[ j ][ 1 ], wGlow, c, a * 0.22 );
+                seg( proj[ j - 1 ][ 0 ], proj[ j - 1 ][ 1 ], proj[ j ][ 0 ], proj[ j ][ 1 ], wCore, c2, a );
+                if( j < proj.length - 1 ) quad( proj[ j ][ 0 ], proj[ j ][ 1 ], wCore * 1.2, c2, a, 1, 0, 0 );
             }
         } else if( e.t === "burst" ) {
             const pc = project( e.x, e.y, e.z );
             if( !pc ) continue;
-            const a = e.a * e.alpha * att( pc[ 3 ] );
-            for( let pass = 0; pass < 2; pass++ ) {
-                c.strokeStyle = hsla( e.hue, e.sat, e.lit, a * ( pass ? 1 : 0.25 ) );
-                c.lineWidth = Math.max( 0.3, ( pass ? e.lw : e.lw * 2.8 ) * pc[ 2 ] );
-                c.beginPath();
-                for( const d of e.dirs ) {
-                    const q1 = project( e.x + d[ 0 ] * e.r * 0.35, e.y + d[ 1 ] * e.r * 0.35, e.z + d[ 2 ] * e.r * 0.35 );
-                    const q2 = project( e.x + d[ 0 ] * e.r, e.y + d[ 1 ] * e.r, e.z + d[ 2 ] * e.r );
-                    if( !q1 || !q2 ) continue;
-                    c.moveTo( q1[ 0 ], q1[ 1 ] ); c.lineTo( q2[ 0 ], q2[ 1 ] );
-                }
-                c.stroke();
+            const a = e.a * e.alpha * att( pc[ 3 ] ), c = rgbOf( e );
+            const wCore = Math.max( 0.3, e.lw * pc[ 2 ] * 0.5 ), wGlow = Math.max( 0.5, e.lw * pc[ 2 ] * 1.4 );
+            for( const d of e.dirs ) {
+                const q1 = project( e.x + d[ 0 ] * e.r * 0.35, e.y + d[ 1 ] * e.r * 0.35, e.z + d[ 2 ] * e.r * 0.35 );
+                const q2 = project( e.x + d[ 0 ] * e.r, e.y + d[ 1 ] * e.r, e.z + d[ 2 ] * e.r );
+                if( !q1 || !q2 ) continue;
+                seg( q1[ 0 ], q1[ 1 ], q2[ 0 ], q2[ 1 ], wGlow, c, a * 0.25 );
+                seg( q1[ 0 ], q1[ 1 ], q2[ 0 ], q2[ 1 ], wCore, c, a );
             }
         } else if( e.t === "firefly" ) {
             const q = project( e.x, e.y, e.z );
             if( !q ) continue;
             const a = e.a * e.alpha * ( e.glow || 1 ) * att( q[ 3 ] );
-            const sz = Math.max( 0.3, e.sz * q[ 2 ] );
-            c.fillStyle = hsla( e.hue, e.sat, e.lit, a );
-            c.beginPath(); c.arc( q[ 0 ], q[ 1 ], sz, 0, 7 ); c.fill();
-            c.fillStyle = hsla( e.hue, e.sat, Math.min( 95, e.lit + 22 ), a * 0.3 );
-            c.beginPath(); c.arc( q[ 0 ], q[ 1 ], sz * 3, 0, 7 ); c.fill();
+            const sz = Math.max( 0.3, e.sz * q[ 2 ] ), c = rgbOf( e );
+            const c2 = e.rgb2 || ( e.rgb2 = hsl2rgb( e.hue, e.sat, Math.min( 95, e.lit + 22 ) ) );
+            quad( q[ 0 ], q[ 1 ], sz * 1.35, c, a, 1, 0, 0 );
+            quad( q[ 0 ], q[ 1 ], sz * 3, c2, a * 0.3, 0, 0, 0 );
         } else {
             const raw = [];
             for( const p of e.pts ) {
                 const q = project( p.x, p.y, p.z );
-                if( q ) raw.push( [ q[ 0 ], q[ 1 ], q[ 2 ], p.hue, p.sat, p.lit, q[ 3 ] ] );
+                if( q ) { q.push( p.rgb || ( p.rgb = hsl2rgb( p.hue, p.sat, p.lit ) ) ); raw.push( q ); }
             }
             const n = raw.length;
             if( n < 2 ) continue;
-            const head = raw[ n - 1 ], tail = raw[ 0 ], mid = raw[ Math.floor( n / 2 ) ];
-            const dim = att( mid[ 6 ] );
-            const grad = c.createLinearGradient( tail[ 0 ], tail[ 1 ], head[ 0 ], head[ 1 ] );
-            grad.addColorStop( 0, hsla( tail[ 3 ], tail[ 4 ], tail[ 5 ], 1 ) );
-            grad.addColorStop( 0.5, hsla( mid[ 3 ], mid[ 4 ], mid[ 5 ], 1 ) );
-            grad.addColorStop( 1, hsla( head[ 3 ], head[ 4 ], head[ 5 ], 1 ) );
-            for( let pass = 0; pass < 2; pass++ ) {
-                const spread = pass ? 0.5 : 1.4;
-                c.globalAlpha = e.a * e.alpha * dim * ( pass ? 1 : 0.16 );
-                c.fillStyle = grad;
-                c.beginPath();
-                for( let dir = 0; dir < 2; dir++ ) {
-                    for( let j = 0; j < n; j++ ) {
-                        const i = dir ? n - 1 - j : j;
-                        const p = raw[ i ], p0 = raw[ Math.max( 0, i - 1 ) ], p1 = raw[ Math.min( n - 1, i + 1 ) ];
-                        const sx = ( p0[ 0 ] + 2 * p[ 0 ] + p1[ 0 ] ) / 4, sy = ( p0[ 1 ] + 2 * p[ 1 ] + p1[ 1 ] ) / 4;
-                        const dx = p1[ 0 ] - p0[ 0 ], dy = p1[ 1 ] - p0[ 1 ], m = Math.hypot( dx, dy ) || 1;
-                        const hw = Math.max( 0.4, e.w * ( 0.15 + ( i / n ) * 0.85 ) ) * spread * p[ 2 ];
-                        const ox = -dy / m * hw * ( dir ? -1 : 1 ), oy = dx / m * hw * ( dir ? -1 : 1 );
-                        if( dir === 0 && j === 0 ) c.moveTo( sx + ox, sy + oy );
-                        else c.lineTo( sx + ox, sy + oy );
-                    }
-                }
-                c.closePath();
-                c.fill();
+            const dim = att( raw[ Math.floor( n / 2 ) ][ 3 ] ), sm = [];
+            for( let i = 0; i < n; i++ ) {
+                const p = raw[ i ], p0 = raw[ Math.max( 0, i - 1 ) ], p1 = raw[ Math.min( n - 1, i + 1 ) ];
+                sm.push( [ ( p0[ 0 ] + 2 * p[ 0 ] + p1[ 0 ] ) / 4, ( p0[ 1 ] + 2 * p[ 1 ] + p1[ 1 ] ) / 4,
+                    Math.max( 0.4, e.w * ( 0.15 + ( i / n ) * 0.85 ) ) * p[ 2 ], p[ 4 ] ] );
             }
-            c.globalAlpha = 1;
+            for( let pass = 0; pass < 2; pass++ ) {
+                const spread = pass ? 0.5 : 1.4, a = e.a * e.alpha * dim * ( pass ? 1 : 0.16 );
+                for( let i = 1; i < n; i++ ) {
+                    rseg( sm[ i - 1 ][ 0 ], sm[ i - 1 ][ 1 ], sm[ i - 1 ][ 2 ] * spread, sm[ i - 1 ][ 3 ],
+                        sm[ i ][ 0 ], sm[ i ][ 1 ], sm[ i ][ 2 ] * spread, sm[ i ][ 3 ], a );
+                }
+            }
         }
     }
 }
@@ -839,8 +904,7 @@ function tick( now ) {
         spawnTick( dt );
     }
     if( !paused ) update( dt );
-    ctx.setTransform( DPR, 0, 0, DPR, 0, 0 );
-    drawScene( ctx, W, H, 1 );
+    renderScene( mainCtx, W, H, 1 );
 }
 requestAnimationFrame( tick );
 
@@ -1084,11 +1148,11 @@ document.getElementById( "saveBtn" ).addEventListener( "click", () => {
 } );
 
 function exportPNG( ew, eh ) {
-    const off = document.createElement( "canvas" );
-    off.width = ew; off.height = eh;
-    const c = off.getContext( "2d" );
-    drawScene( c, ew, eh, Math.max( ew / W, eh / H ) );
-    off.toBlob( ( blob ) => {
+    if( !expCtx ) expCtx = glSetup( document.createElement( "canvas" ), true );
+    if( !expCtx ) return;
+    expCtx.canvas.width = ew; expCtx.canvas.height = eh;
+    renderScene( expCtx, ew, eh, Math.max( ew / W, eh / H ) );
+    expCtx.canvas.toBlob( ( blob ) => {
         const a = document.createElement( "a" );
         a.href = URL.createObjectURL( blob );
         a.download = `wet-paint-${ew}x${eh}.png`;
