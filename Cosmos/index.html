@@ -213,6 +213,7 @@ struct VOut {
     @location(0) uv : vec2<f32>,
     @location(1) color : vec3<f32>,
     @location(2) intensity : f32,
+    @location(3) flare : f32,
 };
 
 fn temp_to_rgb( t : f32 ) -> vec3<f32> {
@@ -253,13 +254,17 @@ fn vs( @builtin(vertex_index) vi : u32, @builtin(instance_index) ii : u32 ) -> V
     let appmag = absmag + 5.0 * log( dist * 0.1 ) * 0.4342945;
     let bright = pow( 10.0, ( 4.0 - appmag ) * 0.2 ) * u.misc.z;
 
-    let pxc = clamp( 6.0 * pow( max( bright, 0.0001 ), 0.35 ) * u.misc.y / 1200.0, 2.2, 360.0 );
+    let flare = smoothstep( 4.0, 28.0, bright ) + clamp( 0.08 / dist, 0.0, 2.0 );
+    let pxc = clamp( 6.0 * pow( max( bright, 0.0001 ), 0.35 ) * u.misc.y / 1200.0 * ( 1.0 + flare * 0.6 ), 2.2, 900.0 );
 
     var out : VOut;
     out.intensity = clamp( bright, 0.0, 60.0 );
+    out.flare = flare;
     let bv = clamp( 0.92 * ci, -0.35, 5.0 );
     let t = 4600.0 * ( 1.0 / ( bv + 1.7 ) + 1.0 / ( bv + 0.62 ) );
-    out.color = temp_to_rgb( t );
+    var col = temp_to_rgb( t );
+    let luma = dot( col, vec3<f32>( 0.299, 0.587, 0.114 ) );
+    out.color = clamp( vec3<f32>( luma ) + ( col - vec3<f32>( luma ) ) * 2.2, vec3<f32>( 0.0 ), vec3<f32>( 1.0 ) );
 
     var clip = u.proj * vpos;
     let c = corners[ vi ];
@@ -272,10 +277,20 @@ fn vs( @builtin(vertex_index) vi : u32, @builtin(instance_index) ii : u32 ) -> V
 @fragment
 fn fs( in : VOut ) -> @location(0) vec4<f32> {
     let r = length( in.uv );
-    if ( r > 1.0 ) { discard; }
     let core = exp( -r * r * 30.0 );
-    let halo = 0.22 * exp( -r * 3.5 );
+    let fl = min( in.flare, 2.5 );
+    let halo = ( 0.22 + 0.45 * fl ) * exp( -r * ( 3.5 - min( fl, 2.0 ) ) );
     var c = in.color * in.intensity * ( core + halo );
+    let fw = smoothstep( 0.5, 2.0, in.flare );
+    if ( fw > 0.0 ) {
+        let ax = abs( in.uv.x );
+        let ay = abs( in.uv.y );
+        let spikes = exp( -ay * 55.0 ) * exp( -ax * 2.6 ) + exp( -ax * 55.0 ) * exp( -ay * 2.6 );
+        let streak = exp( -ay * 80.0 ) * exp( -ax * 1.1 );
+        let fcol = mix( in.color, vec3<f32>( 1.0 ), 0.45 );
+        c += fcol * in.intensity * fw * ( spikes * 0.30 + streak * 0.22 );
+    }
+    c *= smoothstep( 1.0, 0.7, max( abs( in.uv.x ), abs( in.uv.y ) ) );
     c = vec3<f32>( 1.0 ) - exp( -c );
     return vec4<f32>( c, 1.0 );
 }
@@ -414,7 +429,7 @@ async function main() {
     } );
     document.addEventListener( "mousemove", function( e ) {
         if ( !locked ) { return; }
-        cam.yaw -= e.movementX * 0.0022;
+        cam.yaw += e.movementX * 0.0022;
         cam.pitch -= e.movementY * 0.0022;
         cam.pitch = Math.max( -1.55, Math.min( 1.55, cam.pitch ) );
     } );
