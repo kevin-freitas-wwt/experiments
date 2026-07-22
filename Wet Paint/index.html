@@ -193,6 +193,52 @@
         }
         .mrow:hover { background: rgba( 255, 255, 255, 0.07 ); }
         .mrow span { color: var( --ink-dim ); font-size: 0.72rem; }
+        #layerRows { max-height: 46vh; overflow-y: auto; }
+        .lrow {
+            align-items: center;
+            border-radius: 9px;
+            cursor: grab;
+            display: flex;
+            gap: 7px;
+            padding: 6px 7px;
+        }
+        .lrow:hover { background: rgba( 255, 255, 255, 0.05 ); }
+        .lrow.act { background: rgba( 138, 180, 255, 0.1 ); }
+        .lrow.dragging { opacity: 0.35; }
+        .lrow .dot {
+            border-radius: 50%;
+            flex: none;
+            height: 13px;
+            width: 13px;
+        }
+        .lrow .lname {
+            color: var( --ink );
+            flex: 1;
+            font-size: 0.78rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .lrow.off .dot, .lrow.off .lname { opacity: 0.35; }
+        .lrow .lbtn {
+            align-items: center;
+            background: none;
+            border: none;
+            border-radius: 7px;
+            color: var( --ink-dim );
+            cursor: pointer;
+            display: flex;
+            height: 24px;
+            justify-content: center;
+            padding: 0;
+            width: 24px;
+        }
+        .lrow .lbtn:hover { color: var( --ink ); }
+        .lempty {
+            color: var( --ink-dim );
+            font-size: 0.76rem;
+            padding: 4px 6px 8px;
+        }
         .hidden { display: none; }
         .hint {
             background: rgba( 22, 24, 32, 0.7 );
@@ -229,6 +275,9 @@
     <nav class="palette glass" id="palette"></nav>
 
     <div class="deck glass">
+        <button class="tool" id="layersBtn" title="Layers (L)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>
+        </button>
         <button class="tool" id="pauseBtn" title="Pause / resume (Space)"></button>
         <button class="tool" id="undoBtn" title="Undo last stroke (Cmd/Ctrl+Z)">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
@@ -257,7 +306,12 @@
         <div id="sizeRows"></div>
     </div>
 
-    <div class="hint" id="hint">Paint with your mouse &mdash; Space pauses, &#8984;Z undoes a stroke</div>
+    <div class="menu glass hidden" id="layerMenu">
+        <h3>Layers</h3>
+        <div id="layerRows"></div>
+    </div>
+
+    <div class="hint" id="hint">Paint with your mouse &mdash; 1&ndash;8 pick brushes, Space pauses, L shows layers, &#8984;Z undoes</div>
     <div class="brand">Wet Paint</div>
 
 <script>
@@ -277,18 +331,44 @@ const BRUSHES = {
     orb: { label: "Orbs", freq: 0.35, size: 0.45, intensity: 0.55, visc: 0.5, palette: "Aurora" },
     ripple: { label: "Ripples", freq: 0.4, size: 0.5, intensity: 0.6, visc: 0.45, palette: "Ocean" },
     spark: { label: "Sparks", freq: 0.55, size: 0.4, intensity: 0.7, visc: 0.35, palette: "Ember" },
-    ribbon: { label: "Ribbons", freq: 0.4, size: 0.5, intensity: 0.65, visc: 0.3, palette: "Ultraviolet" }
+    ribbon: { label: "Ribbons", freq: 0.4, size: 0.5, intensity: 0.65, visc: 0.3, palette: "Ultraviolet" },
+    nebula: { label: "Nebulae", freq: 0.3, size: 0.6, intensity: 0.5, visc: 0.6, palette: "Ocean" },
+    bolt: { label: "Bolts", freq: 0.45, size: 0.55, intensity: 0.75, visc: 0.5, palette: "Moonlight" },
+    burst: { label: "Bursts", freq: 0.35, size: 0.5, intensity: 0.65, visc: 0.45, palette: "Ember" },
+    firefly: { label: "Fireflies", freq: 0.6, size: 0.4, intensity: 0.7, visc: 0.4, palette: "Spectrum" }
 };
-const CAPS = { orb: 800, ripple: 500, spark: 2000, ribbon: 200 };
+const CAPS = { orb: 800, ripple: 500, spark: 2000, ribbon: 200, nebula: 300, bolt: 300, burst: 400, firefly: 1500 };
 const ICONS = {
     orb: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/></svg>',
     ripple: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7" opacity="0.6"/><circle cx="12" cy="12" r="10.5" opacity="0.3"/></svg>',
     spark: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="17" r="1.6"/><circle cx="11" cy="11" r="2"/><circle cx="17" cy="6" r="2.4"/><circle cx="17.5" cy="15" r="1.3"/><circle cx="8" cy="6.5" r="1.3"/></svg>',
-    ribbon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M3 16c4-8 7 6 11-2 2.5-5 5-4 7-7"/></svg>'
+    ribbon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M3 16c4-8 7 6 11-2 2.5-5 5-4 7-7"/></svg>',
+    nebula: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17.5 19a4.5 4.5 0 1 0-1-8.9 6 6 0 1 0-11.4 2.4A3.5 3.5 0 0 0 6.5 19z"/></svg>',
+    bolt: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11L9.5 22 19 9.5h-6.5z"/></svg>',
+    burst: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg>',
+    firefly: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="7" cy="7" r="1.4"/><circle cx="16" cy="5" r="1"/><circle cx="12" cy="13" r="2.2"/><circle cx="5" cy="16" r="1"/><circle cx="18" cy="17" r="1.5"/></svg>'
 };
 
-let ents = [], strokeStack = [], strokeId = 0;
+let layers = [], active = null, layerSeq = 0, strokeStack = [], strokeId = 0, tsim = 0;
+const nameCount = {};
 let brush = "orb", paused = false, bg = BGS[ 0 ];
+
+function layerSig() {
+    const b = BRUSHES[ brush ];
+    return [ brush, b.freq, b.size, b.intensity, b.visc, b.palette ].join( "|" );
+}
+function ensureLayer() {
+    if( active && layers.includes( active ) && active.sig === layerSig() ) {
+        active.visible = true;
+        return;
+    }
+    const b = BRUSHES[ brush ];
+    nameCount[ brush ] = ( nameCount[ brush ] || 0 ) + 1;
+    active = { id: ++layerSeq, sig: layerSig(), type: brush, pal: b.palette,
+        name: `${b.label} ${nameCount[ brush ]}`, visible: true, ents: [] };
+    layers.push( active );
+    renderLayers();
+}
 let painting = false, spawnAcc = 0, px = 0, py = 0, pvx = 0, pvy = 0, lastMove = 0;
 let liveRibbons = [];
 
@@ -321,17 +401,14 @@ function floorA() {
     return Math.max( 0.12, Math.min( 0.95, 0.66 + ( Math.random() + Math.random() - 1 ) * 0.4 ) );
 }
 function cap( type ) {
-    let n = 0;
-    for( const e of ents ) if( e.t === type ) n++;
-    if( n <= CAPS[ type ] ) return;
-    const i = ents.findIndex( ( e ) => e.t === type );
-    if( i >= 0 ) ents.splice( i, 1 );
+    if( active.ents.length <= CAPS[ type ] ) return;
+    active.ents.shift();
 }
 
 /* ---------- spawning ---------- */
 function spawnOrb( b, x, y ) {
     const c = color( b.palette );
-    ents.push( { t: "orb", sid: strokeId, x, y,
+    active.ents.push( { t: "orb", sid: strokeId, x, y,
         vx: pvx * 0.25 + rand( -30, 30 ), vy: pvy * 0.25 + rand( -30, 30 ),
         r: ( 12 + b.size * 108 ) * rand( 0.6, 1.3 ),
         a: 0.07 + b.intensity * 0.3, fd: 1.2 + b.intensity * 2, visc: b.visc,
@@ -340,7 +417,7 @@ function spawnOrb( b, x, y ) {
 }
 function spawnRipple( b, x, y ) {
     const c = color( b.palette );
-    ents.push( { t: "ripple", sid: strokeId, x, y, r: 2,
+    active.ents.push( { t: "ripple", sid: strokeId, x, y, r: 2,
         vr: ( 90 + b.size * 420 ) * rand( 0.7, 1.2 ), lw: 1.5 + b.size * 6,
         a: 0.2 + b.intensity * 0.55, fd: 0.8 + b.intensity * 1.6, visc: b.visc,
         ph: 0, st: rand( 0.2, 0.5 ), alpha: 1, fl: floorA(), ...c } );
@@ -349,7 +426,7 @@ function spawnRipple( b, x, y ) {
 function spawnSpark( b, x, y ) {
     for( let i = 0; i < 3; i++ ) {
         const c = color( b.palette ), ang = rand( 0, 6.283 ), sp = rand( 20, 160 );
-        ents.push( { t: "spark", sid: strokeId, x, y,
+        active.ents.push( { t: "spark", sid: strokeId, x, y,
             vx: pvx * 0.45 + Math.cos( ang ) * sp, vy: pvy * 0.45 + Math.sin( ang ) * sp,
             sz: ( 1 + b.size * 3.5 ) * rand( 0.5, 1.4 ), tr: [],
             a: 0.35 + b.intensity * 0.6, fd: 0.8 + b.intensity * 1.8, visc: b.visc,
@@ -365,7 +442,7 @@ function startRibbons( b, x, y ) {
         const r = { t: "ribbon", sid: strokeId, pts: [], off: ( i - ( n - 1 ) / 2 ) * ( 8 + b.size * 14 ),
             w: 2.5 + b.size * 20, a: 0.18 + b.intensity * 0.55, fd: 1 + b.intensity * 2,
             visc: b.visc, pal: b.palette, ph: 0, st: rand( 0.3, 0.7 ), alpha: 1, fl: floorA(), ...c };
-        ents.push( r ); liveRibbons.push( r );
+        active.ents.push( r ); liveRibbons.push( r );
         cap( "ribbon" );
     }
     extendRibbons( x, y );
@@ -383,17 +460,65 @@ function extendRibbons( x, y ) {
     }
 }
 
-const RATES = { orb: ( f ) => 3 + f * 27, ripple: ( f ) => 1.5 + f * 12, spark: ( f ) => 12 + f * 90 };
+function spawnNebula( b, x, y ) {
+    const c = color( b.palette ), blobs = [];
+    for( let i = 0; i < 3; i++ ) blobs.push( { dx: rand( -0.5, 0.5 ), dy: rand( -0.5, 0.5 ), s: rand( 0.5, 1 ), dh: rand( -20, 20 ) } );
+    active.ents.push( { t: "nebula", sid: strokeId, x, y,
+        vx: pvx * 0.1 + rand( -14, 14 ), vy: pvy * 0.1 + rand( -14, 14 ),
+        r: ( 60 + b.size * 200 ) * rand( 0.7, 1.3 ), blobs,
+        a: 0.035 + b.intensity * 0.12, fd: 1.5 + b.intensity * 2.5, visc: b.visc,
+        ph: 0, st: rand( 0.4, 1 ), alpha: 1, fl: floorA(), ...c } );
+    cap( "nebula" );
+}
+function spawnBolt( b, x, y ) {
+    const c = color( b.palette ), sp = Math.hypot( pvx, pvy );
+    const ang = sp > 60 ? Math.atan2( pvy, pvx ) + rand( -0.4, 0.4 ) : rand( 0, 6.283 );
+    const len = ( 70 + b.size * 380 ) * rand( 0.7, 1.2 ), n = 12;
+    const dx = Math.cos( ang ), dy = Math.sin( ang ), pts = [], off = [];
+    for( let i = 0; i < n; i++ ) {
+        const f = i / ( n - 1 );
+        pts.push( [ x + dx * len * f + rand( -1, 1 ) * len * 0.04, y + dy * len * f + rand( -1, 1 ) * len * 0.04 ] );
+        off.push( 0 );
+    }
+    active.ents.push( { t: "bolt", sid: strokeId, pts, off, nx: -dy, ny: dx,
+        amp: 5 + b.size * 14, lw: 1 + b.size * 2.5,
+        a: 0.3 + b.intensity * 0.6, fd: 1 + b.intensity * 2, visc: b.visc,
+        ph: 0, st: rand( 0.2, 0.5 ), alpha: 1, fl: floorA(), ...c } );
+    cap( "bolt" );
+}
+function spawnBurst( b, x, y ) {
+    const c = color( b.palette ), n = 7 + Math.floor( rand( 0, 5 ) + b.size * 4 ), angs = [];
+    const a0 = rand( 0, 6.283 );
+    for( let i = 0; i < n; i++ ) angs.push( a0 + i * 6.283 / n + rand( -0.15, 0.15 ) );
+    active.ents.push( { t: "burst", sid: strokeId, x, y, angs, r: 4, rot: 0,
+        vr: ( 60 + b.size * 360 ) * rand( 0.7, 1.2 ), vrot: rand( -1.4, 1.4 ),
+        lw: 1 + b.size * 3,
+        a: 0.25 + b.intensity * 0.6, fd: 0.9 + b.intensity * 1.8, visc: b.visc,
+        ph: 0, st: rand( 0.2, 0.5 ), alpha: 1, fl: floorA(), ...c } );
+    cap( "burst" );
+}
+function spawnFirefly( b, x, y ) {
+    const c = color( b.palette );
+    active.ents.push( { t: "firefly", sid: strokeId, x, y,
+        vx: pvx * 0.3 + rand( -50, 50 ), vy: pvy * 0.3 + rand( -50, 50 ),
+        sz: ( 1 + b.size * 2.8 ) * rand( 0.6, 1.5 ), amp: 90, glow: 1,
+        twp: rand( 0, 6.283 ), tws: rand( 2.5, 7 ),
+        a: 0.35 + b.intensity * 0.6, fd: 1 + b.intensity * 2, visc: b.visc,
+        ph: 0, st: rand( 0.3, 0.8 ), alpha: 1, fl: floorA(), ...c } );
+    cap( "firefly" );
+}
+
+const SPAWN = { orb: spawnOrb, ripple: spawnRipple, spark: spawnSpark,
+    nebula: spawnNebula, bolt: spawnBolt, burst: spawnBurst, firefly: spawnFirefly };
+const RATES = { orb: ( f ) => 3 + f * 27, ripple: ( f ) => 1.5 + f * 12, spark: ( f ) => 12 + f * 90,
+    nebula: ( f ) => 1 + f * 7, bolt: ( f ) => 2 + f * 12, burst: ( f ) => 1 + f * 9, firefly: ( f ) => 8 + f * 52 };
 function spawnTick( dt ) {
     const b = BRUSHES[ brush ];
     if( brush === "ribbon" ) return;
     spawnAcc += dt * RATES[ brush ]( b.freq );
     while( spawnAcc >= 1 ) {
         spawnAcc--;
-        const jx = px + rand( -6, 6 ), jy = py + rand( -6, 6 );
-        if( brush === "orb" ) spawnOrb( b, jx, jy );
-        else if( brush === "ripple" ) spawnRipple( b, jx, jy );
-        else spawnSpark( b, jx, jy );
+        SPAWN[ brush ]( b, px + rand( -6, 6 ), py + rand( -6, 6 ) );
     }
 }
 
@@ -409,6 +534,13 @@ function lifecycle( e, speed, dt ) {
     return true;
 }
 function update( dt ) {
+    tsim += dt;
+    for( const layer of layers ) {
+        if( !layer.visible ) continue;
+        updateEnts( layer.ents, dt );
+    }
+}
+function updateEnts( ents, dt ) {
     for( let i = ents.length - 1; i >= 0; i-- ) {
         const e = ents[ i ];
         let alive = true;
@@ -416,6 +548,25 @@ function update( dt ) {
             e.vr *= drag( e.visc, dt );
             e.r += e.vr * dt;
             alive = lifecycle( e, e.vr, dt );
+        } else if( e.t === "burst" ) {
+            const k = drag( e.visc, dt );
+            e.vr *= k; e.vrot *= k;
+            e.r += e.vr * dt; e.rot += e.vrot * dt;
+            alive = lifecycle( e, e.vr, dt );
+        } else if( e.t === "bolt" ) {
+            if( e.ph < 2 ) {
+                for( let j = 1; j < e.off.length - 1; j++ ) e.off[ j ] = rand( -1, 1 ) * e.amp;
+                e.amp *= drag( e.visc, dt );
+            }
+            alive = lifecycle( e, e.amp * 4, dt );
+        } else if( e.t === "firefly" ) {
+            const k = drag( e.visc, dt );
+            e.vx = e.vx * k + rand( -1, 1 ) * e.amp * dt * 14;
+            e.vy = e.vy * k + rand( -1, 1 ) * e.amp * dt * 14;
+            e.x += e.vx * dt; e.y += e.vy * dt;
+            e.amp *= k;
+            if( e.ph < 3 ) e.glow = 0.7 + 0.3 * Math.sin( tsim * e.tws + e.twp );
+            alive = lifecycle( e, Math.hypot( e.vx, e.vy ) * 0.5 + e.amp * 0.3, dt );
         } else if( e.t === "ribbon" ) {
             const k = drag( e.visc, dt );
             let top = 0;
@@ -447,6 +598,12 @@ function drawScene( c, vw, vh ) {
     c.fillRect( 0, 0, vw, vh );
     c.globalCompositeOperation = "lighter";
     c.lineCap = "round"; c.lineJoin = "round";
+    for( const layer of layers ) {
+        if( layer.visible ) drawEnts( c, layer.ents );
+    }
+    c.globalCompositeOperation = "source-over";
+}
+function drawEnts( c, ents ) {
     for( const e of ents ) {
         if( e.t === "orb" ) {
             const g = c.createRadialGradient( e.x, e.y, 0, e.x, e.y, e.r );
@@ -474,6 +631,46 @@ function drawScene( c, vw, vh ) {
             c.beginPath(); c.arc( e.x, e.y, e.sz, 0, 7 ); c.fill();
             c.fillStyle = hsla( e.hue, e.sat, Math.min( 95, e.lit + 20 ), e.a * e.alpha * 0.35 );
             c.beginPath(); c.arc( e.x, e.y, e.sz * 2.6, 0, 7 ); c.fill();
+        } else if( e.t === "nebula" ) {
+            for( const bl of e.blobs ) {
+                const bx = e.x + bl.dx * e.r, by = e.y + bl.dy * e.r, br = e.r * bl.s;
+                const g = c.createRadialGradient( bx, by, 0, bx, by, br );
+                g.addColorStop( 0, hsla( e.hue + bl.dh, e.sat, e.lit, e.a * e.alpha ) );
+                g.addColorStop( 1, hsla( e.hue + bl.dh, e.sat, e.lit, 0 ) );
+                c.fillStyle = g;
+                c.beginPath(); c.arc( bx, by, br, 0, 7 ); c.fill();
+            }
+        } else if( e.t === "bolt" ) {
+            for( let pass = 0; pass < 2; pass++ ) {
+                c.strokeStyle = hsla( e.hue, e.sat, pass ? Math.min( 96, e.lit + 18 ) : e.lit,
+                    e.a * e.alpha * ( pass ? 1 : 0.22 ) );
+                c.lineWidth = pass ? e.lw : e.lw * 3.4;
+                c.beginPath();
+                for( let j = 0; j < e.pts.length; j++ ) {
+                    const qx = e.pts[ j ][ 0 ] + e.nx * e.off[ j ], qy = e.pts[ j ][ 1 ] + e.ny * e.off[ j ];
+                    if( j === 0 ) c.moveTo( qx, qy ); else c.lineTo( qx, qy );
+                }
+                c.stroke();
+            }
+        } else if( e.t === "burst" ) {
+            c.lineWidth = e.lw;
+            for( let pass = 0; pass < 2; pass++ ) {
+                c.strokeStyle = hsla( e.hue, e.sat, e.lit, e.a * e.alpha * ( pass ? 1 : 0.25 ) );
+                c.lineWidth = pass ? e.lw : e.lw * 2.8;
+                c.beginPath();
+                for( const a of e.angs ) {
+                    const ca = Math.cos( a + e.rot ), sa = Math.sin( a + e.rot );
+                    c.moveTo( e.x + ca * e.r * 0.35, e.y + sa * e.r * 0.35 );
+                    c.lineTo( e.x + ca * e.r, e.y + sa * e.r );
+                }
+                c.stroke();
+            }
+        } else if( e.t === "firefly" ) {
+            const a = e.a * e.alpha * ( e.glow || 1 );
+            c.fillStyle = hsla( e.hue, e.sat, e.lit, a );
+            c.beginPath(); c.arc( e.x, e.y, e.sz, 0, 7 ); c.fill();
+            c.fillStyle = hsla( e.hue, e.sat, Math.min( 95, e.lit + 22 ), a * 0.3 );
+            c.beginPath(); c.arc( e.x, e.y, e.sz * 3, 0, 7 ); c.fill();
         } else {
             const n = e.pts.length;
             if( n < 2 ) continue;
@@ -507,7 +704,6 @@ function drawScene( c, vw, vh ) {
             c.globalAlpha = 1;
         }
     }
-    c.globalCompositeOperation = "source-over";
 }
 
 let lastT = performance.now();
@@ -526,7 +722,8 @@ requestAnimationFrame( tick );
 /* ---------- pointer ---------- */
 canvas.addEventListener( "pointerdown", ( e ) => {
     canvas.setPointerCapture( e.pointerId );
-    strokeId++; strokeStack.push( strokeId );
+    ensureLayer();
+    strokeId++; strokeStack.push( { layer: active, sid: strokeId } );
     painting = true; spawnAcc = 1;
     px = e.clientX; py = e.clientY; pvx = 0; pvy = 0; lastMove = performance.now();
     if( brush === "ribbon" ) startRibbons( BRUSHES[ brush ], px, py );
@@ -549,7 +746,60 @@ canvas.addEventListener( "pointercancel", endStroke );
 /* ---------- UI ---------- */
 const paletteEl = document.getElementById( "palette" ), panel = document.getElementById( "panel" );
 const saveMenu = document.getElementById( "saveMenu" ), hint = document.getElementById( "hint" );
-const pauseBtn = document.getElementById( "pauseBtn" );
+const pauseBtn = document.getElementById( "pauseBtn" ), layerMenu = document.getElementById( "layerMenu" );
+
+function palGrad( name ) {
+    const p = PALETTES[ name ];
+    const stops = ( p.hues || [ 0, 90, 180, 270 ] ).map( ( h, i, arr ) =>
+        hsla( h, p.sat[ 1 ], p.lit[ 1 ], 1 ) + " " + Math.round( i / Math.max( 1, arr.length - 1 ) * 100 ) + "%" ).join( ", " );
+    return `linear-gradient( 135deg, ${stops} )`;
+}
+
+/* ---------- layers UI ---------- */
+const EYE = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 2l20 20M6.7 6.9C3.6 8.9 2 12 2 12s3.5 7 10 7c1.9 0 3.5-.5 4.9-1.2M10.6 5.2C11 5.1 11.5 5 12 5c6.5 0 10 7 10 7s-.9 1.8-2.7 3.5"/></svg>';
+const TRASH = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14"/></svg>';
+let dragRow = null;
+function renderLayers() {
+    const rows = document.getElementById( "layerRows" );
+    rows.innerHTML = "";
+    if( !layers.length ) {
+        rows.innerHTML = '<div class="lempty">Paint to create a layer</div>';
+        return;
+    }
+    [ ...layers ].reverse().forEach( ( layer ) => {
+        const row = document.createElement( "div" );
+        row.className = "lrow" + ( layer.visible ? "" : " off" ) + ( layer === active ? " act" : "" );
+        row.draggable = true;
+        row.innerHTML = `<span class="dot" style="background:${palGrad( layer.pal )}"></span>
+            <span class="lname">${layer.name}</span>`;
+        const eye = document.createElement( "button" );
+        eye.className = "lbtn"; eye.title = layer.visible ? "Hide layer" : "Show layer";
+        eye.innerHTML = layer.visible ? EYE : EYE_OFF;
+        eye.addEventListener( "click", () => { layer.visible = !layer.visible; renderLayers(); } );
+        const del = document.createElement( "button" );
+        del.className = "lbtn"; del.title = "Delete layer";
+        del.innerHTML = TRASH;
+        del.addEventListener( "click", () => removeLayer( layer ) );
+        row.appendChild( eye ); row.appendChild( del );
+        row.addEventListener( "dragstart", () => { dragRow = layer; row.classList.add( "dragging" ); } );
+        row.addEventListener( "dragend", () => { dragRow = null; renderLayers(); } );
+        row.addEventListener( "dragover", ( ev ) => ev.preventDefault() );
+        row.addEventListener( "drop", ( ev ) => {
+            ev.preventDefault();
+            if( !dragRow || dragRow === layer ) return;
+            layers.splice( layers.indexOf( dragRow ), 1 );
+            layers.splice( layers.indexOf( layer ) + 1, 0, dragRow );
+            renderLayers();
+        } );
+        rows.appendChild( row );
+    } );
+}
+document.getElementById( "layersBtn" ).addEventListener( "click", () => {
+    const open = layerMenu.classList.contains( "hidden" );
+    closePanels();
+    if( open ) { renderLayers(); layerMenu.classList.remove( "hidden" ); }
+} );
 
 Object.keys( BRUSHES ).forEach( ( key, i ) => {
     const b = document.createElement( "button" );
@@ -579,11 +829,13 @@ function selectBrush( key, openPanel ) {
 function togglePanel() {
     panel.classList.toggle( "hidden" );
     saveMenu.classList.add( "hidden" );
+    layerMenu.classList.add( "hidden" );
     if( !panel.classList.contains( "hidden" ) ) syncPanel();
 }
 function closePanels() {
     panel.classList.add( "hidden" );
     saveMenu.classList.add( "hidden" );
+    layerMenu.classList.add( "hidden" );
 }
 
 const sliders = { freq: "freq", size: "size", intensity: "intensity", visc: "visc" };
@@ -629,11 +881,23 @@ pauseBtn.addEventListener( "click", () => setPaused( !paused ) );
 
 function undo() {
     if( !strokeStack.length ) return;
-    const id = strokeStack.pop();
-    ents = ents.filter( ( e ) => e.sid !== id );
+    const { layer, sid } = strokeStack.pop();
+    layer.ents = layer.ents.filter( ( e ) => e.sid !== sid );
+    if( !layer.ents.length ) removeLayer( layer );
+}
+function removeLayer( layer ) {
+    const i = layers.indexOf( layer );
+    if( i >= 0 ) layers.splice( i, 1 );
+    if( active === layer ) active = null;
+    strokeStack = strokeStack.filter( ( s ) => s.layer !== layer );
+    renderLayers();
+}
+function clearAll() {
+    layers = []; active = null; strokeStack = [];
+    renderLayers();
 }
 document.getElementById( "undoBtn" ).addEventListener( "click", undo );
-document.getElementById( "clearBtn" ).addEventListener( "click", () => { ents = []; strokeStack = []; } );
+document.getElementById( "clearBtn" ).addEventListener( "click", clearAll );
 
 /* ---------- save ---------- */
 const SIZES = [
@@ -670,6 +934,7 @@ BGS.forEach( ( col ) => {
 document.getElementById( "saveBtn" ).addEventListener( "click", () => {
     saveMenu.classList.toggle( "hidden" );
     panel.classList.add( "hidden" );
+    layerMenu.classList.add( "hidden" );
 } );
 
 function exportPNG( ew, eh ) {
@@ -693,10 +958,11 @@ function exportPNG( ew, eh ) {
 addEventListener( "keydown", ( e ) => {
     if( e.target.tagName === "INPUT" ) return;
     if( e.code === "Space" ) { e.preventDefault(); setPaused( !paused ); }
-    else if( e.key >= "1" && e.key <= "4" ) selectBrush( Object.keys( BRUSHES )[ +e.key - 1 ], false );
+    else if( e.key >= "1" && e.key <= "8" ) selectBrush( Object.keys( BRUSHES )[ +e.key - 1 ], false );
     else if( e.key === "s" ) togglePanel();
     else if( e.key === "e" ) document.getElementById( "saveBtn" ).click();
-    else if( e.key === "x" ) { ents = []; strokeStack = []; }
+    else if( e.key === "l" ) document.getElementById( "layersBtn" ).click();
+    else if( e.key === "x" ) clearAll();
     else if( ( e.metaKey || e.ctrlKey ) && e.key === "z" ) { e.preventDefault(); undo(); }
     else if( e.key === "Escape" ) closePanels();
 } );
