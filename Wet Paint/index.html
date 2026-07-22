@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wet Paint</title>
-    <meta name="description" content="Paint with light — spawn glowing effects that slow, settle, and dissipate. Export at any resolution.">
+    <meta name="description" content="Paint with light in 3D — glowing effects fly out in every direction, slow with viscosity, and settle. Orbit, fly through, and export at any resolution.">
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <style>
         * { box-sizing: border-box; }
@@ -311,13 +311,13 @@
         <div id="layerRows"></div>
     </div>
 
-    <div class="hint" id="hint">Paint with your mouse &mdash; 1&ndash;8 pick brushes, Space pauses, L shows layers, &#8984;Z undoes</div>
+    <div class="hint" id="hint">Paint in 3D &mdash; &#8984;-drag looks around, ESDF flies, R recenters, Space pauses, &#8984;Z undoes</div>
     <div class="brand">Wet Paint</div>
 
 <script>
 "use strict";
 
-/* ---------- state ---------- */
+/* ---------- config ---------- */
 const PALETTES = {
     Aurora: { hues: [ 135, 160, 180, 200 ], sat: [ 70, 95 ], lit: [ 55, 70 ] },
     Ember: { hues: [ 5, 18, 32, 46 ], sat: [ 85, 100 ], lit: [ 55, 66 ] },
@@ -349,9 +349,30 @@ const ICONS = {
     firefly: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="7" cy="7" r="1.4"/><circle cx="16" cy="5" r="1"/><circle cx="12" cy="13" r="2.2"/><circle cx="5" cy="16" r="1"/><circle cx="18" cy="17" r="1.5"/></svg>'
 };
 
+/* ---------- state ---------- */
 let layers = [], active = null, layerSeq = 0, strokeStack = [], strokeId = 0, tsim = 0;
 const nameCount = {};
 let brush = "orb", paused = false, bg = BGS[ 0 ];
+let painting = false, spawnAcc = 0, lastMove = 0;
+let p3 = null, v3 = [ 0, 0, 0 ], strokeR = [ 1, 0, 0 ];
+let liveRibbons = [];
+
+const canvas = document.getElementById( "scene" ), ctx = canvas.getContext( "2d" );
+let W = 0, H = 0, DPR = 1, FL = 900;
+const cam = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 };
+let worldYaw = 0, lastNav = -9999;
+const keys = {};
+
+function resize() {
+    DPR = Math.min( 2, devicePixelRatio || 1 );
+    W = innerWidth; H = innerHeight;
+    FL = Math.min( W, H ) * 1.1;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+}
+function resetCam() { cam.x = 0; cam.y = 0; cam.z = -FL * 1.05; cam.yaw = 0; cam.pitch = 0; }
+addEventListener( "resize", resize );
+resize();
+resetCam();
 
 function layerSig() {
     const b = BRUSHES[ brush ];
@@ -369,19 +390,6 @@ function ensureLayer() {
     layers.push( active );
     renderLayers();
 }
-let painting = false, spawnAcc = 0, px = 0, py = 0, pvx = 0, pvy = 0, lastMove = 0;
-let liveRibbons = [];
-
-const canvas = document.getElementById( "scene" ), ctx = canvas.getContext( "2d" );
-let W = 0, H = 0, DPR = 1;
-
-function resize() {
-    DPR = Math.min( 2, devicePixelRatio || 1 );
-    W = innerWidth; H = innerHeight;
-    canvas.width = W * DPR; canvas.height = H * DPR;
-}
-addEventListener( "resize", resize );
-resize();
 
 /* ---------- helpers ---------- */
 function rand( a, b ) { return a + Math.random() * ( b - a ); }
@@ -400,41 +408,89 @@ function floorA() {
     if( Math.random() < 0.15 ) return 0;
     return Math.max( 0.12, Math.min( 0.95, 0.66 + ( Math.random() + Math.random() - 1 ) * 0.4 ) );
 }
+function sphere( m ) {
+    const z = rand( -1, 1 ), a = rand( 0, 6.283 ), q = Math.sqrt( 1 - z * z );
+    return [ Math.cos( a ) * q * m, Math.sin( a ) * q * m, z * m ];
+}
+function norm3( v ) {
+    const m = Math.hypot( v[ 0 ], v[ 1 ], v[ 2 ] ) || 1;
+    return [ v[ 0 ] / m, v[ 1 ] / m, v[ 2 ] / m ];
+}
+function cross3( a, b ) {
+    return [ a[ 1 ] * b[ 2 ] - a[ 2 ] * b[ 1 ], a[ 2 ] * b[ 0 ] - a[ 0 ] * b[ 2 ], a[ 0 ] * b[ 1 ] - a[ 1 ] * b[ 0 ] ];
+}
 function cap( type ) {
     if( active.ents.length <= CAPS[ type ] ) return;
     active.ents.shift();
 }
 
+/* ---------- camera ---------- */
+let bR, bU, bF, cosO, sinO, vcx, vcy, vfl;
+function basis() {
+    const cy = Math.cos( cam.yaw ), sy = Math.sin( cam.yaw );
+    const cp = Math.cos( cam.pitch ), sp = Math.sin( cam.pitch );
+    bF = [ sy * cp, sp, cy * cp ];
+    bR = [ cy, 0, -sy ];
+    bU = cross3( bF, bR );
+    cosO = Math.cos( worldYaw ); sinO = Math.sin( worldYaw );
+}
+function project( x, y, z ) {
+    const rx = x * cosO + z * sinO, rz = -x * sinO + z * cosO;
+    const vx = rx - cam.x, vy = y - cam.y, vz = rz - cam.z;
+    const cz = vx * bF[ 0 ] + vy * bF[ 1 ] + vz * bF[ 2 ];
+    if( cz < 6 ) return null;
+    const s = vfl / cz;
+    return [ vcx + ( vx * bR[ 0 ] + vy * bR[ 1 ] + vz * bR[ 2 ] ) * s,
+        vcy - ( vx * bU[ 0 ] + vy * bU[ 1 ] + vz * bU[ 2 ] ) * s, s, cz ];
+}
+function att( cz ) { return Math.min( 1, ( FL * 1.8 ) / cz ); }
+function toWorld( v ) {
+    return [ v[ 0 ] * cosO - v[ 2 ] * sinO, v[ 1 ], v[ 0 ] * sinO + v[ 2 ] * cosO ];
+}
+function paintPoint( mx, my ) {
+    basis();
+    const dx = ( mx - W / 2 ) / FL, dy = -( my - H / 2 ) / FL;
+    const d = [ bR[ 0 ] * dx + bU[ 0 ] * dy + bF[ 0 ],
+        bR[ 1 ] * dx + bU[ 1 ] * dy + bF[ 1 ],
+        bR[ 2 ] * dx + bU[ 2 ] * dy + bF[ 2 ] ];
+    const dw = toWorld( d ), pw = toWorld( [ cam.x, cam.y, cam.z ] ), nw = toWorld( bF );
+    const denom = dw[ 0 ] * nw[ 0 ] + dw[ 1 ] * nw[ 1 ] + dw[ 2 ] * nw[ 2 ];
+    if( Math.abs( denom ) < 1e-4 ) return null;
+    const t = -( pw[ 0 ] * nw[ 0 ] + pw[ 1 ] * nw[ 1 ] + pw[ 2 ] * nw[ 2 ] ) / denom;
+    if( t <= 6 ) return null;
+    return [ pw[ 0 ] + dw[ 0 ] * t, pw[ 1 ] + dw[ 1 ] * t, pw[ 2 ] + dw[ 2 ] * t ];
+}
+
 /* ---------- spawning ---------- */
-function spawnOrb( b, x, y ) {
-    const c = color( b.palette );
-    active.ents.push( { t: "orb", sid: strokeId, x, y,
-        vx: pvx * 0.25 + rand( -30, 30 ), vy: pvy * 0.25 + rand( -30, 30 ),
+function spawnOrb( b, x, y, z ) {
+    const c = color( b.palette ), sv = sphere( rand( 10, 45 ) );
+    active.ents.push( { t: "orb", sid: strokeId, x, y, z,
+        vx: v3[ 0 ] * 0.25 + sv[ 0 ], vy: v3[ 1 ] * 0.25 + sv[ 1 ], vz: v3[ 2 ] * 0.25 + sv[ 2 ],
         r: ( 12 + b.size * 108 ) * rand( 0.6, 1.3 ),
         a: 0.07 + b.intensity * 0.3, fd: 1.2 + b.intensity * 2, visc: b.visc,
         ph: 0, st: rand( 0.3, 0.8 ), alpha: 1, fl: floorA(), ...c } );
     cap( "orb" );
 }
-function spawnRipple( b, x, y ) {
+function spawnRipple( b, x, y, z ) {
     const c = color( b.palette );
-    active.ents.push( { t: "ripple", sid: strokeId, x, y, r: 2,
+    active.ents.push( { t: "ripple", sid: strokeId, x, y, z, r: 2,
         vr: ( 90 + b.size * 420 ) * rand( 0.7, 1.2 ), lw: 1.5 + b.size * 6,
         a: 0.2 + b.intensity * 0.55, fd: 0.8 + b.intensity * 1.6, visc: b.visc,
         ph: 0, st: rand( 0.2, 0.5 ), alpha: 1, fl: floorA(), ...c } );
     cap( "ripple" );
 }
-function spawnSpark( b, x, y ) {
+function spawnSpark( b, x, y, z ) {
     for( let i = 0; i < 3; i++ ) {
-        const c = color( b.palette ), ang = rand( 0, 6.283 ), sp = rand( 20, 160 );
-        active.ents.push( { t: "spark", sid: strokeId, x, y,
-            vx: pvx * 0.45 + Math.cos( ang ) * sp, vy: pvy * 0.45 + Math.sin( ang ) * sp,
+        const c = color( b.palette ), sv = sphere( rand( 40, 200 ) );
+        active.ents.push( { t: "spark", sid: strokeId, x, y, z,
+            vx: v3[ 0 ] * 0.45 + sv[ 0 ], vy: v3[ 1 ] * 0.45 + sv[ 1 ], vz: v3[ 2 ] * 0.45 + sv[ 2 ],
             sz: ( 1 + b.size * 3.5 ) * rand( 0.5, 1.4 ), tr: [],
             a: 0.35 + b.intensity * 0.6, fd: 0.8 + b.intensity * 1.8, visc: b.visc,
             ph: 0, st: rand( 0.2, 0.6 ), alpha: 1, fl: floorA(), ...c } );
     }
     cap( "spark" );
 }
-function startRibbons( b, x, y ) {
+function startRibbons( b ) {
     liveRibbons = [];
     const n = 1 + Math.round( b.freq * 3 );
     for( let i = 0; i < n; i++ ) {
@@ -445,62 +501,71 @@ function startRibbons( b, x, y ) {
         active.ents.push( r ); liveRibbons.push( r );
         cap( "ribbon" );
     }
-    extendRibbons( x, y );
+    extendRibbons();
 }
-function extendRibbons( x, y ) {
-    const mag = Math.hypot( pvx, pvy ) || 1;
-    const nx = -pvy / mag, ny = pvx / mag;
+function extendRibbons() {
     for( const r of liveRibbons ) {
         const last = r.pts[ r.pts.length - 1 ];
-        const qx = x + nx * r.off + rand( -1, 1 ), qy = y + ny * r.off + rand( -1, 1 );
-        if( last && Math.hypot( qx - last.x, qy - last.y ) < 4 ) continue;
-        r.pts.push( { x: qx, y: qy, vx: pvx * 0.12 + rand( -6, 6 ), vy: pvy * 0.12 + rand( -6, 6 ),
+        const jj = sphere( 1.2 );
+        const qx = p3[ 0 ] + strokeR[ 0 ] * r.off + jj[ 0 ];
+        const qy = p3[ 1 ] + strokeR[ 1 ] * r.off + jj[ 1 ];
+        const qz = p3[ 2 ] + strokeR[ 2 ] * r.off + jj[ 2 ];
+        if( last && Math.hypot( qx - last.x, qy - last.y, qz - last.z ) < 4 ) continue;
+        const sv = sphere( 8 );
+        r.pts.push( { x: qx, y: qy, z: qz,
+            vx: v3[ 0 ] * 0.12 + sv[ 0 ], vy: v3[ 1 ] * 0.12 + sv[ 1 ], vz: v3[ 2 ] * 0.12 + sv[ 2 ],
             hue: r.hue + rand( -12, 12 ), sat: r.sat, lit: r.lit } );
         if( r.pts.length > 160 ) r.pts.shift();
     }
 }
-
-function spawnNebula( b, x, y ) {
-    const c = color( b.palette ), blobs = [];
-    for( let i = 0; i < 3; i++ ) blobs.push( { dx: rand( -0.5, 0.5 ), dy: rand( -0.5, 0.5 ), s: rand( 0.5, 1 ), dh: rand( -20, 20 ) } );
-    active.ents.push( { t: "nebula", sid: strokeId, x, y,
-        vx: pvx * 0.1 + rand( -14, 14 ), vy: pvy * 0.1 + rand( -14, 14 ),
+function spawnNebula( b, x, y, z ) {
+    const c = color( b.palette ), blobs = [], sv = sphere( rand( 5, 16 ) );
+    for( let i = 0; i < 3; i++ ) {
+        const o = sphere( rand( 0.15, 0.55 ) );
+        blobs.push( { dx: o[ 0 ], dy: o[ 1 ], dz: o[ 2 ], s: rand( 0.5, 1 ), dh: rand( -20, 20 ) } );
+    }
+    active.ents.push( { t: "nebula", sid: strokeId, x, y, z,
+        vx: v3[ 0 ] * 0.1 + sv[ 0 ], vy: v3[ 1 ] * 0.1 + sv[ 1 ], vz: v3[ 2 ] * 0.1 + sv[ 2 ],
         r: ( 60 + b.size * 200 ) * rand( 0.7, 1.3 ), blobs,
         a: 0.035 + b.intensity * 0.12, fd: 1.5 + b.intensity * 2.5, visc: b.visc,
         ph: 0, st: rand( 0.4, 1 ), alpha: 1, fl: floorA(), ...c } );
     cap( "nebula" );
 }
-function spawnBolt( b, x, y ) {
-    const c = color( b.palette ), sp = Math.hypot( pvx, pvy );
-    const ang = sp > 60 ? Math.atan2( pvy, pvx ) + rand( -0.4, 0.4 ) : rand( 0, 6.283 );
-    const len = ( 70 + b.size * 380 ) * rand( 0.7, 1.2 ), n = 12;
-    const dx = Math.cos( ang ), dy = Math.sin( ang ), pts = [], off = [];
+function spawnBolt( b, x, y, z ) {
+    const c = color( b.palette ), sp = Math.hypot( v3[ 0 ], v3[ 1 ], v3[ 2 ] );
+    let d;
+    if( sp > 60 ) {
+        const jj = sphere( 0.35 );
+        d = norm3( [ v3[ 0 ] / sp + jj[ 0 ], v3[ 1 ] / sp + jj[ 1 ], v3[ 2 ] / sp + jj[ 2 ] ] );
+    } else d = sphere( 1 );
+    let n1 = cross3( d, sphere( 1 ) );
+    if( Math.hypot( n1[ 0 ], n1[ 1 ], n1[ 2 ] ) < 0.01 ) n1 = [ 0, 1, 0 ];
+    n1 = norm3( n1 );
+    const len = ( 70 + b.size * 380 ) * rand( 0.7, 1.2 ), n = 12, pts = [], off = [];
     for( let i = 0; i < n; i++ ) {
-        const f = i / ( n - 1 );
-        pts.push( [ x + dx * len * f + rand( -1, 1 ) * len * 0.04, y + dy * len * f + rand( -1, 1 ) * len * 0.04 ] );
+        const f = i / ( n - 1 ), jj = sphere( len * 0.03 );
+        pts.push( [ x + d[ 0 ] * len * f + jj[ 0 ], y + d[ 1 ] * len * f + jj[ 1 ], z + d[ 2 ] * len * f + jj[ 2 ] ] );
         off.push( 0 );
     }
-    active.ents.push( { t: "bolt", sid: strokeId, pts, off, nx: -dy, ny: dx,
+    active.ents.push( { t: "bolt", sid: strokeId, pts, off, n1,
         amp: 5 + b.size * 14, lw: 1 + b.size * 2.5,
         a: 0.3 + b.intensity * 0.6, fd: 1 + b.intensity * 2, visc: b.visc,
         ph: 0, st: rand( 0.2, 0.5 ), alpha: 1, fl: floorA(), ...c } );
     cap( "bolt" );
 }
-function spawnBurst( b, x, y ) {
-    const c = color( b.palette ), n = 7 + Math.floor( rand( 0, 5 ) + b.size * 4 ), angs = [];
-    const a0 = rand( 0, 6.283 );
-    for( let i = 0; i < n; i++ ) angs.push( a0 + i * 6.283 / n + rand( -0.15, 0.15 ) );
-    active.ents.push( { t: "burst", sid: strokeId, x, y, angs, r: 4, rot: 0,
-        vr: ( 60 + b.size * 360 ) * rand( 0.7, 1.2 ), vrot: rand( -1.4, 1.4 ),
-        lw: 1 + b.size * 3,
+function spawnBurst( b, x, y, z ) {
+    const c = color( b.palette ), n = 8 + Math.floor( rand( 0, 6 ) + b.size * 5 ), dirs = [];
+    for( let i = 0; i < n; i++ ) dirs.push( sphere( 1 ) );
+    active.ents.push( { t: "burst", sid: strokeId, x, y, z, dirs, r: 4,
+        vr: ( 60 + b.size * 360 ) * rand( 0.7, 1.2 ), lw: 1 + b.size * 3,
         a: 0.25 + b.intensity * 0.6, fd: 0.9 + b.intensity * 1.8, visc: b.visc,
         ph: 0, st: rand( 0.2, 0.5 ), alpha: 1, fl: floorA(), ...c } );
     cap( "burst" );
 }
-function spawnFirefly( b, x, y ) {
-    const c = color( b.palette );
-    active.ents.push( { t: "firefly", sid: strokeId, x, y,
-        vx: pvx * 0.3 + rand( -50, 50 ), vy: pvy * 0.3 + rand( -50, 50 ),
+function spawnFirefly( b, x, y, z ) {
+    const c = color( b.palette ), sv = sphere( rand( 25, 70 ) );
+    active.ents.push( { t: "firefly", sid: strokeId, x, y, z,
+        vx: v3[ 0 ] * 0.3 + sv[ 0 ], vy: v3[ 1 ] * 0.3 + sv[ 1 ], vz: v3[ 2 ] * 0.3 + sv[ 2 ],
         sz: ( 1 + b.size * 2.8 ) * rand( 0.6, 1.5 ), amp: 90, glow: 1,
         twp: rand( 0, 6.283 ), tws: rand( 2.5, 7 ),
         a: 0.35 + b.intensity * 0.6, fd: 1 + b.intensity * 2, visc: b.visc,
@@ -514,11 +579,12 @@ const RATES = { orb: ( f ) => 3 + f * 27, ripple: ( f ) => 1.5 + f * 12, spark: 
     nebula: ( f ) => 1 + f * 7, bolt: ( f ) => 2 + f * 12, burst: ( f ) => 1 + f * 9, firefly: ( f ) => 8 + f * 52 };
 function spawnTick( dt ) {
     const b = BRUSHES[ brush ];
-    if( brush === "ribbon" ) return;
+    if( brush === "ribbon" || !p3 ) return;
     spawnAcc += dt * RATES[ brush ]( b.freq );
     while( spawnAcc >= 1 ) {
         spawnAcc--;
-        SPAWN[ brush ]( b, px + rand( -6, 6 ), py + rand( -6, 6 ) );
+        const jj = sphere( rand( 0, 8 ) );
+        SPAWN[ brush ]( b, p3[ 0 ] + jj[ 0 ], p3[ 1 ] + jj[ 1 ], p3[ 2 ] + jj[ 2 ] );
     }
 }
 
@@ -544,14 +610,9 @@ function updateEnts( ents, dt ) {
     for( let i = ents.length - 1; i >= 0; i-- ) {
         const e = ents[ i ];
         let alive = true;
-        if( e.t === "ripple" ) {
+        if( e.t === "ripple" || e.t === "burst" ) {
             e.vr *= drag( e.visc, dt );
             e.r += e.vr * dt;
-            alive = lifecycle( e, e.vr, dt );
-        } else if( e.t === "burst" ) {
-            const k = drag( e.visc, dt );
-            e.vr *= k; e.vrot *= k;
-            e.r += e.vr * dt; e.rot += e.vrot * dt;
             alive = lifecycle( e, e.vr, dt );
         } else if( e.t === "bolt" ) {
             if( e.ph < 2 ) {
@@ -560,40 +621,41 @@ function updateEnts( ents, dt ) {
             }
             alive = lifecycle( e, e.amp * 4, dt );
         } else if( e.t === "firefly" ) {
-            const k = drag( e.visc, dt );
-            e.vx = e.vx * k + rand( -1, 1 ) * e.amp * dt * 14;
-            e.vy = e.vy * k + rand( -1, 1 ) * e.amp * dt * 14;
-            e.x += e.vx * dt; e.y += e.vy * dt;
+            const k = drag( e.visc, dt ), nd = sphere( e.amp * dt * 14 );
+            e.vx = e.vx * k + nd[ 0 ]; e.vy = e.vy * k + nd[ 1 ]; e.vz = e.vz * k + nd[ 2 ];
+            e.x += e.vx * dt; e.y += e.vy * dt; e.z += e.vz * dt;
             e.amp *= k;
             if( e.ph < 3 ) e.glow = 0.7 + 0.3 * Math.sin( tsim * e.tws + e.twp );
-            alive = lifecycle( e, Math.hypot( e.vx, e.vy ) * 0.5 + e.amp * 0.3, dt );
+            alive = lifecycle( e, Math.hypot( e.vx, e.vy, e.vz ) * 0.5 + e.amp * 0.3, dt );
         } else if( e.t === "ribbon" ) {
             const k = drag( e.visc, dt );
             let top = 0;
             for( const p of e.pts ) {
-                p.vx *= k; p.vy *= k;
-                p.x += p.vx * dt; p.y += p.vy * dt;
-                const s = Math.hypot( p.vx, p.vy );
+                p.vx *= k; p.vy *= k; p.vz *= k;
+                p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+                const s = Math.hypot( p.vx, p.vy, p.vz );
                 if( s > top ) top = s;
             }
             if( liveRibbons.includes( e ) ) top = 100;
             alive = lifecycle( e, top, dt );
         } else {
             const k = drag( e.visc, dt );
-            e.vx *= k; e.vy *= k;
-            e.x += e.vx * dt; e.y += e.vy * dt;
+            e.vx *= k; e.vy *= k; e.vz *= k;
+            e.x += e.vx * dt; e.y += e.vy * dt; e.z += e.vz * dt;
             if( e.t === "spark" ) {
-                e.tr.push( [ e.x, e.y ] );
+                e.tr.push( [ e.x, e.y, e.z ] );
                 if( e.tr.length > 9 ) e.tr.shift();
             }
-            alive = lifecycle( e, Math.hypot( e.vx, e.vy ), dt );
+            alive = lifecycle( e, Math.hypot( e.vx, e.vy, e.vz ), dt );
         }
         if( !alive ) ents.splice( i, 1 );
     }
 }
 
 /* ---------- rendering ---------- */
-function drawScene( c, vw, vh ) {
+function drawScene( c, vw, vh, k ) {
+    basis();
+    vcx = vw / 2; vcy = vh / 2; vfl = FL * ( k || 1 );
     c.fillStyle = bg;
     c.fillRect( 0, 0, vw, vh );
     c.globalCompositeOperation = "lighter";
@@ -606,93 +668,134 @@ function drawScene( c, vw, vh ) {
 function drawEnts( c, ents ) {
     for( const e of ents ) {
         if( e.t === "orb" ) {
-            const g = c.createRadialGradient( e.x, e.y, 0, e.x, e.y, e.r );
-            g.addColorStop( 0, hsla( e.hue, e.sat, e.lit, e.a * e.alpha ) );
+            const q = project( e.x, e.y, e.z );
+            if( !q ) continue;
+            const rr = e.r * q[ 2 ];
+            if( rr < 0.4 ) continue;
+            const a = e.a * e.alpha * att( q[ 3 ] );
+            const g = c.createRadialGradient( q[ 0 ], q[ 1 ], 0, q[ 0 ], q[ 1 ], rr );
+            g.addColorStop( 0, hsla( e.hue, e.sat, e.lit, a ) );
             g.addColorStop( 1, hsla( e.hue, e.sat, e.lit, 0 ) );
             c.fillStyle = g;
-            c.beginPath(); c.arc( e.x, e.y, e.r, 0, 7 ); c.fill();
+            c.beginPath(); c.arc( q[ 0 ], q[ 1 ], rr, 0, 7 ); c.fill();
         } else if( e.t === "ripple" ) {
-            c.strokeStyle = hsla( e.hue, e.sat, e.lit, e.a * e.alpha );
-            c.lineWidth = e.lw;
-            c.beginPath(); c.arc( e.x, e.y, e.r, 0, 7 ); c.stroke();
-            c.strokeStyle = hsla( e.hue, e.sat, e.lit, e.a * e.alpha * 0.25 );
-            c.lineWidth = e.lw * 3.2;
-            c.beginPath(); c.arc( e.x, e.y, e.r, 0, 7 ); c.stroke();
+            const q = project( e.x, e.y, e.z );
+            if( !q ) continue;
+            const rr = e.r * q[ 2 ], a = e.a * e.alpha * att( q[ 3 ] );
+            if( rr < 0.5 ) continue;
+            c.strokeStyle = hsla( e.hue, e.sat, e.lit, a );
+            c.lineWidth = Math.max( 0.3, e.lw * q[ 2 ] );
+            c.beginPath(); c.arc( q[ 0 ], q[ 1 ], rr, 0, 7 ); c.stroke();
+            c.strokeStyle = hsla( e.hue, e.sat, e.lit, a * 0.25 );
+            c.lineWidth = Math.max( 0.3, e.lw * 3.2 * q[ 2 ] );
+            c.beginPath(); c.arc( q[ 0 ], q[ 1 ], rr, 0, 7 ); c.stroke();
         } else if( e.t === "spark" ) {
+            const q = project( e.x, e.y, e.z );
+            if( !q ) continue;
+            const a = e.a * e.alpha * att( q[ 3 ] ), sz = Math.max( 0.3, e.sz * q[ 2 ] );
             if( e.tr.length > 1 ) {
-                c.strokeStyle = hsla( e.hue, e.sat, e.lit, e.a * e.alpha * 0.3 );
-                c.lineWidth = e.sz;
+                c.strokeStyle = hsla( e.hue, e.sat, e.lit, a * 0.3 );
+                c.lineWidth = sz;
                 c.beginPath();
-                c.moveTo( e.tr[ 0 ][ 0 ], e.tr[ 0 ][ 1 ] );
-                for( let i = 1; i < e.tr.length; i++ ) c.lineTo( e.tr[ i ][ 0 ], e.tr[ i ][ 1 ] );
+                let started = false;
+                for( const tp of e.tr ) {
+                    const tq = project( tp[ 0 ], tp[ 1 ], tp[ 2 ] );
+                    if( !tq ) { started = false; continue; }
+                    if( started ) c.lineTo( tq[ 0 ], tq[ 1 ] );
+                    else { c.moveTo( tq[ 0 ], tq[ 1 ] ); started = true; }
+                }
                 c.stroke();
             }
-            c.fillStyle = hsla( e.hue, e.sat, e.lit, e.a * e.alpha );
-            c.beginPath(); c.arc( e.x, e.y, e.sz, 0, 7 ); c.fill();
-            c.fillStyle = hsla( e.hue, e.sat, Math.min( 95, e.lit + 20 ), e.a * e.alpha * 0.35 );
-            c.beginPath(); c.arc( e.x, e.y, e.sz * 2.6, 0, 7 ); c.fill();
+            c.fillStyle = hsla( e.hue, e.sat, e.lit, a );
+            c.beginPath(); c.arc( q[ 0 ], q[ 1 ], sz, 0, 7 ); c.fill();
+            c.fillStyle = hsla( e.hue, e.sat, Math.min( 95, e.lit + 20 ), a * 0.35 );
+            c.beginPath(); c.arc( q[ 0 ], q[ 1 ], sz * 2.6, 0, 7 ); c.fill();
         } else if( e.t === "nebula" ) {
             for( const bl of e.blobs ) {
-                const bx = e.x + bl.dx * e.r, by = e.y + bl.dy * e.r, br = e.r * bl.s;
-                const g = c.createRadialGradient( bx, by, 0, bx, by, br );
-                g.addColorStop( 0, hsla( e.hue + bl.dh, e.sat, e.lit, e.a * e.alpha ) );
+                const q = project( e.x + bl.dx * e.r, e.y + bl.dy * e.r, e.z + bl.dz * e.r );
+                if( !q ) continue;
+                const br = e.r * bl.s * q[ 2 ];
+                if( br < 0.6 ) continue;
+                const a = e.a * e.alpha * att( q[ 3 ] );
+                const g = c.createRadialGradient( q[ 0 ], q[ 1 ], 0, q[ 0 ], q[ 1 ], br );
+                g.addColorStop( 0, hsla( e.hue + bl.dh, e.sat, e.lit, a ) );
                 g.addColorStop( 1, hsla( e.hue + bl.dh, e.sat, e.lit, 0 ) );
                 c.fillStyle = g;
-                c.beginPath(); c.arc( bx, by, br, 0, 7 ); c.fill();
+                c.beginPath(); c.arc( q[ 0 ], q[ 1 ], br, 0, 7 ); c.fill();
             }
         } else if( e.t === "bolt" ) {
+            const proj = [];
+            for( let j = 0; j < e.pts.length; j++ ) {
+                const q = project( e.pts[ j ][ 0 ] + e.n1[ 0 ] * e.off[ j ],
+                    e.pts[ j ][ 1 ] + e.n1[ 1 ] * e.off[ j ],
+                    e.pts[ j ][ 2 ] + e.n1[ 2 ] * e.off[ j ] );
+                if( q ) proj.push( q );
+            }
+            if( proj.length < 2 ) continue;
+            const mid = proj[ Math.floor( proj.length / 2 ) ];
+            const a = e.a * e.alpha * att( mid[ 3 ] ), sAvg = mid[ 2 ];
             for( let pass = 0; pass < 2; pass++ ) {
                 c.strokeStyle = hsla( e.hue, e.sat, pass ? Math.min( 96, e.lit + 18 ) : e.lit,
-                    e.a * e.alpha * ( pass ? 1 : 0.22 ) );
-                c.lineWidth = pass ? e.lw : e.lw * 3.4;
+                    a * ( pass ? 1 : 0.22 ) );
+                c.lineWidth = Math.max( 0.3, ( pass ? e.lw : e.lw * 3.4 ) * sAvg );
                 c.beginPath();
-                for( let j = 0; j < e.pts.length; j++ ) {
-                    const qx = e.pts[ j ][ 0 ] + e.nx * e.off[ j ], qy = e.pts[ j ][ 1 ] + e.ny * e.off[ j ];
-                    if( j === 0 ) c.moveTo( qx, qy ); else c.lineTo( qx, qy );
+                for( let j = 0; j < proj.length; j++ ) {
+                    if( j === 0 ) c.moveTo( proj[ j ][ 0 ], proj[ j ][ 1 ] );
+                    else c.lineTo( proj[ j ][ 0 ], proj[ j ][ 1 ] );
                 }
                 c.stroke();
             }
         } else if( e.t === "burst" ) {
-            c.lineWidth = e.lw;
+            const pc = project( e.x, e.y, e.z );
+            if( !pc ) continue;
+            const a = e.a * e.alpha * att( pc[ 3 ] );
             for( let pass = 0; pass < 2; pass++ ) {
-                c.strokeStyle = hsla( e.hue, e.sat, e.lit, e.a * e.alpha * ( pass ? 1 : 0.25 ) );
-                c.lineWidth = pass ? e.lw : e.lw * 2.8;
+                c.strokeStyle = hsla( e.hue, e.sat, e.lit, a * ( pass ? 1 : 0.25 ) );
+                c.lineWidth = Math.max( 0.3, ( pass ? e.lw : e.lw * 2.8 ) * pc[ 2 ] );
                 c.beginPath();
-                for( const a of e.angs ) {
-                    const ca = Math.cos( a + e.rot ), sa = Math.sin( a + e.rot );
-                    c.moveTo( e.x + ca * e.r * 0.35, e.y + sa * e.r * 0.35 );
-                    c.lineTo( e.x + ca * e.r, e.y + sa * e.r );
+                for( const d of e.dirs ) {
+                    const q1 = project( e.x + d[ 0 ] * e.r * 0.35, e.y + d[ 1 ] * e.r * 0.35, e.z + d[ 2 ] * e.r * 0.35 );
+                    const q2 = project( e.x + d[ 0 ] * e.r, e.y + d[ 1 ] * e.r, e.z + d[ 2 ] * e.r );
+                    if( !q1 || !q2 ) continue;
+                    c.moveTo( q1[ 0 ], q1[ 1 ] ); c.lineTo( q2[ 0 ], q2[ 1 ] );
                 }
                 c.stroke();
             }
         } else if( e.t === "firefly" ) {
-            const a = e.a * e.alpha * ( e.glow || 1 );
+            const q = project( e.x, e.y, e.z );
+            if( !q ) continue;
+            const a = e.a * e.alpha * ( e.glow || 1 ) * att( q[ 3 ] );
+            const sz = Math.max( 0.3, e.sz * q[ 2 ] );
             c.fillStyle = hsla( e.hue, e.sat, e.lit, a );
-            c.beginPath(); c.arc( e.x, e.y, e.sz, 0, 7 ); c.fill();
+            c.beginPath(); c.arc( q[ 0 ], q[ 1 ], sz, 0, 7 ); c.fill();
             c.fillStyle = hsla( e.hue, e.sat, Math.min( 95, e.lit + 22 ), a * 0.3 );
-            c.beginPath(); c.arc( e.x, e.y, e.sz * 3, 0, 7 ); c.fill();
+            c.beginPath(); c.arc( q[ 0 ], q[ 1 ], sz * 3, 0, 7 ); c.fill();
         } else {
-            const n = e.pts.length;
+            const raw = [];
+            for( const p of e.pts ) {
+                const q = project( p.x, p.y, p.z );
+                if( q ) raw.push( [ q[ 0 ], q[ 1 ], q[ 2 ], p.hue, p.sat, p.lit, q[ 3 ] ] );
+            }
+            const n = raw.length;
             if( n < 2 ) continue;
-            const head = e.pts[ n - 1 ], tail = e.pts[ 0 ];
-            const grad = c.createLinearGradient( tail.x, tail.y, head.x, head.y );
+            const head = raw[ n - 1 ], tail = raw[ 0 ], mid = raw[ Math.floor( n / 2 ) ];
+            const dim = att( mid[ 6 ] );
+            const grad = c.createLinearGradient( tail[ 0 ], tail[ 1 ], head[ 0 ], head[ 1 ] );
+            grad.addColorStop( 0, hsla( tail[ 3 ], tail[ 4 ], tail[ 5 ], 1 ) );
+            grad.addColorStop( 0.5, hsla( mid[ 3 ], mid[ 4 ], mid[ 5 ], 1 ) );
+            grad.addColorStop( 1, hsla( head[ 3 ], head[ 4 ], head[ 5 ], 1 ) );
             for( let pass = 0; pass < 2; pass++ ) {
-                const spread = pass ? 0.5 : 1.4, a = e.a * e.alpha * ( pass ? 1 : 0.16 );
-                if( pass === 0 ) {
-                    grad.addColorStop( 0, hsla( tail.hue, tail.sat, tail.lit, 1 ) );
-                    grad.addColorStop( 0.5, hsla( e.pts[ Math.floor( n / 2 ) ].hue, e.sat, e.lit, 1 ) );
-                    grad.addColorStop( 1, hsla( head.hue, head.sat, head.lit, 1 ) );
-                }
-                c.globalAlpha = a;
+                const spread = pass ? 0.5 : 1.4;
+                c.globalAlpha = e.a * e.alpha * dim * ( pass ? 1 : 0.16 );
                 c.fillStyle = grad;
                 c.beginPath();
                 for( let dir = 0; dir < 2; dir++ ) {
                     for( let j = 0; j < n; j++ ) {
                         const i = dir ? n - 1 - j : j;
-                        const p = e.pts[ i ], p0 = e.pts[ Math.max( 0, i - 1 ) ], p1 = e.pts[ Math.min( n - 1, i + 1 ) ];
-                        const sx = ( p0.x + 2 * p.x + p1.x ) / 4, sy = ( p0.y + 2 * p.y + p1.y ) / 4;
-                        const dx = p1.x - p0.x, dy = p1.y - p0.y, m = Math.hypot( dx, dy ) || 1;
-                        const hw = Math.max( 0.4, e.w * ( 0.15 + ( i / n ) * 0.85 ) ) * spread;
+                        const p = raw[ i ], p0 = raw[ Math.max( 0, i - 1 ) ], p1 = raw[ Math.min( n - 1, i + 1 ) ];
+                        const sx = ( p0[ 0 ] + 2 * p[ 0 ] + p1[ 0 ] ) / 4, sy = ( p0[ 1 ] + 2 * p[ 1 ] + p1[ 1 ] ) / 4;
+                        const dx = p1[ 0 ] - p0[ 0 ], dy = p1[ 1 ] - p0[ 1 ], m = Math.hypot( dx, dy ) || 1;
+                        const hw = Math.max( 0.4, e.w * ( 0.15 + ( i / n ) * 0.85 ) ) * spread * p[ 2 ];
                         const ox = -dy / m * hw * ( dir ? -1 : 1 ), oy = dx / m * hw * ( dir ? -1 : 1 );
                         if( dir === 0 && j === 0 ) c.moveTo( sx + ox, sy + oy );
                         else c.lineTo( sx + ox, sy + oy );
@@ -706,40 +809,85 @@ function drawEnts( c, ents ) {
     }
 }
 
+/* ---------- flight + loop ---------- */
+function nav( dt ) {
+    let mx = 0, mz = 0;
+    if( keys.KeyE ) mz += 1;
+    if( keys.KeyD ) mz -= 1;
+    if( keys.KeyS ) mx -= 1;
+    if( keys.KeyF ) mx += 1;
+    if( mx || mz ) {
+        const sp = ( keys.ShiftLeft || keys.ShiftRight ? 3 : 1 ) * FL * 0.5 * dt;
+        cam.x += ( bR[ 0 ] * mx + bF[ 0 ] * mz ) * sp;
+        cam.y += ( bR[ 1 ] * mx + bF[ 1 ] * mz ) * sp;
+        cam.z += ( bR[ 2 ] * mx + bF[ 2 ] * mz ) * sp;
+        lastNav = performance.now();
+    }
+    if( performance.now() - lastNav > 2500 ) worldYaw += dt * 0.06;
+}
+
 let lastT = performance.now();
 function tick( now ) {
     requestAnimationFrame( tick );
     const dt = Math.min( 0.05, ( now - lastT ) / 1000 );
     lastT = now;
     if( document.hidden ) return;
-    if( painting ) spawnTick( dt );
+    basis();
+    nav( dt );
+    if( painting ) {
+        lastNav = performance.now();
+        spawnTick( dt );
+    }
     if( !paused ) update( dt );
     ctx.setTransform( DPR, 0, 0, DPR, 0, 0 );
-    drawScene( ctx, W, H );
+    drawScene( ctx, W, H, 1 );
 }
 requestAnimationFrame( tick );
 
 /* ---------- pointer ---------- */
+let look = false, lookX = 0, lookY = 0;
+canvas.addEventListener( "contextmenu", ( e ) => e.preventDefault() );
 canvas.addEventListener( "pointerdown", ( e ) => {
     canvas.setPointerCapture( e.pointerId );
+    if( document.activeElement && document.activeElement.blur ) document.activeElement.blur();
+    hint.classList.add( "gone" );
+    if( e.metaKey || e.ctrlKey || e.button === 2 ) {
+        look = true; lookX = e.clientX; lookY = e.clientY;
+        lastNav = performance.now();
+        closePanels();
+        return;
+    }
+    if( e.button !== 0 ) return;
+    const pt = paintPoint( e.clientX, e.clientY );
+    if( !pt ) return;
     ensureLayer();
     strokeId++; strokeStack.push( { layer: active, sid: strokeId } );
     painting = true; spawnAcc = 1;
-    px = e.clientX; py = e.clientY; pvx = 0; pvy = 0; lastMove = performance.now();
-    if( brush === "ribbon" ) startRibbons( BRUSHES[ brush ], px, py );
+    p3 = pt; v3 = [ 0, 0, 0 ]; lastMove = performance.now();
+    strokeR = toWorld( bR );
+    if( brush === "ribbon" ) startRibbons( BRUSHES[ brush ] );
     closePanels();
-    hint.classList.add( "gone" );
 } );
 canvas.addEventListener( "pointermove", ( e ) => {
-    if( !painting ) { px = e.clientX; py = e.clientY; return; }
+    if( look ) {
+        cam.yaw += ( e.clientX - lookX ) * 0.0032;
+        cam.pitch = Math.max( -1.45, Math.min( 1.45, cam.pitch - ( e.clientY - lookY ) * 0.0032 ) );
+        lookX = e.clientX; lookY = e.clientY;
+        lastNav = performance.now();
+        return;
+    }
+    if( !painting ) return;
+    const pt = paintPoint( e.clientX, e.clientY );
+    if( !pt ) return;
     const now = performance.now(), dt = Math.max( 0.004, ( now - lastMove ) / 1000 );
-    const ivx = ( e.clientX - px ) / dt, ivy = ( e.clientY - py ) / dt;
-    pvx += ( Math.max( -1800, Math.min( 1800, ivx ) ) - pvx ) * 0.4;
-    pvy += ( Math.max( -1800, Math.min( 1800, ivy ) ) - pvy ) * 0.4;
-    px = e.clientX; py = e.clientY; lastMove = now;
-    if( brush === "ribbon" ) extendRibbons( px, py );
+    for( let i = 0; i < 3; i++ ) {
+        const iv = Math.max( -2200, Math.min( 2200, ( pt[ i ] - p3[ i ] ) / dt ) );
+        v3[ i ] += ( iv - v3[ i ] ) * 0.4;
+    }
+    p3 = pt; lastMove = now;
+    if( brush === "ribbon" ) extendRibbons();
 } );
-function endStroke() { painting = false; liveRibbons = []; pvx = 0; pvy = 0; }
+function endStroke() { painting = false; look = false; liveRibbons = []; v3 = [ 0, 0, 0 ]; }
 canvas.addEventListener( "pointerup", endStroke );
 canvas.addEventListener( "pointercancel", endStroke );
 
@@ -815,7 +963,7 @@ sep.className = "sep";
 paletteEl.appendChild( sep );
 const gear = document.createElement( "button" );
 gear.className = "tool";
-gear.title = "Brush settings (S)";
+gear.title = "Brush settings (B)";
 gear.innerHTML = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>';
 gear.addEventListener( "click", () => togglePanel() );
 paletteEl.appendChild( gear );
@@ -857,13 +1005,11 @@ for( const k in sliders ) {
 }
 const palChips = document.getElementById( "palChips" );
 Object.keys( PALETTES ).forEach( ( name ) => {
-    const p = PALETTES[ name ], chip = document.createElement( "button" );
+    const chip = document.createElement( "button" );
     chip.className = "chip";
     chip.dataset.pal = name;
     chip.title = name;
-    const stops = ( p.hues || [ 0, 90, 180, 270 ] ).map( ( h, i, arr ) =>
-        hsla( h, p.sat[ 1 ], p.lit[ 1 ], 1 ) + " " + Math.round( i / Math.max( 1, arr.length - 1 ) * 100 ) + "%" ).join( ", " );
-    chip.style.background = `linear-gradient( 135deg, ${stops} )`;
+    chip.style.background = palGrad( name );
     chip.addEventListener( "click", () => { BRUSHES[ brush ].palette = name; syncPanel(); } );
     palChips.appendChild( chip );
 } );
@@ -941,9 +1087,7 @@ function exportPNG( ew, eh ) {
     const off = document.createElement( "canvas" );
     off.width = ew; off.height = eh;
     const c = off.getContext( "2d" );
-    const s = Math.max( ew / W, eh / H );
-    c.setTransform( s, 0, 0, s, ( ew - W * s ) / 2, ( eh - H * s ) / 2 );
-    drawScene( c, W, H );
+    drawScene( c, ew, eh, Math.max( ew / W, eh / H ) );
     off.toBlob( ( blob ) => {
         const a = document.createElement( "a" );
         a.href = URL.createObjectURL( blob );
@@ -957,17 +1101,21 @@ function exportPNG( ew, eh ) {
 /* ---------- keys ---------- */
 addEventListener( "keydown", ( e ) => {
     if( e.target.tagName === "INPUT" ) return;
+    if( !e.metaKey && !e.ctrlKey ) keys[ e.code ] = true;
     if( e.code === "Space" ) { e.preventDefault(); setPaused( !paused ); }
+    else if( ( e.metaKey || e.ctrlKey ) && e.key === "z" ) { e.preventDefault(); undo(); }
     else if( e.key >= "1" && e.key <= "8" ) selectBrush( Object.keys( BRUSHES )[ +e.key - 1 ], false );
-    else if( e.key === "s" ) togglePanel();
-    else if( e.key === "e" ) document.getElementById( "saveBtn" ).click();
+    else if( e.key === "b" ) togglePanel();
+    else if( e.key === "p" ) document.getElementById( "saveBtn" ).click();
     else if( e.key === "l" ) document.getElementById( "layersBtn" ).click();
     else if( e.key === "x" ) clearAll();
-    else if( ( e.metaKey || e.ctrlKey ) && e.key === "z" ) { e.preventDefault(); undo(); }
+    else if( e.key === "r" ) resetCam();
     else if( e.key === "Escape" ) closePanels();
 } );
+addEventListener( "keyup", ( e ) => { keys[ e.code ] = false; } );
+addEventListener( "blur", () => { for( const k in keys ) keys[ k ] = false; } );
 
-setTimeout( () => hint.classList.add( "gone" ), 6000 );
+setTimeout( () => hint.classList.add( "gone" ), 7000 );
 </script>
 </body>
 </html>
