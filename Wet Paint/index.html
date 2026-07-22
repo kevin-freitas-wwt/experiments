@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wet Paint</title>
+    <meta name="description" content="Paint with light — spawn glowing effects that slow, settle, and dissipate. Export at any resolution.">
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <style>
+        * { box-sizing: border-box; }
+        :root {
+            --chrome: rgba( 22, 24, 32, 0.6 );
+            --edge: rgba( 255, 255, 255, 0.09 );
+            --ink: #e8eaf0;
+            --ink-dim: rgba( 232, 234, 240, 0.55 );
+            --accent: #8ab4ff;
+        }
+        html, body {
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+        }
+        body {
+            background: #05070d;
+            color: var( --ink );
+            cursor: crosshair;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        canvas#scene {
+            display: block;
+            height: 100%;
+            width: 100%;
+        }
+        .glass {
+            backdrop-filter: blur( 18px ) saturate( 1.4 );
+            background: var( --chrome );
+            border: 1px solid var( --edge );
+            border-radius: 16px;
+            box-shadow: 0 10px 36px rgba( 0, 0, 0, 0.5 );
+            -webkit-backdrop-filter: blur( 18px ) saturate( 1.4 );
+        }
+        .palette {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            left: 14px;
+            padding: 7px;
+            position: fixed;
+            top: 50%;
+            transform: translateY( -50% );
+            z-index: 20;
+        }
+        .tool {
+            align-items: center;
+            background: none;
+            border: none;
+            border-radius: 11px;
+            color: var( --ink-dim );
+            cursor: pointer;
+            display: flex;
+            height: 44px;
+            justify-content: center;
+            padding: 0;
+            transition: background 0.15s, color 0.15s;
+            width: 44px;
+        }
+        .tool:hover {
+            background: rgba( 255, 255, 255, 0.07 );
+            color: var( --ink );
+        }
+        .tool.on {
+            background: rgba( 138, 180, 255, 0.16 );
+            color: var( --accent );
+        }
+        .tool svg { display: block; }
+        .sep {
+            background: var( --edge );
+            height: 1px;
+            margin: 3px 6px;
+        }
+        .deck {
+            display: flex;
+            gap: 2px;
+            padding: 5px;
+            position: fixed;
+            right: 14px;
+            top: 14px;
+            z-index: 20;
+        }
+        .deck .tool {
+            border-radius: 10px;
+            height: 38px;
+            width: 38px;
+        }
+        .deck .tool.warn:hover { color: #ff9d9d; }
+        .panel {
+            left: 74px;
+            padding: 16px 16px 14px;
+            position: fixed;
+            top: 50%;
+            transform: translateY( -50% );
+            width: 244px;
+            z-index: 19;
+        }
+        .panel h2 {
+            font-size: 0.82rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            margin: 0 0 12px;
+            text-transform: uppercase;
+        }
+        .ctl { margin-bottom: 11px; }
+        .ctl label {
+            color: var( --ink-dim );
+            display: flex;
+            font-size: 0.72rem;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+        .ctl label output { color: var( --ink ); }
+        input[type="range"] {
+            appearance: none;
+            background: rgba( 255, 255, 255, 0.12 );
+            border-radius: 2px;
+            height: 3px;
+            margin: 6px 0;
+            outline: none;
+            width: 100%;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            background: var( --ink );
+            border-radius: 50%;
+            cursor: pointer;
+            height: 14px;
+            width: 14px;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-moz-range-thumb {
+            background: var( --ink );
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            height: 14px;
+            width: 14px;
+        }
+        .chips {
+            display: flex;
+            gap: 6px;
+            margin-top: 4px;
+        }
+        .chip {
+            border: 2px solid transparent;
+            border-radius: 50%;
+            cursor: pointer;
+            height: 24px;
+            padding: 0;
+            width: 24px;
+        }
+        .chip.on { border-color: var( --ink ); }
+        .menu {
+            padding: 10px;
+            position: fixed;
+            right: 14px;
+            top: 64px;
+            width: 228px;
+            z-index: 21;
+        }
+        .menu h3 {
+            color: var( --ink-dim );
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            margin: 8px 4px 6px;
+            text-transform: uppercase;
+        }
+        .menu h3:first-child { margin-top: 2px; }
+        .mrow {
+            align-items: center;
+            background: none;
+            border: none;
+            border-radius: 9px;
+            color: var( --ink );
+            cursor: pointer;
+            display: flex;
+            font-size: 0.82rem;
+            justify-content: space-between;
+            padding: 9px 10px;
+            width: 100%;
+        }
+        .mrow:hover { background: rgba( 255, 255, 255, 0.07 ); }
+        .mrow span { color: var( --ink-dim ); font-size: 0.72rem; }
+        .hidden { display: none; }
+        .hint {
+            background: rgba( 22, 24, 32, 0.7 );
+            border-radius: 20px;
+            bottom: 20px;
+            color: var( --ink-dim );
+            font-size: 0.78rem;
+            left: 50%;
+            opacity: 1;
+            padding: 8px 18px;
+            pointer-events: none;
+            position: fixed;
+            transform: translateX( -50% );
+            transition: opacity 1.2s;
+            z-index: 15;
+        }
+        .hint.gone { opacity: 0; }
+        .brand {
+            bottom: 16px;
+            color: rgba( 232, 234, 240, 0.3 );
+            font-size: 0.72rem;
+            left: 16px;
+            letter-spacing: 0.08em;
+            pointer-events: none;
+            position: fixed;
+            text-transform: uppercase;
+            z-index: 15;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="scene"></canvas>
+
+    <nav class="palette glass" id="palette"></nav>
+
+    <div class="deck glass">
+        <button class="tool" id="pauseBtn" title="Pause / resume (Space)"></button>
+        <button class="tool" id="undoBtn" title="Undo last stroke (Cmd/Ctrl+Z)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+        </button>
+        <button class="tool warn" id="clearBtn" title="Clear canvas (X)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14"/></svg>
+        </button>
+        <button class="tool" id="saveBtn" title="Save image (E)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
+        </button>
+    </div>
+
+    <aside class="panel glass hidden" id="panel">
+        <h2 id="panelTitle"></h2>
+        <div class="ctl"><label>Frequency <output id="freqOut"></output></label><input type="range" id="freq" min="0" max="1" step="0.01"></div>
+        <div class="ctl"><label>Size <output id="sizeOut"></output></label><input type="range" id="size" min="0" max="1" step="0.01"></div>
+        <div class="ctl"><label>Intensity <output id="intOut"></output></label><input type="range" id="intensity" min="0" max="1" step="0.01"></div>
+        <div class="ctl"><label>Viscosity <output id="viscOut"></output></label><input type="range" id="visc" min="0" max="1" step="0.01"></div>
+        <div class="ctl"><label>Palette</label><div class="chips" id="palChips"></div></div>
+    </aside>
+
+    <div class="menu glass hidden" id="saveMenu">
+        <h3>Background</h3>
+        <div class="chips" id="bgChips" style="padding: 0 4px 4px;"></div>
+        <h3>Save PNG</h3>
+        <div id="sizeRows"></div>
+    </div>
+
+    <div class="hint" id="hint">Paint with your mouse &mdash; Space pauses, &#8984;Z undoes a stroke</div>
+    <div class="brand">Wet Paint</div>
+
+<script>
+"use strict";
+
+/* ---------- state ---------- */
+const PALETTES = {
+    Aurora: { hues: [ 135, 160, 180, 200 ], sat: [ 70, 95 ], lit: [ 55, 70 ] },
+    Ember: { hues: [ 5, 18, 32, 46 ], sat: [ 85, 100 ], lit: [ 55, 66 ] },
+    Ultraviolet: { hues: [ 262, 285, 308, 330 ], sat: [ 75, 95 ], lit: [ 60, 72 ] },
+    Ocean: { hues: [ 190, 205, 220, 238 ], sat: [ 75, 95 ], lit: [ 55, 70 ] },
+    Moonlight: { hues: [ 210, 225 ], sat: [ 4, 14 ], lit: [ 78, 96 ] },
+    Spectrum: { hues: null, sat: [ 80, 95 ], lit: [ 58, 68 ] }
+};
+const BGS = [ "#05070d", "#0a0616", "#001318", "#160607", "#000000" ];
+const BRUSHES = {
+    orb: { label: "Orbs", freq: 0.35, size: 0.45, intensity: 0.55, visc: 0.5, palette: "Aurora" },
+    ripple: { label: "Ripples", freq: 0.4, size: 0.5, intensity: 0.6, visc: 0.45, palette: "Ocean" },
+    spark: { label: "Sparks", freq: 0.55, size: 0.4, intensity: 0.7, visc: 0.35, palette: "Ember" },
+    ribbon: { label: "Ribbons", freq: 0.4, size: 0.5, intensity: 0.65, visc: 0.3, palette: "Ultraviolet" }
+};
+const CAPS = { orb: 500, ripple: 300, spark: 1200, ribbon: 120 };
+const ICONS = {
+    orb: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/></svg>',
+    ripple: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7" opacity="0.6"/><circle cx="12" cy="12" r="10.5" opacity="0.3"/></svg>',
+    spark: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="17" r="1.6"/><circle cx="11" cy="11" r="2"/><circle cx="17" cy="6" r="2.4"/><circle cx="17.5" cy="15" r="1.3"/><circle cx="8" cy="6.5" r="1.3"/></svg>',
+    ribbon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M3 16c4-8 7 6 11-2 2.5-5 5-4 7-7"/></svg>'
+};
+
+let ents = [], strokeStack = [], strokeId = 0;
+let brush = "orb", paused = false, bg = BGS[ 0 ];
+let painting = false, spawnAcc = 0, px = 0, py = 0, pvx = 0, pvy = 0, lastMove = 0;
+let liveRibbons = [];
+
+const canvas = document.getElementById( "scene" ), ctx = canvas.getContext( "2d" );
+let W = 0, H = 0, DPR = 1;
+
+function resize() {
+    DPR = Math.min( 2, devicePixelRatio || 1 );
+    W = innerWidth; H = innerHeight;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+}
+addEventListener( "resize", resize );
+resize();
+
+/* ---------- helpers ---------- */
+function rand( a, b ) { return a + Math.random() * ( b - a ); }
+function pick( arr ) { return arr[ Math.floor( Math.random() * arr.length ) ]; }
+function hsla( h, s, l, a ) { return `hsla(${h},${s}%,${l}%,${a})`; }
+function color( name ) {
+    const p = PALETTES[ name ];
+    return {
+        hue: p.hues ? pick( p.hues ) + rand( -8, 8 ) : rand( 0, 360 ),
+        sat: rand( p.sat[ 0 ], p.sat[ 1 ] ),
+        lit: rand( p.lit[ 0 ], p.lit[ 1 ] )
+    };
+}
+function drag( visc, dt ) { return Math.pow( 0.998 - visc * 0.09, dt * 60 ); }
+function cap( type ) {
+    let n = 0;
+    for( const e of ents ) if( e.t === type ) n++;
+    if( n <= CAPS[ type ] ) return;
+    const i = ents.findIndex( ( e ) => e.t === type );
+    if( i >= 0 ) ents.splice( i, 1 );
+}
+
+/* ---------- spawning ---------- */
+function spawnOrb( b, x, y ) {
+    const c = color( b.palette );
+    ents.push( { t: "orb", sid: strokeId, x, y,
+        vx: pvx * 0.25 + rand( -30, 30 ), vy: pvy * 0.25 + rand( -30, 30 ),
+        r: ( 12 + b.size * 108 ) * rand( 0.6, 1.3 ),
+        a: 0.07 + b.intensity * 0.3, fd: 1.2 + b.intensity * 2, visc: b.visc,
+        ph: 0, st: rand( 0.3, 0.8 ), alpha: 1, ...c } );
+    cap( "orb" );
+}
+function spawnRipple( b, x, y ) {
+    const c = color( b.palette );
+    ents.push( { t: "ripple", sid: strokeId, x, y, r: 2,
+        vr: ( 90 + b.size * 420 ) * rand( 0.7, 1.2 ), lw: 1.5 + b.size * 6,
+        a: 0.2 + b.intensity * 0.55, fd: 0.8 + b.intensity * 1.6, visc: b.visc,
+        ph: 0, st: rand( 0.2, 0.5 ), alpha: 1, ...c } );
+    cap( "ripple" );
+}
+function spawnSpark( b, x, y ) {
+    for( let i = 0; i < 3; i++ ) {
+        const c = color( b.palette ), ang = rand( 0, 6.283 ), sp = rand( 20, 160 );
+        ents.push( { t: "spark", sid: strokeId, x, y,
+            vx: pvx * 0.45 + Math.cos( ang ) * sp, vy: pvy * 0.45 + Math.sin( ang ) * sp,
+            sz: ( 1 + b.size * 3.5 ) * rand( 0.5, 1.4 ), tr: [],
+            a: 0.35 + b.intensity * 0.6, fd: 0.8 + b.intensity * 1.8, visc: b.visc,
+            ph: 0, st: rand( 0.2, 0.6 ), alpha: 1, ...c } );
+    }
+    cap( "spark" );
+}
+function startRibbons( b, x, y ) {
+    liveRibbons = [];
+    const n = 1 + Math.round( b.freq * 3 );
+    for( let i = 0; i < n; i++ ) {
+        const c = color( b.palette );
+        const r = { t: "ribbon", sid: strokeId, pts: [], off: ( i - ( n - 1 ) / 2 ) * ( 8 + b.size * 14 ),
+            w: 2.5 + b.size * 20, a: 0.18 + b.intensity * 0.55, fd: 1 + b.intensity * 2,
+            visc: b.visc, pal: b.palette, ph: 0, st: rand( 0.3, 0.7 ), alpha: 1, ...c };
+        ents.push( r ); liveRibbons.push( r );
+        cap( "ribbon" );
+    }
+    extendRibbons( x, y );
+}
+function extendRibbons( x, y ) {
+    const mag = Math.hypot( pvx, pvy ) || 1;
+    const nx = -pvy / mag, ny = pvx / mag;
+    for( const r of liveRibbons ) {
+        const last = r.pts[ r.pts.length - 1 ];
+        const qx = x + nx * r.off + rand( -1, 1 ), qy = y + ny * r.off + rand( -1, 1 );
+        if( last && Math.hypot( qx - last.x, qy - last.y ) < 4 ) continue;
+        r.pts.push( { x: qx, y: qy, vx: pvx * 0.12 + rand( -6, 6 ), vy: pvy * 0.12 + rand( -6, 6 ),
+            hue: r.hue + rand( -12, 12 ), sat: r.sat, lit: r.lit } );
+        if( r.pts.length > 160 ) r.pts.shift();
+    }
+}
+
+const RATES = { orb: ( f ) => 3 + f * 27, ripple: ( f ) => 1.5 + f * 12, spark: ( f ) => 12 + f * 90 };
+function spawnTick( dt ) {
+    const b = BRUSHES[ brush ];
+    if( brush === "ribbon" ) return;
+    spawnAcc += dt * RATES[ brush ]( b.freq );
+    while( spawnAcc >= 1 ) {
+        spawnAcc--;
+        const jx = px + rand( -6, 6 ), jy = py + rand( -6, 6 );
+        if( brush === "orb" ) spawnOrb( b, jx, jy );
+        else if( brush === "ripple" ) spawnRipple( b, jx, jy );
+        else spawnSpark( b, jx, jy );
+    }
+}
+
+/* ---------- simulation ---------- */
+function lifecycle( e, speed, dt ) {
+    if( e.ph === 0 && speed < 7 ) e.ph = 1;
+    else if( e.ph === 1 ) { e.st -= dt; if( e.st <= 0 ) e.ph = 2; }
+    if( e.ph === 2 ) { e.alpha -= dt / e.fd; return e.alpha > 0; }
+    return true;
+}
+function update( dt ) {
+    for( let i = ents.length - 1; i >= 0; i-- ) {
+        const e = ents[ i ];
+        let alive = true;
+        if( e.t === "ripple" ) {
+            e.vr *= drag( e.visc, dt );
+            e.r += e.vr * dt;
+            alive = lifecycle( e, e.vr, dt );
+        } else if( e.t === "ribbon" ) {
+            const k = drag( e.visc, dt );
+            let top = 0;
+            for( const p of e.pts ) {
+                p.vx *= k; p.vy *= k;
+                p.x += p.vx * dt; p.y += p.vy * dt;
+                const s = Math.hypot( p.vx, p.vy );
+                if( s > top ) top = s;
+            }
+            if( liveRibbons.includes( e ) ) top = 100;
+            alive = lifecycle( e, top, dt );
+        } else {
+            const k = drag( e.visc, dt );
+            e.vx *= k; e.vy *= k;
+            e.x += e.vx * dt; e.y += e.vy * dt;
+            if( e.t === "spark" ) {
+                e.tr.push( [ e.x, e.y ] );
+                if( e.tr.length > 9 ) e.tr.shift();
+            }
+            alive = lifecycle( e, Math.hypot( e.vx, e.vy ), dt );
+        }
+        if( !alive ) ents.splice( i, 1 );
+    }
+}
+
+/* ---------- rendering ---------- */
+function drawScene( c, vw, vh ) {
+    c.fillStyle = bg;
+    c.fillRect( 0, 0, vw, vh );
+    c.globalCompositeOperation = "lighter";
+    c.lineCap = "round"; c.lineJoin = "round";
+    for( const e of ents ) {
+        if( e.t === "orb" ) {
+            const g = c.createRadialGradient( e.x, e.y, 0, e.x, e.y, e.r );
+            g.addColorStop( 0, hsla( e.hue, e.sat, e.lit, e.a * e.alpha ) );
+            g.addColorStop( 1, hsla( e.hue, e.sat, e.lit, 0 ) );
+            c.fillStyle = g;
+            c.beginPath(); c.arc( e.x, e.y, e.r, 0, 7 ); c.fill();
+        } else if( e.t === "ripple" ) {
+            c.strokeStyle = hsla( e.hue, e.sat, e.lit, e.a * e.alpha );
+            c.lineWidth = e.lw;
+            c.beginPath(); c.arc( e.x, e.y, e.r, 0, 7 ); c.stroke();
+            c.strokeStyle = hsla( e.hue, e.sat, e.lit, e.a * e.alpha * 0.25 );
+            c.lineWidth = e.lw * 3.2;
+            c.beginPath(); c.arc( e.x, e.y, e.r, 0, 7 ); c.stroke();
+        } else if( e.t === "spark" ) {
+            if( e.tr.length > 1 ) {
+                c.strokeStyle = hsla( e.hue, e.sat, e.lit, e.a * e.alpha * 0.3 );
+                c.lineWidth = e.sz;
+                c.beginPath();
+                c.moveTo( e.tr[ 0 ][ 0 ], e.tr[ 0 ][ 1 ] );
+                for( let i = 1; i < e.tr.length; i++ ) c.lineTo( e.tr[ i ][ 0 ], e.tr[ i ][ 1 ] );
+                c.stroke();
+            }
+            c.fillStyle = hsla( e.hue, e.sat, e.lit, e.a * e.alpha );
+            c.beginPath(); c.arc( e.x, e.y, e.sz, 0, 7 ); c.fill();
+            c.fillStyle = hsla( e.hue, e.sat, Math.min( 95, e.lit + 20 ), e.a * e.alpha * 0.35 );
+            c.beginPath(); c.arc( e.x, e.y, e.sz * 2.6, 0, 7 ); c.fill();
+        } else {
+            const n = e.pts.length;
+            if( n < 2 ) continue;
+            const head = e.pts[ n - 1 ], tail = e.pts[ 0 ];
+            const grad = c.createLinearGradient( tail.x, tail.y, head.x, head.y );
+            for( let pass = 0; pass < 2; pass++ ) {
+                const spread = pass ? 0.5 : 1.4, a = e.a * e.alpha * ( pass ? 1 : 0.16 );
+                if( pass === 0 ) {
+                    grad.addColorStop( 0, hsla( tail.hue, tail.sat, tail.lit, 1 ) );
+                    grad.addColorStop( 0.5, hsla( e.pts[ Math.floor( n / 2 ) ].hue, e.sat, e.lit, 1 ) );
+                    grad.addColorStop( 1, hsla( head.hue, head.sat, head.lit, 1 ) );
+                }
+                c.globalAlpha = a;
+                c.fillStyle = grad;
+                c.beginPath();
+                for( let dir = 0; dir < 2; dir++ ) {
+                    for( let j = 0; j < n; j++ ) {
+                        const i = dir ? n - 1 - j : j;
+                        const p = e.pts[ i ], p0 = e.pts[ Math.max( 0, i - 1 ) ], p1 = e.pts[ Math.min( n - 1, i + 1 ) ];
+                        const sx = ( p0.x + 2 * p.x + p1.x ) / 4, sy = ( p0.y + 2 * p.y + p1.y ) / 4;
+                        const dx = p1.x - p0.x, dy = p1.y - p0.y, m = Math.hypot( dx, dy ) || 1;
+                        const hw = Math.max( 0.4, e.w * ( 0.15 + ( i / n ) * 0.85 ) ) * spread;
+                        const ox = -dy / m * hw * ( dir ? -1 : 1 ), oy = dx / m * hw * ( dir ? -1 : 1 );
+                        if( dir === 0 && j === 0 ) c.moveTo( sx + ox, sy + oy );
+                        else c.lineTo( sx + ox, sy + oy );
+                    }
+                }
+                c.closePath();
+                c.fill();
+            }
+            c.globalAlpha = 1;
+        }
+    }
+    c.globalCompositeOperation = "source-over";
+}
+
+let lastT = performance.now();
+function tick( now ) {
+    requestAnimationFrame( tick );
+    const dt = Math.min( 0.05, ( now - lastT ) / 1000 );
+    lastT = now;
+    if( document.hidden ) return;
+    if( painting ) spawnTick( dt );
+    if( !paused ) update( dt );
+    ctx.setTransform( DPR, 0, 0, DPR, 0, 0 );
+    drawScene( ctx, W, H );
+}
+requestAnimationFrame( tick );
+
+/* ---------- pointer ---------- */
+canvas.addEventListener( "pointerdown", ( e ) => {
+    canvas.setPointerCapture( e.pointerId );
+    strokeId++; strokeStack.push( strokeId );
+    painting = true; spawnAcc = 1;
+    px = e.clientX; py = e.clientY; pvx = 0; pvy = 0; lastMove = performance.now();
+    if( brush === "ribbon" ) startRibbons( BRUSHES[ brush ], px, py );
+    closePanels();
+    hint.classList.add( "gone" );
+} );
+canvas.addEventListener( "pointermove", ( e ) => {
+    if( !painting ) { px = e.clientX; py = e.clientY; return; }
+    const now = performance.now(), dt = Math.max( 0.004, ( now - lastMove ) / 1000 );
+    const ivx = ( e.clientX - px ) / dt, ivy = ( e.clientY - py ) / dt;
+    pvx += ( Math.max( -1800, Math.min( 1800, ivx ) ) - pvx ) * 0.4;
+    pvy += ( Math.max( -1800, Math.min( 1800, ivy ) ) - pvy ) * 0.4;
+    px = e.clientX; py = e.clientY; lastMove = now;
+    if( brush === "ribbon" ) extendRibbons( px, py );
+} );
+function endStroke() { painting = false; liveRibbons = []; pvx = 0; pvy = 0; }
+canvas.addEventListener( "pointerup", endStroke );
+canvas.addEventListener( "pointercancel", endStroke );
+
+/* ---------- UI ---------- */
+const paletteEl = document.getElementById( "palette" ), panel = document.getElementById( "panel" );
+const saveMenu = document.getElementById( "saveMenu" ), hint = document.getElementById( "hint" );
+const pauseBtn = document.getElementById( "pauseBtn" );
+
+Object.keys( BRUSHES ).forEach( ( key, i ) => {
+    const b = document.createElement( "button" );
+    b.className = "tool" + ( key === brush ? " on" : "" );
+    b.dataset.brush = key;
+    b.title = `${BRUSHES[ key ].label} (${i + 1})`;
+    b.innerHTML = ICONS[ key ];
+    b.addEventListener( "click", () => selectBrush( key, true ) );
+    paletteEl.appendChild( b );
+} );
+const sep = document.createElement( "div" );
+sep.className = "sep";
+paletteEl.appendChild( sep );
+const gear = document.createElement( "button" );
+gear.className = "tool";
+gear.title = "Brush settings (S)";
+gear.innerHTML = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>';
+gear.addEventListener( "click", () => togglePanel() );
+paletteEl.appendChild( gear );
+
+function selectBrush( key, openPanel ) {
+    if( brush === key && openPanel ) { togglePanel(); return; }
+    brush = key;
+    document.querySelectorAll( "[data-brush]" ).forEach( ( el ) => el.classList.toggle( "on", el.dataset.brush === key ) );
+    if( !panel.classList.contains( "hidden" ) ) syncPanel();
+}
+function togglePanel() {
+    panel.classList.toggle( "hidden" );
+    saveMenu.classList.add( "hidden" );
+    if( !panel.classList.contains( "hidden" ) ) syncPanel();
+}
+function closePanels() {
+    panel.classList.add( "hidden" );
+    saveMenu.classList.add( "hidden" );
+}
+
+const sliders = { freq: "freq", size: "size", intensity: "intensity", visc: "visc" };
+const outs = { freq: "freqOut", size: "sizeOut", intensity: "intOut", visc: "viscOut" };
+function syncPanel() {
+    const b = BRUSHES[ brush ];
+    document.getElementById( "panelTitle" ).textContent = b.label;
+    for( const k in sliders ) {
+        document.getElementById( sliders[ k ] ).value = b[ k ];
+        document.getElementById( outs[ k ] ).textContent = Math.round( b[ k ] * 100 );
+    }
+    document.querySelectorAll( "#palChips .chip" ).forEach( ( el ) => el.classList.toggle( "on", el.dataset.pal === b.palette ) );
+}
+for( const k in sliders ) {
+    document.getElementById( sliders[ k ] ).addEventListener( "input", ( e ) => {
+        BRUSHES[ brush ][ k ] = +e.target.value;
+        document.getElementById( outs[ k ] ).textContent = Math.round( +e.target.value * 100 );
+    } );
+}
+const palChips = document.getElementById( "palChips" );
+Object.keys( PALETTES ).forEach( ( name ) => {
+    const p = PALETTES[ name ], chip = document.createElement( "button" );
+    chip.className = "chip";
+    chip.dataset.pal = name;
+    chip.title = name;
+    const stops = ( p.hues || [ 0, 90, 180, 270 ] ).map( ( h, i, arr ) =>
+        hsla( h, p.sat[ 1 ], p.lit[ 1 ], 1 ) + " " + Math.round( i / Math.max( 1, arr.length - 1 ) * 100 ) + "%" ).join( ", " );
+    chip.style.background = `linear-gradient( 135deg, ${stops} )`;
+    chip.addEventListener( "click", () => { BRUSHES[ brush ].palette = name; syncPanel(); } );
+    palChips.appendChild( chip );
+} );
+
+/* ---------- transport ---------- */
+const PLAY = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+const PAUSE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
+function setPaused( v ) {
+    paused = v;
+    pauseBtn.innerHTML = paused ? PLAY : PAUSE;
+    pauseBtn.classList.toggle( "on", paused );
+}
+setPaused( false );
+pauseBtn.addEventListener( "click", () => setPaused( !paused ) );
+
+function undo() {
+    if( !strokeStack.length ) return;
+    const id = strokeStack.pop();
+    ents = ents.filter( ( e ) => e.sid !== id );
+}
+document.getElementById( "undoBtn" ).addEventListener( "click", undo );
+document.getElementById( "clearBtn" ).addEventListener( "click", () => { ents = []; strokeStack = []; } );
+
+/* ---------- save ---------- */
+const SIZES = [
+    [ "Desktop 4K", 3840, 2160 ],
+    [ "Desktop QHD", 2560, 1440 ],
+    [ "Slide 16:9", 1920, 1080 ],
+    [ "Phone", 1290, 2796 ],
+    [ "Square", 2048, 2048 ]
+];
+const sizeRows = document.getElementById( "sizeRows" );
+SIZES.forEach( ( [ label, w, h ] ) => {
+    const b = document.createElement( "button" );
+    b.className = "mrow";
+    b.innerHTML = `${label} <span>${w}&times;${h}</span>`;
+    b.addEventListener( "click", () => exportPNG( w, h ) );
+    sizeRows.appendChild( b );
+} );
+const bgChips = document.getElementById( "bgChips" );
+BGS.forEach( ( col ) => {
+    const chip = document.createElement( "button" );
+    chip.className = "chip" + ( col === bg ? " on" : "" );
+    chip.style.background = col;
+    chip.style.borderColor = col === bg ? "var( --ink )" : "rgba( 255, 255, 255, 0.2 )";
+    chip.addEventListener( "click", () => {
+        bg = col;
+        bgChips.querySelectorAll( ".chip" ).forEach( ( el ) => {
+            const on = el === chip;
+            el.classList.toggle( "on", on );
+            el.style.borderColor = on ? "var( --ink )" : "rgba( 255, 255, 255, 0.2 )";
+        } );
+    } );
+    bgChips.appendChild( chip );
+} );
+document.getElementById( "saveBtn" ).addEventListener( "click", () => {
+    saveMenu.classList.toggle( "hidden" );
+    panel.classList.add( "hidden" );
+} );
+
+function exportPNG( ew, eh ) {
+    const off = document.createElement( "canvas" );
+    off.width = ew; off.height = eh;
+    const c = off.getContext( "2d" );
+    const s = Math.max( ew / W, eh / H );
+    c.setTransform( s, 0, 0, s, ( ew - W * s ) / 2, ( eh - H * s ) / 2 );
+    drawScene( c, W, H );
+    off.toBlob( ( blob ) => {
+        const a = document.createElement( "a" );
+        a.href = URL.createObjectURL( blob );
+        a.download = `wet-paint-${ew}x${eh}.png`;
+        a.click();
+        setTimeout( () => URL.revokeObjectURL( a.href ), 4000 );
+    }, "image/png" );
+    saveMenu.classList.add( "hidden" );
+}
+
+/* ---------- keys ---------- */
+addEventListener( "keydown", ( e ) => {
+    if( e.target.tagName === "INPUT" ) return;
+    if( e.code === "Space" ) { e.preventDefault(); setPaused( !paused ); }
+    else if( e.key >= "1" && e.key <= "4" ) selectBrush( Object.keys( BRUSHES )[ +e.key - 1 ], false );
+    else if( e.key === "s" ) togglePanel();
+    else if( e.key === "e" ) document.getElementById( "saveBtn" ).click();
+    else if( e.key === "x" ) { ents = []; strokeStack = []; }
+    else if( ( e.metaKey || e.ctrlKey ) && e.key === "z" ) { e.preventDefault(); undo(); }
+    else if( e.key === "Escape" ) closePanels();
+} );
+
+setTimeout( () => hint.classList.add( "gone" ), 6000 );
+</script>
+</body>
+</html>
