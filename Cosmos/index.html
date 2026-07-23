@@ -129,7 +129,7 @@
         position: absolute;
         text-align: center;
         text-shadow: 0 0 6px #000;
-        transform: translateX(-50%);
+        transform: translate(-50%, -50%);
         white-space: nowrap;
     }
     body.clean .hud {
@@ -482,17 +482,43 @@ struct U {
     proj : mat4x4<f32>,
     misc : vec4<f32>,
 };
+struct LU {
+    color : vec4<f32>,
+    params : vec4<f32>,
+};
 @group(0) @binding(0) var<uniform> u : U;
-@group(0) @binding(1) var<uniform> lc : vec4<f32>;
+@group(0) @binding(1) var<uniform> lu : LU;
+@group(0) @binding(2) var<storage, read> segs : array<vec4<f32>>;
 
 @vertex
-fn vs( @location(0) pos : vec3<f32> ) -> @builtin(position) vec4<f32> {
-    return u.proj * u.view * vec4<f32>( pos, 1.0 );
+fn vs( @builtin(vertex_index) vi : u32, @builtin(instance_index) ii : u32 ) -> @builtin(position) vec4<f32> {
+    var ends = array<u32, 6>( 0u, 1u, 1u, 0u, 1u, 0u );
+    var sides = array<f32, 6>( -1.0, -1.0, 1.0, -1.0, 1.0, 1.0 );
+    let a = segs[ ii * 2u ].xyz;
+    let b = segs[ ii * 2u + 1u ].xyz;
+    let ca = u.proj * u.view * vec4<f32>( a, 1.0 );
+    let cb = u.proj * u.view * vec4<f32>( b, 1.0 );
+    if ( ca.w < 0.001 || cb.w < 0.001 ) {
+        return vec4<f32>( 2.0, 2.0, 2.0, 1.0 );
+    }
+    let vp = u.misc.xy;
+    let na = ca.xy / ca.w;
+    let nb = cb.xy / cb.w;
+    let d = ( nb - na ) * vp;
+    let dl = max( length( d ), 1e-4 );
+    let perp = vec2<f32>( -d.y, d.x ) / dl * lu.params.x;
+    let e = ends[ vi ];
+    let side = sides[ vi ];
+    var clip = ca;
+    var ndc = na;
+    if ( e == 1u ) { clip = cb; ndc = nb; }
+    let off = ndc + perp * side / vp;
+    return vec4<f32>( off * clip.w, clip.zw );
 }
 
 @fragment
 fn fs() -> @location(0) vec4<f32> {
-    return vec4<f32>( lc.rgb * lc.a, 1.0 );
+    return vec4<f32>( lu.color.rgb * lu.color.a, 1.0 );
 }
 `;
 
@@ -677,67 +703,60 @@ async function main() {
 
     let totalLineVerts = 0;
     for ( const c of CONSTS ) { totalLineVerts += c[ 1 ].length; }
-    const lineVerts = new Float32Array( totalLineVerts * 3 );
+    const totalSegs = totalLineVerts / 2;
+    const lineVerts = new Float32Array( totalLineVerts * 4 );
     const lineOffsets = [];
     const constDirs = [];
     {
         let vp = 0;
         for ( const c of CONSTS ) {
-            const first = vp / 3;
+            const firstSeg = vp / 8;
             let sx = 0, sy = 0, sz = 0;
             for ( const idx of c[ 1 ] ) {
                 const o = idx * 4;
-                lineVerts[ vp++ ] = f32[ o ];
-                lineVerts[ vp++ ] = f32[ o + 1 ];
-                lineVerts[ vp++ ] = f32[ o + 2 ];
+                lineVerts[ vp ] = f32[ o ];
+                lineVerts[ vp + 1 ] = f32[ o + 1 ];
+                lineVerts[ vp + 2 ] = f32[ o + 2 ];
+                vp += 4;
                 const l = Math.hypot( f32[ o ], f32[ o + 1 ], f32[ o + 2 ] ) || 1;
                 sx += f32[ o ] / l; sy += f32[ o + 1 ] / l; sz += f32[ o + 2 ] / l;
             }
-            lineOffsets.push( [ first, c[ 1 ].length ] );
+            lineOffsets.push( [ firstSeg, c[ 1 ].length / 2 ] );
             const sl = Math.hypot( sx, sy, sz ) || 1;
             constDirs.push( [ sx / sl, sy / sl, sz / sl ] );
         }
     }
     const lineBuf = device.createBuffer( {
         size: lineVerts.byteLength,
-        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
     } );
     device.queue.writeBuffer( lineBuf, 0, lineVerts );
 
     const lineModule = device.createShaderModule( { code: LINES_WGSL } );
     const linePipeline = device.createRenderPipeline( {
         layout: "auto",
-        vertex: {
-            module: lineModule,
-            entryPoint: "vs",
-            buffers: [ {
-                arrayStride: 12,
-                attributes: [ { shaderLocation: 0, offset: 0, format: "float32x3" } ]
-            } ]
-        },
+        vertex: { module: lineModule, entryPoint: "vs" },
         fragment: {
             module: lineModule,
             entryPoint: "fs",
             targets: [ { format: format, blend: ADD_BLEND } ]
         },
-        primitive: { topology: "line-list" }
+        primitive: { topology: "triangle-list" }
     } );
-    const lineDimBuf = device.createBuffer( { size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST } );
-    const lineHiBuf = device.createBuffer( { size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST } );
-    const lineDimBind = device.createBindGroup( {
-        layout: linePipeline.getBindGroupLayout( 0 ),
-        entries: [
-            { binding: 0, resource: { buffer: uniBuf } },
-            { binding: 1, resource: { buffer: lineDimBuf } }
-        ]
-    } );
-    const lineHiBind = device.createBindGroup( {
-        layout: linePipeline.getBindGroupLayout( 0 ),
-        entries: [
-            { binding: 0, resource: { buffer: uniBuf } },
-            { binding: 1, resource: { buffer: lineHiBuf } }
-        ]
-    } );
+    const lineDimBuf = device.createBuffer( { size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST } );
+    const lineHiBuf = device.createBuffer( { size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST } );
+    function lineBind( buf ) {
+        return device.createBindGroup( {
+            layout: linePipeline.getBindGroupLayout( 0 ),
+            entries: [
+                { binding: 0, resource: { buffer: uniBuf } },
+                { binding: 1, resource: { buffer: buf } },
+                { binding: 2, resource: { buffer: lineBuf } }
+            ]
+        } );
+    }
+    const lineDimBind = lineBind( lineDimBuf );
+    const lineHiBind = lineBind( lineHiBuf );
 
     const markerModule = device.createShaderModule( { code: MARKER_WGSL } );
     const markerPipeline = device.createRenderPipeline( {
@@ -1109,15 +1128,15 @@ async function main() {
         const distSol = Math.hypot( cam.pos[ 0 ], cam.pos[ 1 ], cam.pos[ 2 ] );
         const lineFade = Math.min( Math.max( 1 - distSol / 30, 0 ), 1 );
         if ( lineFade > 0.01 ) {
-            device.queue.writeBuffer( lineDimBuf, 0, new Float32Array( [ 1, 0.69, 0, 0.10 * lineFade ] ) );
+            const lw = Math.max( canvas.width / canvas.clientWidth, 1 );
+            device.queue.writeBuffer( lineDimBuf, 0, new Float32Array( [ 1, 0.69, 0, 0.10 * lineFade, 2.5 * lw, 0, 0, 0 ] ) );
             pass.setPipeline( linePipeline );
-            pass.setVertexBuffer( 0, lineBuf );
             pass.setBindGroup( 0, lineDimBind );
-            pass.draw( totalLineVerts );
+            pass.draw( 6, totalSegs );
             if ( selConst >= 0 ) {
-                device.queue.writeBuffer( lineHiBuf, 0, new Float32Array( [ 1, 0.85, 0.35, 0.6 * lineFade ] ) );
+                device.queue.writeBuffer( lineHiBuf, 0, new Float32Array( [ 1, 0.85, 0.35, 0.6 * lineFade, 4 * lw, 0, 0, 0 ] ) );
                 pass.setBindGroup( 0, lineHiBind );
-                pass.draw( lineOffsets[ selConst ][ 1 ], 1, lineOffsets[ selConst ][ 0 ] );
+                pass.draw( 6, lineOffsets[ selConst ][ 1 ], 0, lineOffsets[ selConst ][ 0 ] );
             }
         }
 
@@ -1193,11 +1212,10 @@ async function main() {
                 const cnx = projArr[ 0 ] * cvx / -cvz;
                 const cny = projArr[ 5 ] * cvy / -cvz;
                 const cw = canvas.clientWidth, ch = canvas.clientHeight;
-                const ringPx = cl.radius / -cvz * projArr[ 5 ] * ch / 2;
                 const cd = Math.hypot( c[ 0 ] - cam.pos[ 0 ], c[ 1 ] - cam.pos[ 1 ], c[ 2 ] - cam.pos[ 2 ] );
                 clabelEl.textContent = cl.name + " · " + fmtNum( cd ) + " PC";
                 clabelEl.style.left = ( cnx * 0.5 + 0.5 ) * cw + "px";
-                clabelEl.style.top = ( 1 - ( cny * 0.5 + 0.5 ) ) * ch + ringPx + 10 + "px";
+                clabelEl.style.top = ( 1 - ( cny * 0.5 + 0.5 ) ) * ch + "px";
                 clabelEl.classList.remove( "hidden" );
             } else {
                 clabelEl.classList.add( "hidden" );
