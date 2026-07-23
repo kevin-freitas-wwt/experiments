@@ -97,7 +97,7 @@
         gap: 18px;
         white-space: nowrap;
     }
-    #ovr {
+    #ovr, #shot {
         background: rgba(10, 7, 0, 0.55);
         border: 1px solid rgba(255, 176, 0, 0.6);
         color: #ffb000;
@@ -108,7 +108,7 @@
         pointer-events: auto;
         text-transform: uppercase;
     }
-    #ovr:hover {
+    #ovr:hover, #shot:hover {
         background: #ffb000;
         color: #000;
     }
@@ -222,9 +222,10 @@
             <div class="row" id="chips"></div>
         </div>
         <button id="ovr" type="button">OVERVIEW</button>
+        <button id="shot" type="button">SNAPSHOT</button>
         <div id="keys">
             FWD<b>E</b> BACK<b>D</b> LEFT<b>S</b> RIGHT<b>F</b> UP<b>SPACE</b> DOWN<b>C</b><br>
-            BOOST<b>SHIFT</b> OVERVIEW<b>O</b> TYPE<b>1&ndash;7</b> LOOK<b>MOUSE</b> SPEED<b>WHEEL</b>
+            BOOST<b>SHIFT</b> OVERVIEW<b>O</b> SNAP<b>P</b> TYPE<b>1&ndash;7</b> LOOK<b>MOUSE</b> SPEED<b>WHEEL</b>
         </div>
     </div>
     <div id="cross"></div>
@@ -656,6 +657,22 @@ async function main() {
     }
     ovrBtn.addEventListener( "click", toggleOverview );
 
+    let shotReq = false;
+    document.getElementById( "shot" ).addEventListener( "click", function() {
+        shotReq = true;
+    } );
+    function saveShot() {
+        canvas.toBlob( function( blob ) {
+            if ( !blob ) { return; }
+            const a = document.createElement( "a" );
+            const ts = new Date().toISOString().replace( /[:.]/g, "-" ).slice( 0, 19 );
+            a.href = URL.createObjectURL( blob );
+            a.download = "cosmos-" + ts + ".png";
+            a.click();
+            setTimeout( function() { URL.revokeObjectURL( a.href ); }, 5000 );
+        }, "image/png" );
+    }
+
     const hint = document.getElementById( "hint" );
     canvas.addEventListener( "click", function() {
         canvas.requestPointerLock();
@@ -674,6 +691,7 @@ async function main() {
         keys[ e.code ] = true;
         if ( e.code === "Space" ) { e.preventDefault(); }
         if ( e.code === "KeyO" ) { toggleOverview(); }
+        if ( e.code === "KeyP" ) { shotReq = true; }
         if ( e.code >= "Digit1" && e.code <= "Digit7" ) { toggleClass( Number( e.code.slice( 5 ) ) - 1 ); }
     } );
     document.addEventListener( "keyup", function( e ) {
@@ -872,6 +890,10 @@ async function main() {
         }
         pass.end();
         device.queue.submit( [ enc.finish() ] );
+        if ( shotReq ) {
+            shotReq = false;
+            saveShot();
+        }
 
         hudT -= dt;
         if ( hudT <= 0 ) {
