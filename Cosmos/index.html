@@ -340,11 +340,11 @@ fn fs( in : VOut ) -> @location(0) vec4<f32> {
 `;
 
 const FLARE_WGSL = `
-struct H {
-    a : vec4<f32>,
-    color : vec4<f32>,
+struct FU {
+    info : vec4<f32>,
+    flares : array<vec4<f32>, 16>,
 };
-@group(0) @binding(0) var<uniform> h : H;
+@group(0) @binding(0) var<uniform> fu : FU;
 
 const PARAMS = array<vec4<f32>, 8>(
     vec4<f32>( 0.0, 0.55, 0.55, 0.0 ),
@@ -382,22 +382,26 @@ fn vs( @builtin(vertex_index) vi : u32, @builtin(instance_index) ii : u32 ) -> V
     );
     var params = PARAMS;
     var colors = COLORS;
-    let e = params[ ii ];
-    let col = colors[ ii ];
-    let strength = clamp( h.a.w, 0.0, 1.0 );
+    let fi = ii / 8u;
+    let ei = ii % 8u;
+    let e = params[ ei ];
+    let col = colors[ ei ];
+    let fd = fu.flares[ fi * 2u ];
+    let fc = fu.flares[ fi * 2u + 1u ];
+    let strength = clamp( fd.z, 0.0, 1.0 );
     let scale = mix( 0.35, 1.3, strength );
-    let center = h.a.xy * ( 1.0 - e.x );
+    let center = fd.xy * ( 1.0 - e.x );
     let c = corners[ vi ];
-    let off = vec2<f32>( c.x * e.y * scale / h.a.z, c.y * e.z * scale );
+    let off = vec2<f32>( c.x * e.y * scale / fu.info.x, c.y * e.z * scale );
 
     var out : VOut;
     out.clip = vec4<f32>( center + off, 0.0, 1.0 );
     out.uv = c;
     var rgb = col.rgb;
-    if ( ii == 0u ) { rgb = h.color.rgb; }
+    if ( ei == 0u ) { rgb = fc.rgb; }
     var a = col.a * strength * strength;
-    if ( ii == 1u ) { a *= smoothstep( 0.15, 0.5, strength ); }
-    if ( ii >= 2u ) { a *= smoothstep( 0.35, 0.75, strength ); }
+    if ( ei == 1u ) { a *= smoothstep( 0.15, 0.5, strength ); }
+    if ( ei >= 2u ) { a *= smoothstep( 0.35, 0.75, strength ); }
     out.color = vec4<f32>( rgb, a );
     out.ty = e.w;
     return out;
@@ -545,7 +549,7 @@ async function main() {
         primitive: { topology: "triangle-list" }
     } );
     const flareBuf = device.createBuffer( {
-        size: 32,
+        size: 272,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     } );
     const flareBind = device.createBindGroup( {
@@ -741,21 +745,25 @@ async function main() {
         return Math.abs( n ) >= 1000 ? n.toFixed( 0 ) : Math.abs( n ) >= 10 ? n.toFixed( 1 ) : n.toFixed( 2 );
     }
 
+    const MAXF = 8;
     const uni = new Float32Array( 36 );
-    const flareU = new Float32Array( 8 );
+    const flareU = new Float32Array( 4 + MAXF * 8 );
+    const flareSlots = [];
+    for ( let i = 0; i < MAXF; i++ ) {
+        flareSlots.push( { idx: -1, live: false, s: 0 } );
+    }
     let last = performance.now();
     let hudT = 0;
-    let heroIdx = -1;
-    let heroT = 0;
-    let flareS = 0;
+    let scanT = 0;
 
     function smooth01( x ) {
         const t = Math.min( Math.max( x, 0 ), 1 );
         return t * t * ( 3 - 2 * t );
     }
 
-    function scanHero() {
-        let best = -1, bs = Infinity;
+    function scanFlares() {
+        const limit = Math.pow( exposure * Math.pow( 10, 1.8 ) / 4, 2 );
+        const cand = [];
         for ( let i = 0; i < starCount; i++ ) {
             if ( !( specMask >> classes[ i ] & 1 ) ) { continue; }
             const o = i * 4;
@@ -763,9 +771,18 @@ async function main() {
             const dy = f32[ o + 1 ] - cam.pos[ 1 ];
             const dz = f32[ o + 2 ] - cam.pos[ 2 ];
             const s = ( dx * dx + dy * dy + dz * dz ) * lumfac2[ i ];
-            if ( s < bs ) { bs = s; best = i; }
+            if ( s < limit ) { cand.push( [ s, i ] ); }
         }
-        heroIdx = best;
+        cand.sort( function( a, b ) { return a[ 0 ] - b[ 0 ]; } );
+        const top = cand.slice( 0, MAXF ).map( function( c ) { return c[ 1 ]; } );
+        for ( const slot of flareSlots ) {
+            slot.live = slot.idx >= 0 && top.indexOf( slot.idx ) >= 0;
+        }
+        for ( const idx of top ) {
+            if ( flareSlots.some( function( sl ) { return sl.idx === idx; } ) ) { continue; }
+            const free = flareSlots.find( function( sl ) { return sl.idx < 0; } );
+            if ( free ) { free.idx = idx; free.live = true; free.s = 0; }
+        }
     }
 
     function frame( now ) {
@@ -811,41 +828,47 @@ async function main() {
         pass.setBindGroup( 0, bindGroup );
         pass.draw( 6, starCount );
 
-        heroT -= dt;
-        if ( heroT <= 0 ) { heroT = 0.1; scanHero(); }
-        let flareDrawn = false;
-        if ( heroIdx >= 0 ) {
-            const o = heroIdx * 4;
+        scanT -= dt;
+        if ( scanT <= 0 ) { scanT = 0.1; scanFlares(); }
+        let fcount = 0;
+        const m4 = v.m;
+        for ( const slot of flareSlots ) {
+            if ( slot.idx < 0 ) { continue; }
+            const o = slot.idx * 4;
             const x = f32[ o ], y = f32[ o + 1 ], z = f32[ o + 2 ];
-            const m4 = v.m;
             const vx = m4[ 0 ] * x + m4[ 4 ] * y + m4[ 8 ] * z + m4[ 12 ];
             const vy = m4[ 1 ] * x + m4[ 5 ] * y + m4[ 9 ] * z + m4[ 13 ];
             const vz = m4[ 2 ] * x + m4[ 6 ] * y + m4[ 10 ] * z + m4[ 14 ];
-            if ( vz < 0 ) {
+            let target = 0;
+            let nx = 0, ny = 0;
+            if ( slot.live && vz < 0 ) {
                 const d = Math.max( Math.hypot( vx, vy, vz ), 1e-5 );
-                const appmag = absmags[ heroIdx ] + 5 * Math.log10( d / 10 );
+                const appmag = absmags[ slot.idx ] + 5 * Math.log10( d / 10 );
                 const bright = Math.pow( 10, ( 4 - appmag ) * 0.2 ) * exposure;
-                const nx = projArr[ 0 ] * vx / -vz;
-                const ny = projArr[ 5 ] * vy / -vz;
+                nx = projArr[ 0 ] * vx / -vz;
+                ny = projArr[ 5 ] * vy / -vz;
                 const edge = Math.min( Math.max( 1.6 - Math.max( Math.abs( nx ), Math.abs( ny ) ), 0 ), 1 );
-                const target = smooth01( Math.log10( Math.max( bright, 0.01 ) / 4 ) / 2.4 ) * edge;
-                flareS += ( target - flareS ) * Math.min( dt * 4, 1 );
-                flareDrawn = true;
-                const strength = flareS;
-                if ( strength > 0.02 ) {
-                    const bv = Math.min( Math.max( 0.92 * cis[ heroIdx ], -0.35 ), 5 );
-                    const col = tempToRgb( 4600 * ( 1 / ( bv + 1.7 ) + 1 / ( bv + 0.62 ) ) );
-                    flareU[ 0 ] = nx; flareU[ 1 ] = ny; flareU[ 2 ] = aspect; flareU[ 3 ] = strength;
-                    flareU[ 4 ] = col[ 0 ]; flareU[ 5 ] = col[ 1 ]; flareU[ 6 ] = col[ 2 ]; flareU[ 7 ] = 1;
-                    device.queue.writeBuffer( flareBuf, 0, flareU );
-                    pass.setPipeline( flarePipeline );
-                    pass.setBindGroup( 0, flareBind );
-                    pass.draw( 6, 8 );
-                }
+                target = smooth01( Math.log10( Math.max( bright, 0.01 ) / 4 ) / 2.4 ) * edge;
             }
+            slot.s += ( target - slot.s ) * Math.min( dt * 4, 1 );
+            if ( slot.s <= 0.02 ) {
+                if ( !slot.live ) { slot.idx = -1; }
+                continue;
+            }
+            if ( vz >= 0 || fcount >= MAXF ) { continue; }
+            const bv = Math.min( Math.max( 0.92 * cis[ slot.idx ], -0.35 ), 5 );
+            const col = tempToRgb( 4600 * ( 1 / ( bv + 1.7 ) + 1 / ( bv + 0.62 ) ) );
+            const b = 4 + fcount * 8;
+            flareU[ b ] = nx; flareU[ b + 1 ] = ny; flareU[ b + 2 ] = slot.s; flareU[ b + 3 ] = 0;
+            flareU[ b + 4 ] = col[ 0 ]; flareU[ b + 5 ] = col[ 1 ]; flareU[ b + 6 ] = col[ 2 ]; flareU[ b + 7 ] = 1;
+            fcount++;
         }
-        if ( !flareDrawn ) {
-            flareS += ( 0 - flareS ) * Math.min( dt * 4, 1 );
+        if ( fcount > 0 ) {
+            flareU[ 0 ] = aspect;
+            device.queue.writeBuffer( flareBuf, 0, flareU );
+            pass.setPipeline( flarePipeline );
+            pass.setBindGroup( 0, flareBind );
+            pass.draw( 6, fcount * 8 );
         }
         pass.end();
         device.queue.submit( [ enc.finish() ] );
