@@ -97,7 +97,7 @@
         gap: 18px;
         white-space: nowrap;
     }
-    #nav {
+    #navsel {
         appearance: none;
         background: rgba(10, 7, 0, 0.55);
         border: 1px solid rgba(255, 176, 0, 0.6);
@@ -260,7 +260,7 @@
             <div class="row" id="chips"></div>
         </div>
         <div id="navwrap">
-            <select id="nav">
+            <select id="navsel">
                 <option value="" disabled selected>NAVIGATE</option>
                 <optgroup label="Views">
                     <option value="v:overview">Overview</option>
@@ -888,7 +888,7 @@ async function main() {
         }
     }
 
-    const navEl = document.getElementById( "nav" );
+    const navEl = document.getElementById( "navsel" );
     const ogCon = document.getElementById( "og-con" );
     const ogClu = document.getElementById( "og-clu" );
     CONSTS.forEach( function( c, i ) {
