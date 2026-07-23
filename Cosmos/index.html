@@ -623,7 +623,7 @@ async function main() {
         history.replaceState( null, "", "#" + h );
     }
     const keys = {};
-    let exposure = 1.0;
+    const exposure = 5.0;
     let locked = false;
     let savedView = null;
 
@@ -640,14 +640,12 @@ async function main() {
             cam.pos = [ overviewR * 0.5, overviewR * 0.6, overviewR * 1.0 ];
             aimAtOrigin();
             baseSpeed = overviewR * 0.15;
-            exposure = 5.0;
             ovrBtn.textContent = "RETURN TO SOL";
         } else {
             cam.pos = savedView.pos;
             cam.yaw = savedView.yaw;
             cam.pitch = savedView.pitch;
             baseSpeed = savedView.speed;
-            exposure = 1.0;
             savedView = null;
             ovrBtn.textContent = "OVERVIEW";
         }
