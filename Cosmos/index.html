@@ -112,6 +112,38 @@
         background: #ffb000;
         color: #000;
     }
+    #filter .row {
+        display: flex;
+        gap: 5px;
+        margin-top: 4px;
+    }
+    .chip {
+        align-items: center;
+        background: transparent;
+        border: 1px solid rgba(255, 176, 0, 0.45);
+        color: #ffb000;
+        cursor: pointer;
+        display: flex;
+        font: inherit;
+        font-size: 10px;
+        gap: 5px;
+        letter-spacing: 0.1em;
+        padding: 4px 8px;
+        pointer-events: auto;
+    }
+    .chip .dot {
+        border-radius: 50%;
+        display: inline-block;
+        height: 7px;
+        width: 7px;
+    }
+    .chip.off {
+        border-color: rgba(255, 176, 0, 0.15);
+        color: rgba(255, 176, 0, 0.3);
+    }
+    .chip.off .dot {
+        opacity: 0.2;
+    }
     #keys {
         color: rgba(255, 176, 0, 0.6);
         font-size: 10px;
@@ -185,10 +217,14 @@
                 <div><div class="label">SPEED</div><div class="value" id="spd">&mdash;</div></div>
             </div>
         </div>
+        <div class="panel" id="filter">
+            <div class="label">SPECTRAL TYPE</div>
+            <div class="row" id="chips"></div>
+        </div>
         <button id="ovr" type="button">OVERVIEW</button>
         <div id="keys">
             FWD<b>E</b> BACK<b>D</b> LEFT<b>S</b> RIGHT<b>F</b> UP<b>SPACE</b> DOWN<b>C</b><br>
-            BOOST<b>SHIFT</b> OVERVIEW<b>O</b> LOOK<b>MOUSE</b> SPEED<b>WHEEL</b>
+            BOOST<b>SHIFT</b> OVERVIEW<b>O</b> TYPE<b>1&ndash;7</b> LOOK<b>MOUSE</b> SPEED<b>WHEEL</b>
         </div>
     </div>
     <div id="cross"></div>
@@ -214,6 +250,16 @@ struct VOut {
     @location(1) color : vec3<f32>,
     @location(2) intensity : f32,
 };
+
+fn spec_class( ci : f32 ) -> u32 {
+    if ( ci < -0.30 ) { return 0u; }
+    if ( ci < -0.02 ) { return 1u; }
+    if ( ci < 0.30 ) { return 2u; }
+    if ( ci < 0.58 ) { return 3u; }
+    if ( ci < 0.81 ) { return 4u; }
+    if ( ci < 1.40 ) { return 5u; }
+    return 6u;
+}
 
 fn temp_to_rgb( t : f32 ) -> vec3<f32> {
     let k = clamp( t, 1000.0, 40000.0 ) / 100.0;
@@ -246,6 +292,16 @@ fn vs( @builtin(vertex_index) vi : u32, @builtin(instance_index) ii : u32 ) -> V
     let ciq = s.w - amq * 256.0;
     let absmag = amq / 255.0 * 37.0 - 17.0;
     let ci = ciq / 255.0 * 6.0 - 0.5;
+
+    let mask = u32( u.misc.w + 0.5 );
+    if ( ( ( mask >> spec_class( ci ) ) & 1u ) == 0u ) {
+        var cull : VOut;
+        cull.clip = vec4<f32>( 2.0, 2.0, 2.0, 1.0 );
+        cull.uv = vec2<f32>( 0.0 );
+        cull.color = vec3<f32>( 0.0 );
+        cull.intensity = 0.0;
+        return cull;
+    }
 
     let vpos = u.view * vec4<f32>( s.xyz, 1.0 );
     let dist = max( length( vpos.xyz ), 1e-5 );
@@ -416,7 +472,6 @@ async function main() {
     const bytes = decodeStars( STARS_B64 );
     const starCount = bytes.byteLength / 16;
     const f32 = new Float32Array( bytes.buffer );
-    document.getElementById( "count" ).textContent = starCount.toLocaleString() + " CATALOGED STARS · HYG v41";
 
     let overviewR = 0;
     {
@@ -498,16 +553,55 @@ async function main() {
         entries: [ { binding: 0, resource: { buffer: flareBuf } } ]
     } );
 
+    function specClass( ci ) {
+        const edges = [ -0.30, -0.02, 0.30, 0.58, 0.81, 1.40 ];
+        for ( let c = 0; c < edges.length; c++ ) {
+            if ( ci < edges[ c ] ) { return c; }
+        }
+        return 6;
+    }
+
     const lumfac2 = new Float32Array( starCount );
     const absmags = new Float32Array( starCount );
     const cis = new Float32Array( starCount );
+    const classes = new Uint8Array( starCount );
+    const classCounts = [ 0, 0, 0, 0, 0, 0, 0 ];
     for ( let i = 0; i < starCount; i++ ) {
         const w = f32[ i * 4 + 3 ];
         const amq = Math.floor( w / 256 );
         absmags[ i ] = amq / 255 * 37 - 17;
         cis[ i ] = ( w - amq * 256 ) / 255 * 6 - 0.5;
         lumfac2[ i ] = Math.pow( 10, absmags[ i ] * 0.4 );
+        classes[ i ] = specClass( cis[ i ] );
+        classCounts[ classes[ i ] ]++;
     }
+
+    let specMask = 127;
+    const countEl = document.getElementById( "count" );
+    function updateCount() {
+        let n = 0;
+        for ( let c = 0; c < 7; c++ ) {
+            if ( specMask >> c & 1 ) { n += classCounts[ c ]; }
+        }
+        countEl.textContent = ( n === starCount ? n.toLocaleString() : n.toLocaleString() + " OF " + starCount.toLocaleString() ) + " CATALOGED STARS · HYG v41";
+    }
+    const SPEC = [ [ "O", "#9bb0ff" ], [ "B", "#aabfff" ], [ "A", "#cad7ff" ], [ "F", "#f8f7ff" ], [ "G", "#fff4ea" ], [ "K", "#ffd2a1" ], [ "M", "#ffcc6f" ] ];
+    const chipsEl = document.getElementById( "chips" );
+    const chipEls = SPEC.map( function( s, c ) {
+        const btn = document.createElement( "button" );
+        btn.className = "chip";
+        btn.type = "button";
+        btn.innerHTML = '<span class="dot" style="background:' + s[ 1 ] + '"></span>' + s[ 0 ];
+        btn.addEventListener( "click", function() { toggleClass( c ); } );
+        chipsEl.appendChild( btn );
+        return btn;
+    } );
+    function toggleClass( c ) {
+        specMask ^= 1 << c;
+        chipEls[ c ].classList.toggle( "off", !( specMask >> c & 1 ) );
+        updateCount();
+    }
+    updateCount();
 
     const cam = { pos: [ 0.6, 0.25, 1.1 ], yaw: -0.5, pitch: -0.2 };
     let baseSpeed = 2.0;
@@ -578,6 +672,7 @@ async function main() {
         keys[ e.code ] = true;
         if ( e.code === "Space" ) { e.preventDefault(); }
         if ( e.code === "KeyO" ) { toggleOverview(); }
+        if ( e.code >= "Digit1" && e.code <= "Digit7" ) { toggleClass( Number( e.code.slice( 5 ) ) - 1 ); }
     } );
     document.addEventListener( "keyup", function( e ) {
         keys[ e.code ] = false;
@@ -664,6 +759,7 @@ async function main() {
     function scanHero() {
         let best = -1, bs = Infinity;
         for ( let i = 0; i < starCount; i++ ) {
+            if ( !( specMask >> classes[ i ] & 1 ) ) { continue; }
             const o = i * 4;
             const dx = f32[ o ] - cam.pos[ 0 ];
             const dy = f32[ o + 1 ] - cam.pos[ 1 ];
@@ -701,6 +797,7 @@ async function main() {
         uni[ 32 ] = canvas.width;
         uni[ 33 ] = canvas.height;
         uni[ 34 ] = exposure;
+        uni[ 35 ] = specMask;
         device.queue.writeBuffer( uniBuf, 0, uni );
 
         const enc = device.createCommandEncoder();
