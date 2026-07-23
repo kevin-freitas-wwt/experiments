@@ -713,7 +713,7 @@ async function main() {
                 const nx = projArr[ 0 ] * vx / -vz;
                 const ny = projArr[ 5 ] * vy / -vz;
                 const edge = Math.min( Math.max( 1.6 - Math.max( Math.abs( nx ), Math.abs( ny ) ), 0 ), 1 );
-                const target = smooth01( ( bright - 2.0 ) / 14 ) * 1.5 * edge;
+                const target = Math.pow( smooth01( Math.log10( Math.max( bright, 0.01 ) / 2 ) / 1.6 ), 1.4 ) * 1.5 * edge;
                 flareS += ( target - flareS ) * Math.min( dt * 4, 1 );
                 flareDrawn = true;
                 const strength = flareS;
