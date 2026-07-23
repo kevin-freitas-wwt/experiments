@@ -328,8 +328,8 @@ fn vs( @builtin(vertex_index) vi : u32, @builtin(instance_index) ii : u32 ) -> V
     var colors = COLORS;
     let e = params[ ii ];
     let col = colors[ ii ];
-    let strength = h.a.w;
-    let scale = mix( 0.5, 1.25, min( strength, 1.0 ) );
+    let strength = clamp( h.a.w, 0.0, 1.0 );
+    let scale = mix( 0.35, 1.3, strength );
     let center = h.a.xy * ( 1.0 - e.x );
     let c = corners[ vi ];
     let off = vec2<f32>( c.x * e.y * scale / h.a.z, c.y * e.z * scale );
@@ -339,7 +339,10 @@ fn vs( @builtin(vertex_index) vi : u32, @builtin(instance_index) ii : u32 ) -> V
     out.uv = c;
     var rgb = col.rgb;
     if ( ii == 0u ) { rgb = h.color.rgb; }
-    out.color = vec4<f32>( rgb, col.a * min( strength, 1.5 ) );
+    var a = col.a * strength * strength;
+    if ( ii == 1u ) { a *= smoothstep( 0.15, 0.5, strength ); }
+    if ( ii >= 2u ) { a *= smoothstep( 0.35, 0.75, strength ); }
+    out.color = vec4<f32>( rgb, a );
     out.ty = e.w;
     return out;
 }
@@ -730,7 +733,7 @@ async function main() {
                 const nx = projArr[ 0 ] * vx / -vz;
                 const ny = projArr[ 5 ] * vy / -vz;
                 const edge = Math.min( Math.max( 1.6 - Math.max( Math.abs( nx ), Math.abs( ny ) ), 0 ), 1 );
-                const target = Math.pow( smooth01( Math.log10( Math.max( bright, 0.01 ) / 2 ) / 1.6 ), 1.4 ) * 1.5 * edge;
+                const target = smooth01( Math.log10( Math.max( bright, 0.01 ) / 4 ) / 2.4 ) * edge;
                 flareS += ( target - flareS ) * Math.min( dt * 4, 1 );
                 flareDrawn = true;
                 const strength = flareS;
