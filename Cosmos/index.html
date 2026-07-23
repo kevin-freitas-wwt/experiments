@@ -634,6 +634,12 @@ async function main() {
     let hudT = 0;
     let heroIdx = -1;
     let heroT = 0;
+    let flareS = 0;
+
+    function smooth01( x ) {
+        const t = Math.min( Math.max( x, 0 ), 1 );
+        return t * t * ( 3 - 2 * t );
+    }
 
     function scanHero() {
         let best = -1, bs = Infinity;
@@ -692,6 +698,7 @@ async function main() {
 
         heroT -= dt;
         if ( heroT <= 0 ) { heroT = 0.1; scanHero(); }
+        let flareDrawn = false;
         if ( heroIdx >= 0 ) {
             const o = heroIdx * 4;
             const x = f32[ o ], y = f32[ o + 1 ], z = f32[ o + 2 ];
@@ -706,7 +713,10 @@ async function main() {
                 const nx = projArr[ 0 ] * vx / -vz;
                 const ny = projArr[ 5 ] * vy / -vz;
                 const edge = Math.min( Math.max( 1.6 - Math.max( Math.abs( nx ), Math.abs( ny ) ), 0 ), 1 );
-                const strength = Math.min( Math.max( ( bright - 2.5 ) / 8, 0 ), 1.6 ) * edge;
+                const target = smooth01( ( bright - 2.0 ) / 14 ) * 1.5 * edge;
+                flareS += ( target - flareS ) * Math.min( dt * 4, 1 );
+                flareDrawn = true;
+                const strength = flareS;
                 if ( strength > 0.02 ) {
                     const bv = Math.min( Math.max( 0.92 * cis[ heroIdx ], -0.35 ), 5 );
                     const col = tempToRgb( 4600 * ( 1 / ( bv + 1.7 ) + 1 / ( bv + 0.62 ) ) );
@@ -718,6 +728,9 @@ async function main() {
                     pass.draw( 6, 8 );
                 }
             }
+        }
+        if ( !flareDrawn ) {
+            flareS += ( 0 - flareS ) * Math.min( dt * 4, 1 );
         }
         pass.end();
         device.queue.submit( [ enc.finish() ] );
