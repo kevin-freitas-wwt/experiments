@@ -122,7 +122,7 @@
         top: 50%;
         transform: translateY(-50%);
     }
-    #clabel {
+    .clabel {
         color: #ffb000;
         font-size: 11px;
         letter-spacing: 0.25em;
@@ -283,7 +283,7 @@
         </div>
     </div>
     <div id="cross"></div>
-    <div id="clabel" class="hidden"></div>
+    <div id="clabels"></div>
     <div class="panel" id="hint">CLICK TO ENGAGE FLIGHT CONTROLS</div>
     <div class="panel" id="err">WEBGPU REQUIRED &mdash; NO FALLBACK<br><span class="label" id="errdetail">USE CHROME, EDGE OR SAFARI 26+</span></div>
 </div>
@@ -534,8 +534,7 @@ struct U {
     misc : vec4<f32>,
 };
 struct M {
-    center : vec4<f32>,
-    color : vec4<f32>,
+    data : array<vec4<f32>, 20>,
 };
 @group(0) @binding(0) var<uniform> u : U;
 @group(0) @binding(1) var<uniform> m : M;
@@ -543,20 +542,23 @@ struct M {
 struct VOut {
     @builtin(position) clip : vec4<f32>,
     @location(0) uv : vec2<f32>,
+    @location(1) col : vec4<f32>,
 };
 
 @vertex
-fn vs( @builtin(vertex_index) vi : u32 ) -> VOut {
+fn vs( @builtin(vertex_index) vi : u32, @builtin(instance_index) ii : u32 ) -> VOut {
     var corners = array<vec2<f32>, 6>(
         vec2<f32>( -1.0, -1.0 ), vec2<f32>( 1.0, -1.0 ), vec2<f32>( 1.0, 1.0 ),
         vec2<f32>( -1.0, -1.0 ), vec2<f32>( 1.0, 1.0 ), vec2<f32>( -1.0, 1.0 )
     );
+    let center = m.data[ ii * 2u ];
     let c = corners[ vi ];
-    var vpos = u.view * vec4<f32>( m.center.xyz, 1.0 );
-    vpos = vec4<f32>( vpos.xy + c * m.center.w, vpos.zw );
+    var vpos = u.view * vec4<f32>( center.xyz, 1.0 );
+    vpos = vec4<f32>( vpos.xy + c * center.w, vpos.zw );
     var out : VOut;
     out.clip = u.proj * vpos;
     out.uv = c;
+    out.col = m.data[ ii * 2u + 1u ];
     return out;
 }
 
@@ -564,7 +566,7 @@ fn vs( @builtin(vertex_index) vi : u32 ) -> VOut {
 fn fs( in : VOut ) -> @location(0) vec4<f32> {
     let d = length( in.uv );
     let ring = smoothstep( 0.045, 0.012, abs( d - 0.9 ) );
-    return vec4<f32>( m.color.rgb * ring * m.color.a, 1.0 );
+    return vec4<f32>( in.col.rgb * ring * in.col.a, 1.0 );
 }
 `;
 
@@ -774,7 +776,7 @@ async function main() {
         },
         primitive: { topology: "triangle-list" }
     } );
-    const markerBuf = device.createBuffer( { size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST } );
+    const markerBuf = device.createBuffer( { size: 320, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST } );
     const markerBind = device.createBindGroup( {
         layout: markerPipeline.getBindGroupLayout( 0 ),
         entries: [
@@ -883,11 +885,15 @@ async function main() {
         cam.yaw = Math.atan2( dx / l, -dz / l );
     }
 
-    const clabelEl = document.getElementById( "clabel" );
+    const clabels = CLUSTERS.map( function( cl ) {
+        const el = document.createElement( "div" );
+        el.className = "clabel hidden";
+        document.getElementById( "clabels" ).appendChild( el );
+        return el;
+    } );
     function navigate( val ) {
         selConst = -1;
         selCluster = -1;
-        clabelEl.classList.add( "hidden" );
         const kind = val.slice( 0, 2 );
         const i = Number( val.slice( 2 ) );
         if ( val === "v:overview" ) {
@@ -933,12 +939,12 @@ async function main() {
         navEl.blur();
     } );
 
-    let overlays = true;
+    let overlays = false;
     const ovlBtn = document.getElementById( "ovl" );
+    ovlBtn.classList.add( "off" );
     function toggleOverlays() {
         overlays = !overlays;
         ovlBtn.classList.toggle( "off", !overlays );
-        if ( !overlays ) { clabelEl.classList.add( "hidden" ); }
     }
     ovlBtn.addEventListener( "click", toggleOverlays );
 
@@ -1141,12 +1147,13 @@ async function main() {
         pass.draw( 6, starCount );
 
         const distSol = Math.hypot( cam.pos[ 0 ], cam.pos[ 1 ], cam.pos[ 2 ] );
-        const lineFade = Math.min( Math.max( 1 - distSol / 30, 0 ), 1 );
-        if ( overlays && ( lineFade > 0.01 || selConst >= 0 ) ) {
+        const lineFade = overlays ? 1 : Math.min( Math.max( 1 - distSol / 30, 0 ), 1 );
+        const dimAlpha = overlays ? 0.22 : 0.10 * lineFade;
+        if ( dimAlpha > 0.001 || selConst >= 0 ) {
             const lw = Math.max( canvas.width / canvas.clientWidth, 1 );
             pass.setPipeline( linePipeline );
-            if ( lineFade > 0.01 ) {
-                device.queue.writeBuffer( lineDimBuf, 0, new Float32Array( [ 1, 0.69, 0, 0.10 * lineFade, 2.5 * lw, 0, 0, 0 ] ) );
+            if ( dimAlpha > 0.001 ) {
+                device.queue.writeBuffer( lineDimBuf, 0, new Float32Array( [ 1, 0.69, 0, dimAlpha, 2.5 * lw, 0, 0, 0 ] ) );
                 pass.setBindGroup( 0, lineDimBind );
                 pass.draw( 6, totalSegs );
             }
@@ -1157,16 +1164,24 @@ async function main() {
             }
         }
 
-        if ( overlays && selCluster >= 0 ) {
-            const cl = CLUSTERS[ selCluster ];
-            const mU = new Float32Array( 8 );
-            mU.set( cl.center, 0 );
-            mU[ 3 ] = cl.radius;
-            mU[ 4 ] = 1; mU[ 5 ] = 0.69; mU[ 6 ] = 0; mU[ 7 ] = 0.55;
-            device.queue.writeBuffer( markerBuf, 0, mU );
-            pass.setPipeline( markerPipeline );
-            pass.setBindGroup( 0, markerBind );
-            pass.draw( 6 );
+        let mcount = 0;
+        {
+            const mU = new Float32Array( 80 );
+            CLUSTERS.forEach( function( cl, i ) {
+                if ( !overlays && i !== selCluster ) { return; }
+                const b = mcount * 8;
+                mU.set( cl.center, b );
+                mU[ b + 3 ] = cl.radius;
+                mU[ b + 4 ] = 1; mU[ b + 5 ] = 0.69; mU[ b + 6 ] = 0;
+                mU[ b + 7 ] = i === selCluster ? 0.55 : 0.28;
+                mcount++;
+            } );
+            if ( mcount > 0 ) {
+                device.queue.writeBuffer( markerBuf, 0, mU );
+                pass.setPipeline( markerPipeline );
+                pass.setBindGroup( 0, markerBind );
+                pass.draw( 6, mcount );
+            }
         }
 
         scanT -= dt;
@@ -1218,8 +1233,12 @@ async function main() {
             saveShot();
         }
 
-        if ( overlays && selCluster >= 0 ) {
-            const cl = CLUSTERS[ selCluster ];
+        CLUSTERS.forEach( function( cl, i ) {
+            const el = clabels[ i ];
+            if ( !overlays && i !== selCluster ) {
+                el.classList.add( "hidden" );
+                return;
+            }
             const c = cl.center;
             const m4 = v.m;
             const cvx = m4[ 0 ] * c[ 0 ] + m4[ 4 ] * c[ 1 ] + m4[ 8 ] * c[ 2 ] + m4[ 12 ];
@@ -1230,14 +1249,14 @@ async function main() {
                 const cny = projArr[ 5 ] * cvy / -cvz;
                 const cw = canvas.clientWidth, ch = canvas.clientHeight;
                 const cd = Math.hypot( c[ 0 ] - cam.pos[ 0 ], c[ 1 ] - cam.pos[ 1 ], c[ 2 ] - cam.pos[ 2 ] );
-                clabelEl.textContent = cl.name + " · " + fmtNum( cd ) + " PC";
-                clabelEl.style.left = ( cnx * 0.5 + 0.5 ) * cw + "px";
-                clabelEl.style.top = ( 1 - ( cny * 0.5 + 0.5 ) ) * ch + "px";
-                clabelEl.classList.remove( "hidden" );
+                el.textContent = cl.name + " · " + fmtNum( cd ) + " PC";
+                el.style.left = ( cnx * 0.5 + 0.5 ) * cw + "px";
+                el.style.top = ( 1 - ( cny * 0.5 + 0.5 ) ) * ch + "px";
+                el.classList.remove( "hidden" );
             } else {
-                clabelEl.classList.add( "hidden" );
+                el.classList.add( "hidden" );
             }
-        }
+        } );
 
         hudT -= dt;
         if ( hudT <= 0 ) {
