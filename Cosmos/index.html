@@ -784,16 +784,16 @@ async function main() {
         return [ d * Math.cos( dec ) * Math.cos( ra ), d * Math.cos( dec ) * Math.sin( ra ), d * Math.sin( dec ) ];
     }
     const CLUSTERS = [
-        [ "Hyades", 4.47, 15.87, 47, 5.5 ],
-        [ "Pleiades", 3.79, 24.12, 136, 4.5 ],
-        [ "Beehive (M44)", 8.67, 19.67, 187, 4.5 ],
-        [ "Coma Star Cluster", 12.38, 25.85, 86, 3.5 ],
-        [ "Alpha Persei", 3.43, 48.62, 172, 5.5 ],
-        [ "Southern Pleiades", 10.72, -64.4, 147, 3.5 ],
-        [ "Omicron Velorum", 8.67, -53.05, 148, 2.5 ],
-        [ "NGC 2451", 7.75, -37.97, 189, 3.5 ],
-        [ "Ursa Major Group", 12.0, 56.0, 25, 7 ],
-        [ "M39", 21.53, 48.43, 311, 4 ]
+        [ "Hyades", 4.47, 15.87, 47, 9 ],
+        [ "Pleiades", 3.79, 24.12, 136, 9 ],
+        [ "Beehive (M44)", 8.67, 19.67, 187, 10 ],
+        [ "Coma Star Cluster", 12.38, 25.85, 86, 7 ],
+        [ "Alpha Persei", 3.43, 48.62, 172, 11 ],
+        [ "Southern Pleiades", 10.72, -64.4, 147, 8 ],
+        [ "Omicron Velorum", 8.67, -53.05, 148, 8 ],
+        [ "NGC 2451", 7.75, -37.97, 189, 10 ],
+        [ "Ursa Major Group", 12.0, 56.0, 25, 8 ],
+        [ "M39", 21.53, 48.43, 311, 10 ]
     ].map( function( c ) {
         return { name: c[ 0 ], center: clusterXyz( c[ 1 ], c[ 2 ], c[ 3 ] ), radius: c[ 4 ] };
     } );
@@ -901,7 +901,7 @@ async function main() {
             const cl = CLUSTERS[ i ];
             const c = cl.center;
             const l = Math.hypot( c[ 0 ], c[ 1 ], c[ 2 ] );
-            const back = 1 - cl.radius * 5 / l;
+            const back = 1 - cl.radius * 3 / l;
             cam.pos = [ c[ 0 ] * back, c[ 1 ] * back, c[ 2 ] * back ];
             aimDir( c[ 0 ], c[ 1 ], c[ 2 ] );
         }
