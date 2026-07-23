@@ -213,7 +213,6 @@ struct VOut {
     @location(0) uv : vec2<f32>,
     @location(1) color : vec3<f32>,
     @location(2) intensity : f32,
-    @location(3) flare : f32,
 };
 
 fn temp_to_rgb( t : f32 ) -> vec3<f32> {
@@ -254,12 +253,10 @@ fn vs( @builtin(vertex_index) vi : u32, @builtin(instance_index) ii : u32 ) -> V
     let appmag = absmag + 5.0 * log( dist * 0.1 ) * 0.4342945;
     let bright = pow( 10.0, ( 4.0 - appmag ) * 0.2 ) * u.misc.z;
 
-    let flare = smoothstep( 4.0, 28.0, bright ) + clamp( 0.08 / dist, 0.0, 2.0 );
-    let pxc = clamp( 6.0 * pow( max( bright, 0.0001 ), 0.35 ) * u.misc.y / 1200.0 * ( 1.0 + flare * 0.6 ), 2.2, 900.0 );
+    let pxc = clamp( 6.0 * pow( max( bright, 0.0001 ), 0.35 ) * u.misc.y / 1200.0, 2.2, 420.0 );
 
     var out : VOut;
     out.intensity = clamp( bright, 0.0, 60.0 );
-    out.flare = flare;
     let bv = clamp( 0.92 * ci, -0.35, 5.0 );
     let t = 4600.0 * ( 1.0 / ( bv + 1.7 ) + 1.0 / ( bv + 0.62 ) );
     var col = temp_to_rgb( t );
@@ -277,24 +274,111 @@ fn vs( @builtin(vertex_index) vi : u32, @builtin(instance_index) ii : u32 ) -> V
 @fragment
 fn fs( in : VOut ) -> @location(0) vec4<f32> {
     let r = length( in.uv );
-    let core = exp( -r * r * 30.0 );
-    let fl = min( in.flare, 2.5 );
-    let halo = ( 0.22 + 0.45 * fl ) * exp( -r * ( 3.5 - min( fl, 2.0 ) ) );
-    var c = in.color * in.intensity * ( core + halo );
-    let fw = smoothstep( 0.5, 2.0, in.flare );
-    if ( fw > 0.0 ) {
-        let ax = abs( in.uv.x );
-        let ay = abs( in.uv.y );
-        let spikes = exp( -ay * 55.0 ) * exp( -ax * 2.6 ) + exp( -ax * 55.0 ) * exp( -ay * 2.6 );
-        let streak = exp( -ay * 80.0 ) * exp( -ax * 1.1 );
-        let fcol = mix( in.color, vec3<f32>( 1.0 ), 0.45 );
-        c += fcol * in.intensity * fw * ( spikes * 0.30 + streak * 0.22 );
-    }
-    c *= smoothstep( 1.0, 0.7, max( abs( in.uv.x ), abs( in.uv.y ) ) );
+    if ( r > 1.0 ) { discard; }
+    let core = exp( -r * r * 30.0 ) * in.intensity;
+    let halo = 0.3 * exp( -r * 3.5 ) * min( in.intensity, 8.0 );
+    var c = in.color * ( core + halo );
     c = vec3<f32>( 1.0 ) - exp( -c );
     return vec4<f32>( c, 1.0 );
 }
 `;
+
+const FLARE_WGSL = `
+struct H {
+    a : vec4<f32>,
+    color : vec4<f32>,
+};
+@group(0) @binding(0) var<uniform> h : H;
+
+const PARAMS = array<vec4<f32>, 8>(
+    vec4<f32>( 0.0, 0.55, 0.55, 0.0 ),
+    vec4<f32>( 0.0, 1.9, 0.05, 1.0 ),
+    vec4<f32>( 0.45, 0.05, 0.05, 2.0 ),
+    vec4<f32>( 0.75, 0.11, 0.11, 2.0 ),
+    vec4<f32>( 1.05, 0.045, 0.045, 0.0 ),
+    vec4<f32>( 1.35, 0.17, 0.17, 3.0 ),
+    vec4<f32>( 1.65, 0.08, 0.08, 2.0 ),
+    vec4<f32>( 1.95, 0.28, 0.28, 3.0 )
+);
+const COLORS = array<vec4<f32>, 8>(
+    vec4<f32>( 1.0, 1.0, 1.0, 1.1 ),
+    vec4<f32>( 0.5, 0.65, 1.0, 0.9 ),
+    vec4<f32>( 0.55, 0.75, 1.0, 0.3 ),
+    vec4<f32>( 1.0, 0.62, 0.4, 0.22 ),
+    vec4<f32>( 1.0, 1.0, 1.0, 0.25 ),
+    vec4<f32>( 0.6, 0.85, 1.0, 0.28 ),
+    vec4<f32>( 0.85, 0.55, 1.0, 0.22 ),
+    vec4<f32>( 1.0, 0.75, 0.5, 0.18 )
+);
+
+struct VOut {
+    @builtin(position) clip : vec4<f32>,
+    @location(0) uv : vec2<f32>,
+    @location(1) color : vec4<f32>,
+    @location(2) ty : f32,
+};
+
+@vertex
+fn vs( @builtin(vertex_index) vi : u32, @builtin(instance_index) ii : u32 ) -> VOut {
+    var corners = array<vec2<f32>, 6>(
+        vec2<f32>( -1.0, -1.0 ), vec2<f32>( 1.0, -1.0 ), vec2<f32>( 1.0, 1.0 ),
+        vec2<f32>( -1.0, -1.0 ), vec2<f32>( 1.0, 1.0 ), vec2<f32>( -1.0, 1.0 )
+    );
+    var params = PARAMS;
+    var colors = COLORS;
+    let e = params[ ii ];
+    let col = colors[ ii ];
+    let strength = h.a.w;
+    let scale = mix( 0.5, 1.25, min( strength, 1.0 ) );
+    let center = h.a.xy * ( 1.0 - e.x );
+    let c = corners[ vi ];
+    let off = vec2<f32>( c.x * e.y * scale / h.a.z, c.y * e.z * scale );
+
+    var out : VOut;
+    out.clip = vec4<f32>( center + off, 0.0, 1.0 );
+    out.uv = c;
+    var rgb = col.rgb;
+    if ( ii == 0u ) { rgb = h.color.rgb; }
+    out.color = vec4<f32>( rgb, col.a * min( strength, 1.5 ) );
+    out.ty = e.w;
+    return out;
+}
+
+@fragment
+fn fs( in : VOut ) -> @location(0) vec4<f32> {
+    let r = length( in.uv );
+    var f = 0.0;
+    if ( in.ty < 0.5 ) {
+        f = pow( max( 1.0 - r, 0.0 ), 2.4 ) * 1.4 + exp( -r * 8.0 ) * 0.6;
+    } else if ( in.ty < 1.5 ) {
+        f = exp( -abs( in.uv.y ) * 5.0 ) * pow( max( 1.0 - abs( in.uv.x ), 0.0 ), 1.6 );
+    } else if ( in.ty < 2.5 ) {
+        f = smoothstep( 1.0, 0.7, r ) * 0.7;
+    } else {
+        f = smoothstep( 0.12, 0.02, abs( r - 0.72 ) ) * 0.6;
+    }
+    return vec4<f32>( in.color.rgb * f * in.color.a, 1.0 );
+}
+`;
+
+function tempToRgb( t ) {
+    const k = Math.min( Math.max( t, 1000 ), 40000 ) / 100;
+    let r, g, b;
+    if ( k <= 66 ) {
+        r = 1;
+        g = Math.min( Math.max( 0.3900816 * Math.log( k ) - 0.6318414, 0 ), 1 );
+    } else {
+        r = Math.min( Math.max( 1.2929362 * Math.pow( k - 60, -0.1332047 ), 0 ), 1 );
+        g = Math.min( Math.max( 1.1298909 * Math.pow( k - 60, -0.0755148 ), 0 ), 1 );
+    }
+    if ( k >= 66 ) { b = 1; }
+    else if ( k <= 19 ) { b = 0; }
+    else { b = Math.min( Math.max( 0.5432068 * Math.log( k - 10 ) - 1.1962541, 0 ), 1 ); }
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    return [ r, g, b ].map( function( v ) {
+        return Math.min( Math.max( luma + ( v - luma ) * 2.2, 0 ), 1 );
+    } );
+}
 
 function decodeStars( b64 ) {
     const raw = atob( b64 );
@@ -384,6 +468,43 @@ async function main() {
             { binding: 1, resource: { buffer: starBuf } }
         ]
     } );
+
+    const flareModule = device.createShaderModule( { code: FLARE_WGSL } );
+    const flarePipeline = device.createRenderPipeline( {
+        layout: "auto",
+        vertex: { module: flareModule, entryPoint: "vs" },
+        fragment: {
+            module: flareModule,
+            entryPoint: "fs",
+            targets: [ {
+                format: format,
+                blend: {
+                    color: { srcFactor: "one", dstFactor: "one", operation: "add" },
+                    alpha: { srcFactor: "one", dstFactor: "one", operation: "add" }
+                }
+            } ]
+        },
+        primitive: { topology: "triangle-list" }
+    } );
+    const flareBuf = device.createBuffer( {
+        size: 32,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    } );
+    const flareBind = device.createBindGroup( {
+        layout: flarePipeline.getBindGroupLayout( 0 ),
+        entries: [ { binding: 0, resource: { buffer: flareBuf } } ]
+    } );
+
+    const lumfac2 = new Float32Array( starCount );
+    const absmags = new Float32Array( starCount );
+    const cis = new Float32Array( starCount );
+    for ( let i = 0; i < starCount; i++ ) {
+        const w = f32[ i * 4 + 3 ];
+        const amq = Math.floor( w / 256 );
+        absmags[ i ] = amq / 255 * 37 - 17;
+        cis[ i ] = ( w - amq * 256 ) / 255 * 6 - 0.5;
+        lumfac2[ i ] = Math.pow( 10, absmags[ i ] * 0.4 );
+    }
 
     const cam = { pos: [ 0.6, 0.25, 1.1 ], yaw: -0.5, pitch: -0.2 };
     const keys = {};
@@ -508,8 +629,24 @@ async function main() {
     }
 
     const uni = new Float32Array( 36 );
+    const flareU = new Float32Array( 8 );
     let last = performance.now();
     let hudT = 0;
+    let heroIdx = -1;
+    let heroT = 0;
+
+    function scanHero() {
+        let best = -1, bs = Infinity;
+        for ( let i = 0; i < starCount; i++ ) {
+            const o = i * 4;
+            const dx = f32[ o ] - cam.pos[ 0 ];
+            const dy = f32[ o + 1 ] - cam.pos[ 1 ];
+            const dz = f32[ o + 2 ] - cam.pos[ 2 ];
+            const s = ( dx * dx + dy * dy + dz * dz ) * lumfac2[ i ];
+            if ( s < bs ) { bs = s; best = i; }
+        }
+        heroIdx = best;
+    }
 
     function frame( now ) {
         const dt = Math.min( ( now - last ) / 1000, 0.1 );
@@ -532,8 +669,9 @@ async function main() {
         }
 
         const aspect = canvas.width / canvas.height;
+        const projArr = perspective( 1.15, aspect, 0.001, 300000 );
         uni.set( v.m, 0 );
-        uni.set( perspective( 1.15, aspect, 0.001, 300000 ), 16 );
+        uni.set( projArr, 16 );
         uni[ 32 ] = canvas.width;
         uni[ 33 ] = canvas.height;
         uni[ 34 ] = exposure;
@@ -551,6 +689,36 @@ async function main() {
         pass.setPipeline( pipeline );
         pass.setBindGroup( 0, bindGroup );
         pass.draw( 6, starCount );
+
+        heroT -= dt;
+        if ( heroT <= 0 ) { heroT = 0.1; scanHero(); }
+        if ( heroIdx >= 0 ) {
+            const o = heroIdx * 4;
+            const x = f32[ o ], y = f32[ o + 1 ], z = f32[ o + 2 ];
+            const m4 = v.m;
+            const vx = m4[ 0 ] * x + m4[ 4 ] * y + m4[ 8 ] * z + m4[ 12 ];
+            const vy = m4[ 1 ] * x + m4[ 5 ] * y + m4[ 9 ] * z + m4[ 13 ];
+            const vz = m4[ 2 ] * x + m4[ 6 ] * y + m4[ 10 ] * z + m4[ 14 ];
+            if ( vz < 0 ) {
+                const d = Math.max( Math.hypot( vx, vy, vz ), 1e-5 );
+                const appmag = absmags[ heroIdx ] + 5 * Math.log10( d / 10 );
+                const bright = Math.pow( 10, ( 4 - appmag ) * 0.2 ) * exposure;
+                const nx = projArr[ 0 ] * vx / -vz;
+                const ny = projArr[ 5 ] * vy / -vz;
+                const edge = Math.min( Math.max( 1.6 - Math.max( Math.abs( nx ), Math.abs( ny ) ), 0 ), 1 );
+                const strength = Math.min( Math.max( ( bright - 2.5 ) / 8, 0 ), 1.6 ) * edge;
+                if ( strength > 0.02 ) {
+                    const bv = Math.min( Math.max( 0.92 * cis[ heroIdx ], -0.35 ), 5 );
+                    const col = tempToRgb( 4600 * ( 1 / ( bv + 1.7 ) + 1 / ( bv + 0.62 ) ) );
+                    flareU[ 0 ] = nx; flareU[ 1 ] = ny; flareU[ 2 ] = aspect; flareU[ 3 ] = strength;
+                    flareU[ 4 ] = col[ 0 ]; flareU[ 5 ] = col[ 1 ]; flareU[ 6 ] = col[ 2 ]; flareU[ 7 ] = 1;
+                    device.queue.writeBuffer( flareBuf, 0, flareU );
+                    pass.setPipeline( flarePipeline );
+                    pass.setBindGroup( 0, flareBind );
+                    pass.draw( 6, 8 );
+                }
+            }
+        }
         pass.end();
         device.queue.submit( [ enc.finish() ] );
 
