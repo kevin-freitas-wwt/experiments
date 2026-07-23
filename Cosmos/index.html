@@ -270,7 +270,7 @@
         <button id="shot" type="button">SNAPSHOT</button>
         <div id="keys">
             FWD<b>E</b> BACK<b>D</b> LEFT<b>S</b> RIGHT<b>F</b> UP<b>SPACE</b> DOWN<b>C</b><br>
-            BOOST<b>SHIFT</b> OVERVIEW<b>O</b> SNAP<b>P</b> TYPE<b>1&ndash;7</b> LOOK<b>MOUSE</b> SPEED<b>WHEEL</b>
+            BOOST<b>SHIFT</b> OVERVIEW<b>O</b> SNAP<b>P</b> TYPE<b>1&ndash;7</b> LOOK<b>MOUSE</b>
         </div>
     </div>
     <div id="cross"></div>
@@ -826,19 +826,18 @@ async function main() {
     updateCount();
 
     const cam = { pos: [ 0.6, 0.25, 1.1 ], yaw: -0.5, pitch: -0.2 };
-    let baseSpeed = 2.0;
+    const baseSpeed = 15;
     {
         const hp = location.hash.slice( 1 ).split( "," ).map( Number );
         if ( hp.length >= 5 && hp.every( isFinite ) ) {
             cam.pos = [ hp[ 0 ], hp[ 1 ], hp[ 2 ] ];
             cam.yaw = hp[ 3 ];
             cam.pitch = hp[ 4 ];
-            if ( hp.length >= 6 && hp[ 5 ] > 0 ) { baseSpeed = hp[ 5 ]; }
         }
     }
     let lastHash = "";
     function saveHash() {
-        const h = [ cam.pos[ 0 ], cam.pos[ 1 ], cam.pos[ 2 ], cam.yaw, cam.pitch, baseSpeed ]
+        const h = [ cam.pos[ 0 ], cam.pos[ 1 ], cam.pos[ 2 ], cam.yaw, cam.pitch ]
             .map( function( n ) { return +n.toPrecision( 6 ); } ).join( "," );
         if ( h === lastHash ) { return; }
         lastHash = h;
@@ -866,17 +865,14 @@ async function main() {
         if ( val === "v:overview" ) {
             cam.pos = [ overviewR * 0.5, overviewR * 0.6, overviewR * 1.0 ];
             aimDir( -cam.pos[ 0 ], -cam.pos[ 1 ], -cam.pos[ 2 ] );
-            baseSpeed = overviewR * 0.15;
         } else if ( val === "v:sol" ) {
             cam.pos = [ 0.6, 0.25, 1.1 ];
             aimDir( -0.6, -0.25, -1.1 );
-            baseSpeed = 2;
         } else if ( kind === "c:" ) {
             selConst = i;
             cam.pos = [ 0.12, 0.06, 0.12 ];
             const d = constDirs[ i ];
             aimDir( d[ 0 ], d[ 1 ], d[ 2 ] );
-            baseSpeed = 2;
         } else if ( kind === "k:" ) {
             selCluster = i;
             const cl = CLUSTERS[ i ];
@@ -885,7 +881,6 @@ async function main() {
             const back = 1 - cl.radius * 5 / l;
             cam.pos = [ c[ 0 ] * back, c[ 1 ] * back, c[ 2 ] * back ];
             aimDir( c[ 0 ], c[ 1 ], c[ 2 ] );
-            baseSpeed = cl.radius;
         }
     }
 
@@ -950,11 +945,6 @@ async function main() {
     document.addEventListener( "keyup", function( e ) {
         keys[ e.code ] = false;
     } );
-    document.addEventListener( "wheel", function( e ) {
-        baseSpeed *= e.deltaY < 0 ? 1.18 : 1 / 1.18;
-        baseSpeed = Math.max( 0.01, Math.min( 50000, baseSpeed ) );
-    } );
-
     function resize() {
         const dpr = Math.min( window.devicePixelRatio || 1, 2 );
         canvas.width = Math.max( 1, Math.floor( canvas.clientWidth * dpr ) );
@@ -1061,7 +1051,7 @@ async function main() {
         last = now;
 
         const v = viewMatrix( cam.pos, cam.yaw, cam.pitch );
-        const speed = baseSpeed * ( keys[ "ShiftLeft" ] || keys[ "ShiftRight" ] ? 14 : 1 );
+        const speed = baseSpeed * ( keys[ "ShiftLeft" ] || keys[ "ShiftRight" ] ? 10 : 1 );
         const mv = [ 0, 0, 0 ];
         if ( keys[ "KeyE" ] ) { mv[ 0 ] += v.fwd[ 0 ]; mv[ 1 ] += v.fwd[ 1 ]; mv[ 2 ] += v.fwd[ 2 ]; }
         if ( keys[ "KeyD" ] ) { mv[ 0 ] -= v.fwd[ 0 ]; mv[ 1 ] -= v.fwd[ 1 ]; mv[ 2 ] -= v.fwd[ 2 ]; }
