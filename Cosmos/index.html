@@ -135,7 +135,11 @@
     body.clean .hud {
         display: none;
     }
-    #ovr, #shot, #full {
+    #ovl.off {
+        border-color: rgba(255, 176, 0, 0.2);
+        color: rgba(255, 176, 0, 0.35);
+    }
+    #ovr, #shot, #full, #ovl {
         background: rgba(10, 7, 0, 0.55);
         border: 1px solid rgba(255, 176, 0, 0.6);
         color: #ffb000;
@@ -146,7 +150,7 @@
         pointer-events: auto;
         text-transform: uppercase;
     }
-    #ovr:hover, #shot:hover, #full:hover {
+    #ovr:hover, #shot:hover, #full:hover, #ovl:hover {
         background: #ffb000;
         color: #000;
     }
@@ -270,11 +274,12 @@
                 <optgroup label="Clusters" id="og-clu"></optgroup>
             </select>
         </div>
+        <button id="ovl" type="button">OVERLAYS</button>
         <button id="shot" type="button">SNAPSHOT</button>
         <button id="full" type="button">FULLSCREEN</button>
         <div id="keys">
             FWD<b>E</b> BACK<b>D</b> LEFT<b>S</b> RIGHT<b>F</b> UP<b>SPACE</b> DOWN<b>C</b><br>
-            BOOST<b>SHIFT</b> OVERVIEW<b>O</b> SNAP<b>P</b> FULL<b>V</b> TYPE<b>1&ndash;7</b> LOOK<b>MOUSE</b>
+            BOOST<b>SHIFT</b> OVERVIEW<b>O</b> OVERLAYS<b>L</b> SNAP<b>P</b> FULL<b>V</b> TYPE<b>1&ndash;7</b> LOOK<b>MOUSE</b>
         </div>
     </div>
     <div id="cross"></div>
@@ -928,6 +933,15 @@ async function main() {
         navEl.blur();
     } );
 
+    let overlays = true;
+    const ovlBtn = document.getElementById( "ovl" );
+    function toggleOverlays() {
+        overlays = !overlays;
+        ovlBtn.classList.toggle( "off", !overlays );
+        if ( !overlays ) { clabelEl.classList.add( "hidden" ); }
+    }
+    ovlBtn.addEventListener( "click", toggleOverlays );
+
     function toggleFull() {
         if ( !document.fullscreenElement ) {
             ( document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen ).call( document.documentElement );
@@ -976,6 +990,7 @@ async function main() {
         if ( e.code === "KeyO" ) { navigate( "v:overview" ); }
         if ( e.code === "KeyP" ) { shotReq = true; }
         if ( e.code === "KeyV" ) { toggleFull(); }
+        if ( e.code === "KeyL" ) { toggleOverlays(); }
         if ( e.code >= "Digit1" && e.code <= "Digit7" ) { toggleClass( Number( e.code.slice( 5 ) ) - 1 ); }
     } );
     document.addEventListener( "keyup", function( e ) {
@@ -1127,20 +1142,22 @@ async function main() {
 
         const distSol = Math.hypot( cam.pos[ 0 ], cam.pos[ 1 ], cam.pos[ 2 ] );
         const lineFade = Math.min( Math.max( 1 - distSol / 30, 0 ), 1 );
-        if ( lineFade > 0.01 ) {
+        if ( overlays && ( lineFade > 0.01 || selConst >= 0 ) ) {
             const lw = Math.max( canvas.width / canvas.clientWidth, 1 );
-            device.queue.writeBuffer( lineDimBuf, 0, new Float32Array( [ 1, 0.69, 0, 0.10 * lineFade, 2.5 * lw, 0, 0, 0 ] ) );
             pass.setPipeline( linePipeline );
-            pass.setBindGroup( 0, lineDimBind );
-            pass.draw( 6, totalSegs );
+            if ( lineFade > 0.01 ) {
+                device.queue.writeBuffer( lineDimBuf, 0, new Float32Array( [ 1, 0.69, 0, 0.10 * lineFade, 2.5 * lw, 0, 0, 0 ] ) );
+                pass.setBindGroup( 0, lineDimBind );
+                pass.draw( 6, totalSegs );
+            }
             if ( selConst >= 0 ) {
-                device.queue.writeBuffer( lineHiBuf, 0, new Float32Array( [ 1, 0.85, 0.35, 0.6 * lineFade, 4 * lw, 0, 0, 0 ] ) );
+                device.queue.writeBuffer( lineHiBuf, 0, new Float32Array( [ 1, 0.85, 0.35, 0.6, 4 * lw, 0, 0, 0 ] ) );
                 pass.setBindGroup( 0, lineHiBind );
                 pass.draw( 6, lineOffsets[ selConst ][ 1 ], 0, lineOffsets[ selConst ][ 0 ] );
             }
         }
 
-        if ( selCluster >= 0 ) {
+        if ( overlays && selCluster >= 0 ) {
             const cl = CLUSTERS[ selCluster ];
             const mU = new Float32Array( 8 );
             mU.set( cl.center, 0 );
@@ -1201,7 +1218,7 @@ async function main() {
             saveShot();
         }
 
-        if ( selCluster >= 0 ) {
+        if ( overlays && selCluster >= 0 ) {
             const cl = CLUSTERS[ selCluster ];
             const c = cl.center;
             const m4 = v.m;
