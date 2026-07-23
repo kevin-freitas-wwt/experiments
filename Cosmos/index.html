@@ -132,7 +132,10 @@
         transform: translateX(-50%);
         white-space: nowrap;
     }
-    #ovr, #shot {
+    body.clean .hud {
+        display: none;
+    }
+    #ovr, #shot, #full {
         background: rgba(10, 7, 0, 0.55);
         border: 1px solid rgba(255, 176, 0, 0.6);
         color: #ffb000;
@@ -143,7 +146,7 @@
         pointer-events: auto;
         text-transform: uppercase;
     }
-    #ovr:hover, #shot:hover {
+    #ovr:hover, #shot:hover, #full:hover {
         background: #ffb000;
         color: #000;
     }
@@ -268,9 +271,10 @@
             </select>
         </div>
         <button id="shot" type="button">SNAPSHOT</button>
+        <button id="full" type="button">FULLSCREEN</button>
         <div id="keys">
             FWD<b>E</b> BACK<b>D</b> LEFT<b>S</b> RIGHT<b>F</b> UP<b>SPACE</b> DOWN<b>C</b><br>
-            BOOST<b>SHIFT</b> OVERVIEW<b>O</b> SNAP<b>P</b> TYPE<b>1&ndash;7</b> LOOK<b>MOUSE</b>
+            BOOST<b>SHIFT</b> OVERVIEW<b>O</b> SNAP<b>P</b> FULL<b>V</b> TYPE<b>1&ndash;7</b> LOOK<b>MOUSE</b>
         </div>
     </div>
     <div id="cross"></div>
@@ -905,6 +909,18 @@ async function main() {
         navEl.blur();
     } );
 
+    function toggleFull() {
+        if ( !document.fullscreenElement ) {
+            ( document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen ).call( document.documentElement );
+        } else {
+            document.exitFullscreen();
+        }
+    }
+    document.getElementById( "full" ).addEventListener( "click", toggleFull );
+    document.addEventListener( "fullscreenchange", function() {
+        document.body.classList.toggle( "clean", !!document.fullscreenElement );
+    } );
+
     let shotReq = false;
     document.getElementById( "shot" ).addEventListener( "click", function() {
         shotReq = true;
@@ -940,6 +956,7 @@ async function main() {
         if ( e.code === "Space" ) { e.preventDefault(); }
         if ( e.code === "KeyO" ) { navigate( "v:overview" ); }
         if ( e.code === "KeyP" ) { shotReq = true; }
+        if ( e.code === "KeyV" ) { toggleFull(); }
         if ( e.code >= "Digit1" && e.code <= "Digit7" ) { toggleClass( Number( e.code.slice( 5 ) ) - 1 ); }
     } );
     document.addEventListener( "keyup", function( e ) {
