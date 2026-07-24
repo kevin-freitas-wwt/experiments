@@ -1360,6 +1360,7 @@ async function main() {
     let last = performance.now();
     let hudT = 0;
     let scanT = 0;
+    let flareDim = 1;
 
     function smooth01( x ) {
         const t = Math.min( Math.max( x, 0 ), 1 );
@@ -1551,6 +1552,13 @@ async function main() {
 
         scanT -= dt;
         if ( scanT <= 0 ) { scanT = 0.1; scanFlares(); }
+        let dimTarget = 1;
+        if ( activeSys ) {
+            const c = activeSys.center;
+            const dc = Math.hypot( cam.pos[ 0 ] - c[ 0 ], cam.pos[ 1 ] - c[ 1 ], cam.pos[ 2 ] - c[ 2 ] );
+            if ( dc < activeSys.amax * 1.5 ) { dimTarget = 0.1; }
+        }
+        flareDim += ( dimTarget - flareDim ) * Math.min( dt * 4, 1 );
         let fcount = 0;
         const m4 = v.m;
         for ( const slot of flareSlots ) {
@@ -1580,7 +1588,7 @@ async function main() {
             const bv = Math.min( Math.max( 0.92 * cis[ slot.idx ], -0.35 ), 5 );
             const col = tempToRgb( 4600 * ( 1 / ( bv + 1.7 ) + 1 / ( bv + 0.62 ) ) );
             const b = 4 + fcount * 8;
-            flareU[ b ] = nx; flareU[ b + 1 ] = ny; flareU[ b + 2 ] = slot.s; flareU[ b + 3 ] = 0;
+            flareU[ b ] = nx; flareU[ b + 1 ] = ny; flareU[ b + 2 ] = slot.s * flareDim; flareU[ b + 3 ] = 0;
             flareU[ b + 4 ] = col[ 0 ]; flareU[ b + 5 ] = col[ 1 ]; flareU[ b + 6 ] = col[ 2 ]; flareU[ b + 7 ] = 1;
             fcount++;
         }
