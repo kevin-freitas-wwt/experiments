@@ -196,7 +196,7 @@
         letter-spacing: 0.2em;
         position: absolute;
         text-shadow: 0 0 5px #000;
-        transform: translate(-50%, -170%);
+        transform: translate(-50%, -100%);
         white-space: nowrap;
     }
     .clabel {
@@ -1590,7 +1590,7 @@ async function main() {
                 const dy = p[ 1 ] - cam.pos[ 1 ];
                 const dz = p[ 2 ] - cam.pos[ 2 ];
                 const d2 = dx * dx + dy * dy + dz * dz;
-                if ( d2 < 9 ) { near.push( [ d2, p, NAMES[ i ][ 1 ] ] ); }
+                if ( d2 < 9 ) { near.push( [ d2, p, NAMES[ i ][ 1 ], NAMES[ i ][ 0 ] ] ); }
             }
             near.sort( function( a, b ) { return a[ 0 ] - b[ 0 ]; } );
             slabels.forEach( function( el, i ) {
@@ -1604,9 +1604,21 @@ async function main() {
                 const svy = m4[ 1 ] * p[ 0 ] + m4[ 5 ] * p[ 1 ] + m4[ 9 ] * p[ 2 ] + m4[ 13 ];
                 const svz = m4[ 2 ] * p[ 0 ] + m4[ 6 ] * p[ 1 ] + m4[ 10 ] * p[ 2 ] + m4[ 14 ];
                 if ( svz < 0 ) {
+                    const idx = near[ i ][ 3 ];
+                    const d = Math.sqrt( near[ i ][ 0 ] );
+                    const appmag = absmags[ idx ] + 5 * Math.log10( Math.max( d, 1e-9 ) / 10 );
+                    const bright = Math.pow( 10, ( 4 - appmag ) * 0.2 ) * exposure;
+                    const ch = canvas.clientHeight;
+                    const spritePx = Math.min( Math.max( 6 * Math.pow( Math.max( bright, 1e-4 ), 0.35 ) * canvas.height / 1200, 2.2 ), 420 ) * ch / canvas.height;
+                    let fs = 0;
+                    for ( const slot of flareSlots ) {
+                        if ( slot.idx === idx ) { fs = Math.min( slot.s, 1 ); break; }
+                    }
+                    const glowPx = 0.124 * ( 0.35 + 0.95 * fs ) * ch * fs;
+                    const off = Math.max( spritePx * 0.75, glowPx ) + 10;
                     el.textContent = near[ i ][ 2 ];
                     el.style.left = ( projArr[ 0 ] * svx / -svz * 0.5 + 0.5 ) * canvas.clientWidth + "px";
-                    el.style.top = ( 1 - ( projArr[ 5 ] * svy / -svz * 0.5 + 0.5 ) ) * canvas.clientHeight + "px";
+                    el.style.top = ( 1 - ( projArr[ 5 ] * svy / -svz * 0.5 + 0.5 ) ) * ch - off + "px";
                     el.classList.remove( "hidden" );
                 } else {
                     el.classList.add( "hidden" );
