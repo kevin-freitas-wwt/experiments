@@ -501,8 +501,10 @@ fn vs( @builtin(vertex_index) vi : u32, @builtin(instance_index) ii : u32 ) -> V
         if ( sl > 1.0 ) {
             let along = svPx / sl;
             let perp2 = vec2<f32>( -along.y, along.x );
-            let stretch = warp * clamp( sl * 0.004, 0.0, 1.0 ) * 170.0;
-            offPx = perp2 * ( c.x * pxc ) + along * ( c.y * ( pxc + stretch ) );
+            let thin = pxc * ( 1.0 - warp * 0.7 );
+            let stretch = warp * clamp( sl * 0.004, 0.0, 1.0 ) * 140.0;
+            offPx = perp2 * ( c.x * thin ) + along * ( c.y * ( thin + stretch ) );
+            out.intensity = out.intensity * ( 1.0 - warp * 0.6 );
         }
     }
     clip = vec4<f32>( clip.xy + offPx * 2.0 / u.misc.xy * clip.w, clip.zw );
