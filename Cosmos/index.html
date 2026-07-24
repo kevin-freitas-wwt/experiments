@@ -879,10 +879,25 @@ async function main() {
     let selConst = -1;
     let selCluster = -1;
 
-    function aimDir( dx, dy, dz ) {
+    function dirAngles( dx, dy, dz ) {
         const l = Math.hypot( dx, dy, dz ) || 1;
-        cam.pitch = Math.asin( dy / l );
-        cam.yaw = Math.atan2( dx / l, -dz / l );
+        return [ Math.atan2( dx / l, -dz / l ), Math.asin( dy / l ) ];
+    }
+
+    let flight = null;
+    function startFlight( pos, angles ) {
+        let dy = angles[ 0 ] - cam.yaw;
+        dy = ( ( dy + Math.PI ) % ( 2 * Math.PI ) + 2 * Math.PI ) % ( 2 * Math.PI ) - Math.PI;
+        flight = {
+            t: 0,
+            dur: 4.5,
+            p0: cam.pos.slice(),
+            p1: pos,
+            yaw0: cam.yaw,
+            yaw1: cam.yaw + dy,
+            pitch0: cam.pitch,
+            pitch1: angles[ 1 ]
+        };
     }
 
     const clabels = CLUSTERS.map( function( cl ) {
@@ -897,24 +912,21 @@ async function main() {
         const kind = val.slice( 0, 2 );
         const i = Number( val.slice( 2 ) );
         if ( val === "v:overview" ) {
-            cam.pos = [ overviewR * 0.5, overviewR * 0.6, overviewR * 1.0 ];
-            aimDir( -cam.pos[ 0 ], -cam.pos[ 1 ], -cam.pos[ 2 ] );
+            const p = [ overviewR * 0.5, overviewR * 0.6, overviewR * 1.0 ];
+            startFlight( p, dirAngles( -p[ 0 ], -p[ 1 ], -p[ 2 ] ) );
         } else if ( val === "v:sol" ) {
-            cam.pos = [ 0.6, 0.25, 1.1 ];
-            aimDir( -0.6, -0.25, -1.1 );
+            startFlight( [ 0.6, 0.25, 1.1 ], dirAngles( -0.6, -0.25, -1.1 ) );
         } else if ( kind === "c:" ) {
             selConst = i;
-            cam.pos = [ 0.12, 0.06, 0.12 ];
             const d = constDirs[ i ];
-            aimDir( d[ 0 ], d[ 1 ], d[ 2 ] );
+            startFlight( [ 0.12, 0.06, 0.12 ], dirAngles( d[ 0 ], d[ 1 ], d[ 2 ] ) );
         } else if ( kind === "k:" ) {
             selCluster = i;
             const cl = CLUSTERS[ i ];
             const c = cl.center;
             const l = Math.hypot( c[ 0 ], c[ 1 ], c[ 2 ] );
             const back = 1 - cl.radius * 3 / l;
-            cam.pos = [ c[ 0 ] * back, c[ 1 ] * back, c[ 2 ] * back ];
-            aimDir( c[ 0 ], c[ 1 ], c[ 2 ] );
+            startFlight( [ c[ 0 ] * back, c[ 1 ] * back, c[ 2 ] * back ], dirAngles( c[ 0 ], c[ 1 ], c[ 2 ] ) );
         }
     }
 
@@ -986,6 +998,7 @@ async function main() {
     } );
     document.addEventListener( "mousemove", function( e ) {
         if ( !locked ) { return; }
+        flight = null;
         cam.yaw += e.movementX * 0.0022;
         cam.pitch -= e.movementY * 0.0022;
         cam.pitch = Math.max( -1.55, Math.min( 1.55, cam.pitch ) );
@@ -1107,6 +1120,18 @@ async function main() {
         const dt = Math.min( ( now - last ) / 1000, 0.1 );
         last = now;
 
+        if ( flight ) {
+            flight.t += dt;
+            const r = Math.min( flight.t / flight.dur, 1 );
+            const k = r * r * r * ( r * ( r * 6 - 15 ) + 10 );
+            for ( let a = 0; a < 3; a++ ) {
+                cam.pos[ a ] = flight.p0[ a ] + ( flight.p1[ a ] - flight.p0[ a ] ) * k;
+            }
+            cam.yaw = flight.yaw0 + ( flight.yaw1 - flight.yaw0 ) * k;
+            cam.pitch = flight.pitch0 + ( flight.pitch1 - flight.pitch0 ) * k;
+            if ( r >= 1 ) { flight = null; }
+        }
+
         const v = viewMatrix( cam.pos, cam.yaw, cam.pitch );
         const speed = baseSpeed * ( keys[ "ShiftLeft" ] || keys[ "ShiftRight" ] ? 10 : 1 );
         const mv = [ 0, 0, 0 ];
@@ -1118,6 +1143,7 @@ async function main() {
         if ( keys[ "KeyC" ] ) { mv[ 1 ] -= 1; }
         const ml = Math.hypot( mv[ 0 ], mv[ 1 ], mv[ 2 ] );
         if ( ml > 0 ) {
+            flight = null;
             cam.pos[ 0 ] += mv[ 0 ] / ml * speed * dt;
             cam.pos[ 1 ] += mv[ 1 ] / ml * speed * dt;
             cam.pos[ 2 ] += mv[ 2 ] / ml * speed * dt;
