@@ -684,38 +684,6 @@ fn fs( in : VOut ) -> @location(0) vec4<f32> {
 }
 `;
 
-const POST_WGSL = `
-@group(0) @binding(0) var samp : sampler;
-@group(0) @binding(1) var tex : texture_2d<f32>;
-
-struct VOut {
-    @builtin(position) clip : vec4<f32>,
-    @location(0) uv : vec2<f32>,
-};
-
-@vertex
-fn vs( @builtin(vertex_index) vi : u32 ) -> VOut {
-    var p = array<vec2<f32>, 3>(
-        vec2<f32>( -1.0, -1.0 ), vec2<f32>( 3.0, -1.0 ), vec2<f32>( -1.0, 3.0 )
-    );
-    let xy = p[ vi ];
-    var out : VOut;
-    out.clip = vec4<f32>( xy, 0.0, 1.0 );
-    out.uv = vec2<f32>( xy.x * 0.5 + 0.5, 1.0 - ( xy.y * 0.5 + 0.5 ) );
-    return out;
-}
-
-@fragment
-fn fs_blit( in : VOut ) -> @location(0) vec4<f32> {
-    return textureSample( tex, samp, in.uv );
-}
-
-@fragment
-fn fs_black( in : VOut ) -> @location(0) vec4<f32> {
-    return vec4<f32>( 0.0, 0.0, 0.0, 1.0 );
-}
-`;
-
 function tempToRgb( t ) {
     const k = Math.min( Math.max( t, 1000 ), 40000 ) / 100;
     let r, g, b;
@@ -1153,8 +1121,24 @@ async function main() {
         const dur = Math.min( Math.max( Math.abs( t - tYears ) / 400000 * 2, 0.4 ), 2.5 );
         timeAnim = { from: tYears, to: t, t: 0, dur: dur };
     }
+    let sliderDown = false, sliderMoved = false;
+    timeSlider.addEventListener( "pointerdown", function() {
+        sliderDown = true;
+        sliderMoved = false;
+    } );
+    timeSlider.addEventListener( "pointermove", function() {
+        if ( sliderDown ) { sliderMoved = true; }
+    } );
+    window.addEventListener( "pointerup", function() {
+        sliderDown = false;
+    } );
     timeSlider.addEventListener( "input", function() {
-        setTimeTarget( Number( timeSlider.value ) );
+        if ( sliderDown && sliderMoved ) {
+            timeAnim = null;
+            applyTime( Number( timeSlider.value ) );
+        } else {
+            setTimeTarget( Number( timeSlider.value ) );
+        }
     } );
     timeSlider.addEventListener( "change", function() {
         timeSlider.blur();
@@ -1303,65 +1287,10 @@ async function main() {
     document.addEventListener( "keyup", function( e ) {
         keys[ e.code ] = false;
     } );
-    const postModule = device.createShaderModule( { code: POST_WGSL } );
-    const fadePipeline = device.createRenderPipeline( {
-        layout: "auto",
-        vertex: { module: postModule, entryPoint: "vs" },
-        fragment: {
-            module: postModule,
-            entryPoint: "fs_black",
-            targets: [ {
-                format: format,
-                blend: {
-                    color: { srcFactor: "zero", dstFactor: "constant", operation: "add" },
-                    alpha: { srcFactor: "zero", dstFactor: "one", operation: "add" }
-                }
-            } ]
-        },
-        primitive: { topology: "triangle-list" }
-    } );
-    const blitPipeline = device.createRenderPipeline( {
-        layout: "auto",
-        vertex: { module: postModule, entryPoint: "vs" },
-        fragment: {
-            module: postModule,
-            entryPoint: "fs_blit",
-            targets: [ {
-                format: format,
-                blend: {
-                    color: { srcFactor: "constant", dstFactor: "zero", operation: "add" },
-                    alpha: { srcFactor: "one", dstFactor: "zero", operation: "add" }
-                }
-            } ]
-        },
-        primitive: { topology: "triangle-list" }
-    } );
-    const postSampler = device.createSampler( { magFilter: "linear", minFilter: "linear" } );
-
-    let accumTex = null, accumView = null, blitBind = null, accumFresh = true;
-    function makeAccum() {
-        if ( accumTex ) { accumTex.destroy(); }
-        accumTex = device.createTexture( {
-            size: [ canvas.width, canvas.height ],
-            format: format,
-            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING
-        } );
-        accumView = accumTex.createView();
-        blitBind = device.createBindGroup( {
-            layout: blitPipeline.getBindGroupLayout( 0 ),
-            entries: [
-                { binding: 0, resource: postSampler },
-                { binding: 1, resource: accumView }
-            ]
-        } );
-        accumFresh = true;
-    }
-
     function resize() {
         const dpr = Math.min( window.devicePixelRatio || 1, 2 );
         canvas.width = Math.max( 1, Math.floor( canvas.clientWidth * dpr ) );
         canvas.height = Math.max( 1, Math.floor( canvas.clientHeight * dpr ) );
-        makeAccum();
     }
     window.addEventListener( "resize", resize );
     resize();
@@ -1421,8 +1350,6 @@ async function main() {
 
     const MAXF = 8;
     const uni = new Float32Array( 40 );
-    let blurS = 0;
-    let lastYaw = 0, lastPitch = 0;
     const flareU = new Float32Array( 4 + MAXF * 8 );
     const flareSlots = [];
     for ( let i = 0; i < MAXF; i++ ) {
@@ -1527,25 +1454,15 @@ async function main() {
         uni[ 36 ] = tYears;
         device.queue.writeBuffer( uniBuf, 0, uni );
 
-        const rotD = Math.abs( cam.yaw - lastYaw ) + Math.abs( cam.pitch - lastPitch );
-        lastYaw = cam.yaw; lastPitch = cam.pitch;
-        const moving = ml > 0 || flight || timeAnim || rotD > 1e-4;
-        blurS += ( ( moving ? 0.45 : 0 ) - blurS ) * Math.min( dt * 6, 1 );
-        if ( blurS < 0.02 ) { blurS = 0; }
-
         const enc = device.createCommandEncoder();
         const pass = enc.beginRenderPass( {
             colorAttachments: [ {
-                view: accumView,
+                view: ctx.getCurrentTexture().createView(),
                 clearValue: { r: 0, g: 0, b: 0, a: 1 },
-                loadOp: accumFresh ? "clear" : "load",
+                loadOp: "clear",
                 storeOp: "store"
             } ]
         } );
-        accumFresh = false;
-        pass.setPipeline( fadePipeline );
-        pass.setBlendConstant( { r: blurS, g: blurS, b: blurS, a: 1 } );
-        pass.draw( 3 );
         pass.setPipeline( pipeline );
         pass.setBindGroup( 0, bindGroup );
         pass.draw( 6, starCount );
@@ -1654,20 +1571,6 @@ async function main() {
             pass.draw( 6, fcount * 8 );
         }
         pass.end();
-        const comp = 1 - blurS;
-        const blitPass = enc.beginRenderPass( {
-            colorAttachments: [ {
-                view: ctx.getCurrentTexture().createView(),
-                clearValue: { r: 0, g: 0, b: 0, a: 1 },
-                loadOp: "clear",
-                storeOp: "store"
-            } ]
-        } );
-        blitPass.setPipeline( blitPipeline );
-        blitPass.setBindGroup( 0, blitBind );
-        blitPass.setBlendConstant( { r: comp, g: comp, b: comp, a: 1 } );
-        blitPass.draw( 3 );
-        blitPass.end();
         device.queue.submit( [ enc.finish() ] );
         if ( shotReq ) {
             shotReq = false;
