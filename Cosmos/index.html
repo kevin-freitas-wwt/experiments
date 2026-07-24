@@ -492,22 +492,7 @@ fn vs( @builtin(vertex_index) vi : u32, @builtin(instance_index) ii : u32 ) -> V
 
     var clip = u.proj * vpos;
     let c = corners[ vi ];
-    var offPx = c * pxc;
-    let warp = u.misc2.y;
-    if ( warp > 0.01 && clip.w > 0.0 ) {
-        let sv = clip.xy / clip.w - u.misc2.zw;
-        let svPx = sv * u.misc.xy * 0.5;
-        let sl = length( svPx );
-        if ( sl > 1.0 ) {
-            let along = svPx / sl;
-            let perp2 = vec2<f32>( -along.y, along.x );
-            let thin = pxc * ( 1.0 - warp * 0.7 );
-            let stretch = warp * clamp( sl * 0.004, 0.0, 1.0 ) * 140.0;
-            offPx = perp2 * ( c.x * thin ) + along * ( c.y * ( thin + stretch ) );
-            out.intensity = out.intensity * ( 1.0 - warp * 0.6 );
-        }
-    }
-    clip = vec4<f32>( clip.xy + offPx * 2.0 / u.misc.xy * clip.w, clip.zw );
+    clip = vec4<f32>( clip.xy + c * pxc * 2.0 / u.misc.xy * clip.w, clip.zw );
     out.clip = clip;
     out.uv = c;
     return out;
@@ -1342,8 +1327,6 @@ async function main() {
 
     const MAXF = 8;
     const uni = new Float32Array( 40 );
-    let warpS = 0;
-    let vanX = 0, vanY = 0;
     const flareU = new Float32Array( 4 + MAXF * 8 );
     const flareSlots = [];
     for ( let i = 0; i < MAXF; i++ ) {
@@ -1412,8 +1395,7 @@ async function main() {
         }
 
         const v = viewMatrix( cam.pos, cam.yaw, cam.pitch );
-        const boost = keys[ "ShiftLeft" ] || keys[ "ShiftRight" ];
-        const speed = baseSpeed * ( boost ? 10 : 1 );
+        const speed = baseSpeed * ( keys[ "ShiftLeft" ] || keys[ "ShiftRight" ] ? 10 : 1 );
         const mv = [ 0, 0, 0 ];
         if ( keys[ "KeyE" ] ) { mv[ 0 ] += v.fwd[ 0 ]; mv[ 1 ] += v.fwd[ 1 ]; mv[ 2 ] += v.fwd[ 2 ]; }
         if ( keys[ "KeyD" ] ) { mv[ 0 ] -= v.fwd[ 0 ]; mv[ 1 ] -= v.fwd[ 1 ]; mv[ 2 ] -= v.fwd[ 2 ]; }
@@ -1434,29 +1416,11 @@ async function main() {
         const projArr = perspective( 1.15, aspect, 0.001, 300000 );
         uni.set( v.m, 0 );
         uni.set( projArr, 16 );
-        let warpT = 0;
-        if ( ml > 0 && boost ) {
-            const m4w = v.m;
-            const dwx = mv[ 0 ] / ml, dwy = mv[ 1 ] / ml, dwz = mv[ 2 ] / ml;
-            const dvx = m4w[ 0 ] * dwx + m4w[ 4 ] * dwy + m4w[ 8 ] * dwz;
-            const dvy = m4w[ 1 ] * dwx + m4w[ 5 ] * dwy + m4w[ 9 ] * dwz;
-            const dvz = m4w[ 2 ] * dwx + m4w[ 6 ] * dwy + m4w[ 10 ] * dwz;
-            if ( dvz < -0.3 ) {
-                warpT = 1;
-                vanX = projArr[ 0 ] * dvx / -dvz;
-                vanY = projArr[ 5 ] * dvy / -dvz;
-            }
-        }
-        warpS += ( warpT - warpS ) * Math.min( dt * 4, 1 );
-
         uni[ 32 ] = canvas.width;
         uni[ 33 ] = canvas.height;
         uni[ 34 ] = exposure;
         uni[ 35 ] = specMask;
         uni[ 36 ] = tYears;
-        uni[ 37 ] = warpS < 0.01 ? 0 : warpS;
-        uni[ 38 ] = vanX;
-        uni[ 39 ] = vanY;
         device.queue.writeBuffer( uniBuf, 0, uni );
 
         const enc = device.createCommandEncoder();
