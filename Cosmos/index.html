@@ -1271,7 +1271,8 @@ async function main() {
 
     const C_PCS = 0.30660139;
     let radioOn = false, lightOn = false, audioOn = false, driftOn = false;
-    let lsYears = 0, driftDwell = 0;
+    let lsYears = 0;
+    let driftTarget = null, driftDir = null, driftSpeed = 0;
     let audio = null;
     let lastV = null;
 
@@ -1380,7 +1381,12 @@ async function main() {
         }
         if ( name === "DRIFT" ) {
             driftOn = on;
-            if ( on ) { driftDwell = 0; }
+            if ( on ) {
+                driftTarget = null;
+                driftDir = null;
+                driftSpeed = 0;
+                flight = null;
+            }
         }
         modeChipEls[ name ].classList.toggle( "off", !on );
         modeLabel();
@@ -1645,17 +1651,37 @@ async function main() {
             if ( r >= 1 ) { timeAnim = null; }
         }
 
-        if ( driftOn && !flight ) {
-            driftDwell -= dt;
-            if ( driftDwell <= 0 ) {
+        if ( driftOn ) {
+            const tdx = driftTarget ? driftTarget[ 0 ] - cam.pos[ 0 ] : 0;
+            const tdy = driftTarget ? driftTarget[ 1 ] - cam.pos[ 1 ] : 0;
+            const tdz = driftTarget ? driftTarget[ 2 ] - cam.pos[ 2 ] : 0;
+            const tdist = driftTarget ? Math.hypot( tdx, tdy, tdz ) : 0;
+            if ( !driftTarget || tdist < 0.8 ) {
                 const pick = NAMES[ Math.floor( Math.random() * NAMES.length ) ][ 0 ];
-                const p = starPosAt( pick );
-                const th = Math.random() * 2 * Math.PI;
-                const ph = ( Math.random() - 0.5 ) * 2;
-                const off = [ Math.cos( th ) * Math.cos( ph ), Math.sin( ph ), Math.sin( th ) * Math.cos( ph ) ];
-                const tp = [ p[ 0 ] + off[ 0 ] * 1.4, p[ 1 ] + off[ 1 ] * 1.4, p[ 2 ] + off[ 2 ] * 1.4 ];
-                startFlight( tp, dirAngles( p[ 0 ] - tp[ 0 ], p[ 1 ] - tp[ 1 ], p[ 2 ] - tp[ 2 ] ) );
-                driftDwell = 3 + Math.random() * 3;
+                driftTarget = starPosAt( pick );
+            } else {
+                const des = [ tdx / tdist, tdy / tdist, tdz / tdist ];
+                if ( !driftDir ) {
+                    const cy = Math.cos( cam.yaw ), sy = Math.sin( cam.yaw );
+                    const cp = Math.cos( cam.pitch ), sp = Math.sin( cam.pitch );
+                    driftDir = [ sy * cp, sp, -cy * cp ];
+                }
+                const kd = Math.min( dt * 0.4, 1 );
+                for ( let a = 0; a < 3; a++ ) {
+                    driftDir[ a ] += ( des[ a ] - driftDir[ a ] ) * kd;
+                }
+                const dl = Math.hypot( driftDir[ 0 ], driftDir[ 1 ], driftDir[ 2 ] ) || 1;
+                for ( let a = 0; a < 3; a++ ) { driftDir[ a ] /= dl; }
+                driftSpeed += ( 1.2 - driftSpeed ) * Math.min( dt * 0.6, 1 );
+                for ( let a = 0; a < 3; a++ ) {
+                    cam.pos[ a ] += driftDir[ a ] * driftSpeed * dt;
+                }
+                const ta = dirAngles( tdx, tdy, tdz );
+                let dyw = ta[ 0 ] - cam.yaw;
+                dyw = ( ( dyw + Math.PI ) % ( 2 * Math.PI ) + 2 * Math.PI ) % ( 2 * Math.PI ) - Math.PI;
+                const ka = Math.min( dt * 0.8, 1 );
+                cam.yaw += dyw * ka;
+                cam.pitch += ( ta[ 1 ] - cam.pitch ) * ka;
             }
         }
 
