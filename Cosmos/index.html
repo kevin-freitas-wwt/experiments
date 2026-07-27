@@ -1467,14 +1467,20 @@ async function main() {
         modeChipEls[ def[ 0 ] ] = btn;
     } );
 
-    function wireDrop( btn, list ) {
+    function wireDrop( btn, list, alignRight ) {
         btn.addEventListener( "click", function( e ) {
             e.stopPropagation();
             const open = !list.classList.contains( "hidden" );
             document.querySelectorAll( ".droplist" ).forEach( function( l ) { l.classList.add( "hidden" ); } );
             if ( !open ) {
                 const r = btn.getBoundingClientRect();
-                list.style.left = r.left + "px";
+                if ( alignRight ) {
+                    list.style.left = "auto";
+                    list.style.right = ( window.innerWidth - r.right ) + "px";
+                } else {
+                    list.style.right = "auto";
+                    list.style.left = r.left + "px";
+                }
                 list.style.bottom = ( window.innerHeight - r.top + 8 ) + "px";
                 list.classList.remove( "hidden" );
             }
@@ -1483,7 +1489,7 @@ async function main() {
     }
     wireDrop( specBtn, specList );
     wireDrop( modeBtn, document.getElementById( "modelist" ) );
-    wireDrop( document.getElementById( "keysbtn" ), document.getElementById( "keyslist" ) );
+    wireDrop( document.getElementById( "keysbtn" ), document.getElementById( "keyslist" ), true );
     document.addEventListener( "click", function() {
         document.querySelectorAll( ".droplist" ).forEach( function( l ) { l.classList.add( "hidden" ); } );
     } );
