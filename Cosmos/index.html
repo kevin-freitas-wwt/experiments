@@ -307,19 +307,21 @@
     .dropitem.off .tick::before {
         content: "";
     }
-    #keys {
-        color: rgba(255, 176, 0, 0.6);
+    .keyrow {
+        color: rgba(255, 176, 0, 0.65);
+        display: flex;
         font-size: 10px;
-        line-height: 1.9;
-        text-align: right;
+        gap: 16px;
+        justify-content: space-between;
+        letter-spacing: 0.12em;
+        padding: 4px 10px;
         white-space: nowrap;
     }
-    #keys b {
+    .keyrow b {
         border: 1px solid rgba(255, 176, 0, 0.45);
         color: #ffb000;
         display: inline-block;
         font-weight: 400;
-        margin-left: 6px;
         min-width: 18px;
         padding: 0 4px;
         text-align: center;
@@ -421,9 +423,24 @@
         <button id="full" type="button" title="Fullscreen (V)" aria-label="Fullscreen">
             <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
         </button>
-        <div id="keys">
-            FWD<b>E</b> BACK<b>D</b> LEFT<b>S</b> RIGHT<b>F</b> UP<b>SPACE</b> DOWN<b>C</b><br>
-            BOOST<b>SHIFT</b> OVERVIEW<b>O</b> OVERLAYS<b>L</b> INSPECT<b>I</b> SNAP<b>P</b> FULL<b>V</b> TYPE<b>1&ndash;7</b> LOOK<b>MOUSE</b>
+        <div class="dropwrap">
+            <button class="dropbtn" id="keysbtn" type="button">KEYS</button>
+            <div class="droplist hidden" id="keyslist">
+                <div class="keyrow">FORWARD<b>E</b></div>
+                <div class="keyrow">BACK<b>D</b></div>
+                <div class="keyrow">LEFT<b>S</b></div>
+                <div class="keyrow">RIGHT<b>F</b></div>
+                <div class="keyrow">UP<b>SPACE</b></div>
+                <div class="keyrow">DOWN<b>C</b></div>
+                <div class="keyrow">BOOST<b>SHIFT</b></div>
+                <div class="keyrow">LOOK<b>MOUSE</b></div>
+                <div class="keyrow">OVERVIEW<b>O</b></div>
+                <div class="keyrow">OVERLAYS<b>L</b></div>
+                <div class="keyrow">INSPECT<b>I</b></div>
+                <div class="keyrow">SNAPSHOT<b>P</b></div>
+                <div class="keyrow">FULLSCREEN<b>V</b></div>
+                <div class="keyrow">SPECTRAL<b>1&ndash;7</b></div>
+            </div>
         </div>
     </div>
     <div id="cross"></div>
@@ -1466,6 +1483,7 @@ async function main() {
     }
     wireDrop( specBtn, specList );
     wireDrop( modeBtn, document.getElementById( "modelist" ) );
+    wireDrop( document.getElementById( "keysbtn" ), document.getElementById( "keyslist" ) );
     document.addEventListener( "click", function() {
         document.querySelectorAll( ".droplist" ).forEach( function( l ) { l.classList.add( "hidden" ); } );
     } );
