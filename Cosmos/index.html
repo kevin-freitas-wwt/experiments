@@ -240,37 +240,72 @@
         background: #ffb000;
         color: #000;
     }
-    #filter .row, #modes .row {
-        display: flex;
-        gap: 5px;
-        margin-top: 4px;
+    .dropbtn {
+        background: rgba(10, 7, 0, 0.55);
+        border: 1px solid rgba(255, 176, 0, 0.6);
+        color: #ffb000;
+        cursor: pointer;
+        font: inherit;
+        letter-spacing: 0.15em;
+        padding: 12px 16px;
+        pointer-events: auto;
+        text-transform: uppercase;
     }
-    .chip {
+    .dropbtn::after {
+        content: " \25BE";
+    }
+    .dropbtn:hover {
+        background: #ffb000;
+        color: #000;
+    }
+    .droplist {
+        background: rgba(10, 7, 0, 0.92);
+        border: 1px solid rgba(255, 176, 0, 0.5);
+        min-width: 150px;
+        padding: 4px;
+        position: fixed;
+        z-index: 10;
+    }
+    .dropitem {
         align-items: center;
         background: transparent;
-        border: 1px solid rgba(255, 176, 0, 0.45);
+        border: 0;
         color: #ffb000;
         cursor: pointer;
         display: flex;
         font: inherit;
         font-size: 10px;
-        gap: 5px;
-        letter-spacing: 0.1em;
-        padding: 4px 8px;
+        gap: 8px;
+        letter-spacing: 0.15em;
+        padding: 6px 10px;
         pointer-events: auto;
+        text-align: left;
+        text-transform: uppercase;
+        width: 100%;
     }
-    .chip .dot {
+    .dropitem:hover {
+        background: rgba(255, 176, 0, 0.15);
+    }
+    .dropitem.off {
+        color: rgba(255, 176, 0, 0.35);
+    }
+    .dropitem .dot {
         border-radius: 50%;
-        display: inline-block;
         height: 7px;
         width: 7px;
     }
-    .chip.off {
-        border-color: rgba(255, 176, 0, 0.15);
-        color: rgba(255, 176, 0, 0.3);
+    .dropitem.off .dot {
+        opacity: 0.25;
     }
-    .chip.off .dot {
-        opacity: 0.2;
+    .dropitem .tick {
+        display: inline-block;
+        width: 11px;
+    }
+    .dropitem .tick::before {
+        content: "\2713";
+    }
+    .dropitem.off .tick::before {
+        content: "";
     }
     #keys {
         color: rgba(255, 176, 0, 0.6);
@@ -360,13 +395,13 @@
                 <div><div class="label">SPEED</div><div class="value" id="spd">&mdash;</div></div>
             </div>
         </div>
-        <div class="panel" id="filter">
-            <div class="label">SPECTRAL TYPE</div>
-            <div class="row" id="chips"></div>
+        <div class="dropwrap">
+            <button class="dropbtn" id="specbtn" type="button">SPECTRAL 7/7</button>
+            <div class="droplist hidden" id="speclist"></div>
         </div>
-        <div class="panel" id="modes">
-            <div class="label">MODES</div>
-            <div class="row" id="modechips"></div>
+        <div class="dropwrap">
+            <button class="dropbtn" id="modebtn" type="button">MODES</button>
+            <div class="droplist hidden" id="modelist"></div>
         </div>
         <div id="navwrap">
             <select id="navsel">
@@ -1036,19 +1071,26 @@ async function main() {
         countEl.textContent = ( n === starCount ? n.toLocaleString() : n.toLocaleString() + " OF " + starCount.toLocaleString() ) + " CATALOGED STARS · HYG v41";
     }
     const SPEC = [ [ "O", "#9bb0ff" ], [ "B", "#aabfff" ], [ "A", "#cad7ff" ], [ "F", "#f8f7ff" ], [ "G", "#fff4ea" ], [ "K", "#ffd2a1" ], [ "M", "#ffcc6f" ] ];
-    const chipsEl = document.getElementById( "chips" );
+    const specBtn = document.getElementById( "specbtn" );
+    const specList = document.getElementById( "speclist" );
     const chipEls = SPEC.map( function( s, c ) {
         const btn = document.createElement( "button" );
-        btn.className = "chip";
+        btn.className = "dropitem";
         btn.type = "button";
-        btn.innerHTML = '<span class="dot" style="background:' + s[ 1 ] + '"></span>' + s[ 0 ];
+        btn.innerHTML = '<span class="tick"></span><span class="dot" style="background:' + s[ 1 ] + '"></span>' + s[ 0 ] + "-TYPE";
         btn.addEventListener( "click", function() { toggleClass( c ); } );
-        chipsEl.appendChild( btn );
+        specList.appendChild( btn );
         return btn;
     } );
+    function specLabel() {
+        let n = 0;
+        for ( let c = 0; c < 7; c++ ) { if ( specMask >> c & 1 ) { n++; } }
+        specBtn.textContent = "SPECTRAL " + n + "/7";
+    }
     function toggleClass( c ) {
         specMask ^= 1 << c;
         chipEls[ c ].classList.toggle( "off", !( specMask >> c & 1 ) );
+        specLabel();
         updateCount();
     }
     updateCount();
@@ -1253,6 +1295,11 @@ async function main() {
     }
 
     const modeChipEls = {};
+    const modeBtn = document.getElementById( "modebtn" );
+    function modeLabel() {
+        const n = [ radioOn, lightOn, audioOn, driftOn ].filter( Boolean ).length;
+        modeBtn.textContent = n ? "MODES " + n : "MODES";
+    }
     function setMode( name, on ) {
         if ( name === "RADIO" ) { radioOn = on; }
         if ( name === "1C" ) {
@@ -1274,20 +1321,42 @@ async function main() {
             if ( on ) { driftDwell = 0; }
         }
         modeChipEls[ name ].classList.toggle( "off", !on );
+        modeLabel();
     }
     function modeState( name ) {
         return name === "RADIO" ? radioOn : name === "1C" ? lightOn : name === "AUDIO" ? audioOn : driftOn;
     }
-    [ "RADIO", "1C", "AUDIO", "DRIFT" ].forEach( function( name ) {
+    const MODE_DEFS = [ [ "RADIO", "RADIO BUBBLE" ], [ "1C", "LIGHTSPEED" ], [ "AUDIO", "SONIFICATION" ], [ "DRIFT", "AUTOPILOT DRIFT" ] ];
+    MODE_DEFS.forEach( function( def ) {
         const btn = document.createElement( "button" );
-        btn.className = "chip off";
+        btn.className = "dropitem off";
         btn.type = "button";
-        btn.textContent = name;
+        btn.innerHTML = '<span class="tick"></span>' + def[ 1 ];
         btn.addEventListener( "click", function() {
-            setMode( name, !modeState( name ) );
+            setMode( def[ 0 ], !modeState( def[ 0 ] ) );
         } );
-        document.getElementById( "modechips" ).appendChild( btn );
-        modeChipEls[ name ] = btn;
+        document.getElementById( "modelist" ).appendChild( btn );
+        modeChipEls[ def[ 0 ] ] = btn;
+    } );
+
+    function wireDrop( btn, list ) {
+        btn.addEventListener( "click", function( e ) {
+            e.stopPropagation();
+            const open = !list.classList.contains( "hidden" );
+            document.querySelectorAll( ".droplist" ).forEach( function( l ) { l.classList.add( "hidden" ); } );
+            if ( !open ) {
+                const r = btn.getBoundingClientRect();
+                list.style.left = r.left + "px";
+                list.style.bottom = ( window.innerHeight - r.top + 8 ) + "px";
+                list.classList.remove( "hidden" );
+            }
+        } );
+        list.addEventListener( "click", function( e ) { e.stopPropagation(); } );
+    }
+    wireDrop( specBtn, specList );
+    wireDrop( modeBtn, document.getElementById( "modelist" ) );
+    document.addEventListener( "click", function() {
+        document.querySelectorAll( ".droplist" ).forEach( function( l ) { l.classList.add( "hidden" ); } );
     } );
 
     const inspEl = document.getElementById( "insp" );
