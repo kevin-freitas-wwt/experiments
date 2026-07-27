@@ -1273,6 +1273,30 @@ async function main() {
     let radioOn = false, lightOn = false, audioOn = false, driftOn = false;
     let lsYears = 0;
     let driftTarget = null, driftDir = null, driftSpeed = 0;
+    let driftTurn = 0.4, driftSpeedTgt = 1.2, driftLegT = 0;
+
+    function pickDriftTarget() {
+        const cands = [];
+        for ( let i = 0; i < NAMES.length; i++ ) {
+            const p = starPosAt( NAMES[ i ][ 0 ] );
+            const dx = p[ 0 ] - cam.pos[ 0 ];
+            const dy = p[ 1 ] - cam.pos[ 1 ];
+            const dz = p[ 2 ] - cam.pos[ 2 ];
+            const d = Math.hypot( dx, dy, dz );
+            if ( d < 4 || d > 40 ) { continue; }
+            if ( driftDir ) {
+                const ang = Math.acos( Math.max( -1, Math.min( 1, ( dx * driftDir[ 0 ] + dy * driftDir[ 1 ] + dz * driftDir[ 2 ] ) / d ) ) );
+                if ( ang < 0.45 || ang > 1.9 ) { continue; }
+            }
+            cands.push( p );
+        }
+        driftTarget = cands.length
+            ? cands[ Math.floor( Math.random() * cands.length ) ]
+            : starPosAt( NAMES[ Math.floor( Math.random() * NAMES.length ) ][ 0 ] );
+        driftTurn = 0.25 + Math.random() * 0.45;
+        driftSpeedTgt = 0.9 + Math.random() * 0.8;
+        driftLegT = 14 + Math.random() * 10;
+    }
     let audio = null;
     let lastV = null;
 
@@ -1671,27 +1695,27 @@ async function main() {
         }
 
         if ( driftOn ) {
+            if ( !driftDir ) {
+                const cy = Math.cos( cam.yaw ), sy = Math.sin( cam.yaw );
+                const cp = Math.cos( cam.pitch ), sp = Math.sin( cam.pitch );
+                driftDir = [ sy * cp, sp, -cy * cp ];
+            }
             const tdx = driftTarget ? driftTarget[ 0 ] - cam.pos[ 0 ] : 0;
             const tdy = driftTarget ? driftTarget[ 1 ] - cam.pos[ 1 ] : 0;
             const tdz = driftTarget ? driftTarget[ 2 ] - cam.pos[ 2 ] : 0;
             const tdist = driftTarget ? Math.hypot( tdx, tdy, tdz ) : 0;
-            if ( !driftTarget || tdist < 0.8 ) {
-                const pick = NAMES[ Math.floor( Math.random() * NAMES.length ) ][ 0 ];
-                driftTarget = starPosAt( pick );
+            driftLegT -= dt;
+            if ( !driftTarget || tdist < 0.8 || driftLegT <= 0 ) {
+                pickDriftTarget();
             } else {
                 const des = [ tdx / tdist, tdy / tdist, tdz / tdist ];
-                if ( !driftDir ) {
-                    const cy = Math.cos( cam.yaw ), sy = Math.sin( cam.yaw );
-                    const cp = Math.cos( cam.pitch ), sp = Math.sin( cam.pitch );
-                    driftDir = [ sy * cp, sp, -cy * cp ];
-                }
-                const kd = Math.min( dt * 0.4, 1 );
+                const kd = Math.min( dt * driftTurn, 1 );
                 for ( let a = 0; a < 3; a++ ) {
                     driftDir[ a ] += ( des[ a ] - driftDir[ a ] ) * kd;
                 }
                 const dl = Math.hypot( driftDir[ 0 ], driftDir[ 1 ], driftDir[ 2 ] ) || 1;
                 for ( let a = 0; a < 3; a++ ) { driftDir[ a ] /= dl; }
-                driftSpeed += ( 1.2 - driftSpeed ) * Math.min( dt * 0.6, 1 );
+                driftSpeed += ( driftSpeedTgt - driftSpeed ) * Math.min( dt * 0.6, 1 );
                 for ( let a = 0; a < 3; a++ ) {
                     cam.pos[ a ] += driftDir[ a ] * driftSpeed * dt;
                 }
