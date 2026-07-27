@@ -1293,68 +1293,87 @@ async function main() {
     function ensureAudio() {
         if ( audio ) { return; }
         const actx = new ( window.AudioContext || window.webkitAudioContext )();
+        const comp = actx.createDynamicsCompressor();
+        comp.connect( actx.destination );
         const master = actx.createGain();
         master.gain.value = 0;
-        master.connect( actx.destination );
-        const voices = [];
-        const types = [ "sine", "triangle", "sawtooth" ];
-        for ( let i = 0; i < 12; i++ ) {
-            const bell = Math.random() < 0.4;
-            const osc = actx.createOscillator();
-            osc.type = bell ? "sine" : types[ Math.floor( Math.random() * types.length ) ];
-            osc.detune.value = ( Math.random() - 0.5 ) * 7;
-            const filt = actx.createBiquadFilter();
-            filt.type = "lowpass";
-            filt.frequency.value = 500 + Math.random() * 1600;
-            filt.Q.value = 0.4;
-            const gain = actx.createGain();
-            gain.gain.value = 0;
-            const pan = actx.createStereoPanner();
-            osc.connect( filt );
-            filt.connect( gain );
-            gain.connect( pan );
-            pan.connect( master );
-            osc.start();
-            voices.push( { osc: osc, gain: gain, pan: pan, bell: bell, nextStrike: 0 } );
+        master.connect( comp );
+        audio = { ctx: actx, master: master, live: 0, cooldown: new Map() };
+    }
+
+    function triggerNote( freq, g, pan ) {
+        const actx = audio.ctx;
+        const t = actx.currentTime;
+        const kinds = [ "bell", "pluck", "pad", "string" ];
+        const kind = kinds[ Math.floor( Math.random() * kinds.length ) ];
+        const osc = actx.createOscillator();
+        osc.frequency.value = freq;
+        osc.detune.value = ( Math.random() - 0.5 ) * 6;
+        const filt = actx.createBiquadFilter();
+        filt.type = "lowpass";
+        filt.Q.value = 0.4;
+        const env = actx.createGain();
+        env.gain.value = 0;
+        const panner = actx.createStereoPanner();
+        panner.pan.value = pan;
+        osc.connect( filt );
+        filt.connect( env );
+        env.connect( panner );
+        panner.connect( audio.master );
+        let attack = 0.3, hold = 0, release = 3;
+        if ( kind === "bell" ) {
+            osc.type = "sine";
+            filt.frequency.value = 3000;
+            attack = 0.02; release = 3.5 + Math.random() * 1.5;
+        } else if ( kind === "pluck" ) {
+            osc.type = "triangle";
+            filt.frequency.value = 1600;
+            attack = 0.01; release = 1.4;
+        } else if ( kind === "pad" ) {
+            osc.type = "triangle";
+            filt.frequency.value = 900 + Math.random() * 600;
+            attack = 0.5 + Math.random() * 0.4; hold = 0.6; release = 2.5;
+        } else {
+            osc.type = "sawtooth";
+            filt.frequency.value = 600 + Math.random() * 700;
+            attack = 0.7 + Math.random() * 0.5; hold = 0.5; release = 2.8;
         }
-        audio = { ctx: actx, master: master, voices: voices };
+        const peak = Math.max( g, 1e-4 );
+        env.gain.setValueAtTime( 1e-4, t );
+        env.gain.exponentialRampToValueAtTime( peak, t + attack );
+        env.gain.setValueAtTime( peak, t + attack + hold );
+        env.gain.exponentialRampToValueAtTime( 1e-4, t + attack + hold + release );
+        osc.start( t );
+        osc.stop( t + attack + hold + release + 0.1 );
+        audio.live++;
+        osc.onended = function() {
+            audio.live--;
+            panner.disconnect();
+        };
     }
 
     function updateVoices( cand ) {
-        if ( !audio || !audioOn ) { return; }
+        if ( !audio || !audioOn || !lastV ) { return; }
         const t = audio.ctx.currentTime;
-        audio.voices.forEach( function( vo, k ) {
-            if ( k < cand.length && lastV ) {
-                const idx = cand[ k ][ 1 ];
-                const bv = Math.min( Math.max( 0.92 * cis[ idx ], -0.35 ), 5 );
-                const temp = 4600 * ( 1 / ( bv + 1.7 ) + 1 / ( bv + 0.62 ) );
-                const freq = chordSnap( Math.min( Math.max( 50 + ( temp - 2500 ) * 0.028, 50 ), 1000 ) );
-                const bright = exposure * Math.pow( 10, 1.8 ) / Math.sqrt( cand[ k ][ 0 ] );
-                const g = Math.min( 0.5, Math.pow( Math.min( bright, 60 ) / 60, 0.6 ) * 0.45 ) / 3;
-                const p = starPosAt( idx );
-                const m4 = lastV.m;
-                const vx = m4[ 0 ] * p[ 0 ] + m4[ 4 ] * p[ 1 ] + m4[ 8 ] * p[ 2 ] + m4[ 12 ];
-                const vz = m4[ 2 ] * p[ 0 ] + m4[ 6 ] * p[ 1 ] + m4[ 10 ] * p[ 2 ] + m4[ 14 ];
-                const pan = Math.max( -1, Math.min( 1, vx / ( Math.abs( vz ) + Math.abs( vx ) + 1e-6 ) ) );
-                vo.pan.pan.setTargetAtTime( pan, t, 0.12 );
-                if ( vo.bell ) {
-                    if ( t >= vo.nextStrike ) {
-                        const peak = Math.max( g * 2.2, 1e-4 );
-                        vo.osc.frequency.setValueAtTime( freq, t );
-                        vo.gain.gain.cancelScheduledValues( t );
-                        vo.gain.gain.setValueAtTime( 1e-4, t );
-                        vo.gain.gain.exponentialRampToValueAtTime( peak, t + 0.04 );
-                        vo.gain.gain.exponentialRampToValueAtTime( 1e-4, t + 3.2 );
-                        vo.nextStrike = t + 2.5 + Math.random() * 5;
-                    }
-                } else {
-                    vo.osc.frequency.setTargetAtTime( freq, t, 0.12 );
-                    vo.gain.gain.setTargetAtTime( g, t, 0.18 );
-                }
-            } else if ( !vo.bell ) {
-                vo.gain.gain.setTargetAtTime( 0, t, 0.2 );
-            }
-        } );
+        let fired = 0;
+        for ( const c of cand ) {
+            if ( fired >= 4 || audio.live >= 24 ) { break; }
+            const idx = c[ 1 ];
+            if ( t < ( audio.cooldown.get( idx ) || 0 ) ) { continue; }
+            audio.cooldown.set( idx, t + 4 + Math.random() * 4 );
+            const bv = Math.min( Math.max( 0.92 * cis[ idx ], -0.35 ), 5 );
+            const temp = 4600 * ( 1 / ( bv + 1.7 ) + 1 / ( bv + 0.62 ) );
+            const freq = chordSnap( Math.min( Math.max( 50 + ( temp - 2500 ) * 0.028, 50 ), 1000 ) );
+            const bright = exposure * Math.pow( 10, 1.8 ) / Math.sqrt( c[ 0 ] );
+            const g = Math.min( 0.3, Math.pow( Math.min( bright, 60 ) / 60, 0.6 ) * 0.28 );
+            const p = starPosAt( idx );
+            const m4 = lastV.m;
+            const vx = m4[ 0 ] * p[ 0 ] + m4[ 4 ] * p[ 1 ] + m4[ 8 ] * p[ 2 ] + m4[ 12 ];
+            const vz = m4[ 2 ] * p[ 0 ] + m4[ 6 ] * p[ 1 ] + m4[ 10 ] * p[ 2 ] + m4[ 14 ];
+            const pan = Math.max( -1, Math.min( 1, vx / ( Math.abs( vz ) + Math.abs( vx ) + 1e-6 ) ) );
+            triggerNote( freq, g, pan );
+            fired++;
+        }
     }
 
     const modeChipEls = {};
