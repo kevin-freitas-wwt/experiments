@@ -727,6 +727,56 @@ fn fs( in : VOut ) -> @location(0) vec4<f32> {
 }
 `;
 
+const BUBBLE_WGSL = `
+struct U {
+    view : mat4x4<f32>,
+    proj : mat4x4<f32>,
+    misc : vec4<f32>,
+};
+struct B {
+    params : vec4<f32>,
+    campos : vec4<f32>,
+};
+@group(0) @binding(0) var<uniform> u : U;
+@group(0) @binding(1) var<uniform> b : B;
+
+struct VOut {
+    @builtin(position) clip : vec4<f32>,
+    @location(0) normal : vec3<f32>,
+    @location(1) world : vec3<f32>,
+};
+
+const LON = 32u;
+const LAT = 20u;
+
+@vertex
+fn vs( @builtin(vertex_index) vi : u32 ) -> VOut {
+    var ox = array<u32, 6>( 0u, 1u, 1u, 0u, 1u, 0u );
+    var oy = array<u32, 6>( 0u, 0u, 1u, 0u, 1u, 1u );
+    let cell = vi / 6u;
+    let corner = vi % 6u;
+    let cx = f32( cell % LON ) + f32( ox[ corner ] );
+    let cy = f32( cell / LON ) + f32( oy[ corner ] );
+    let lon = cx / f32( LON ) * 6.2831853;
+    let lat = ( cy / f32( LAT ) - 0.5 ) * 3.1415927;
+    let n = vec3<f32>( cos( lat ) * cos( lon ), sin( lat ), cos( lat ) * sin( lon ) );
+    let world = n * b.params.x;
+    var out : VOut;
+    out.clip = u.proj * u.view * vec4<f32>( world, 1.0 );
+    out.normal = n;
+    out.world = world;
+    return out;
+}
+
+@fragment
+fn fs( in : VOut ) -> @location(0) vec4<f32> {
+    let vd = normalize( in.world - b.campos.xyz );
+    let rim = pow( 1.0 - abs( dot( normalize( in.normal ), vd ) ), 2.5 );
+    let c = vec3<f32>( 1.0, 0.69, 0.0 ) * ( 0.02 + rim * 0.32 ) * b.params.y;
+    return vec4<f32>( c, 1.0 );
+}
+`;
+
 function tempToRgb( t ) {
     const k = Math.min( Math.max( t, 1000 ), 40000 ) / 100;
     let r, g, b;
@@ -955,48 +1005,26 @@ async function main() {
     const lineDimBind = lineBind( lineDimBuf );
     const lineHiBind = lineBind( lineHiBuf );
 
-    const BUBBLE_SEGS = 64;
-    const BUBBLE_CIRCLES = [
-        [ [ 1, 0, 0 ], [ 0, 1, 0 ] ],
-        [ [ 1, 0, 0 ], [ 0, 0, 1 ] ],
-        [ [ 0, 1, 0 ], [ 0, 0, 1 ] ],
-        [ [ 0.7071, 0.7071, 0 ], [ 0, 0, 1 ] ],
-        [ [ 0.7071, -0.7071, 0 ], [ 0, 0, 1 ] ]
-    ];
-    const bubbleSegCount = BUBBLE_CIRCLES.length * BUBBLE_SEGS;
-    const bubbleVerts = new Float32Array( bubbleSegCount * 8 );
-    const bubbleBuf = device.createBuffer( {
-        size: bubbleVerts.byteLength,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+    const bubbleModule = device.createShaderModule( { code: BUBBLE_WGSL } );
+    const bubblePipeline = device.createRenderPipeline( {
+        layout: "auto",
+        vertex: { module: bubbleModule, entryPoint: "vs" },
+        fragment: {
+            module: bubbleModule,
+            entryPoint: "fs",
+            targets: [ { format: format, blend: ADD_BLEND } ]
+        },
+        primitive: { topology: "triangle-list" }
     } );
-    const bubbleLU = device.createBuffer( { size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST } );
+    const bubbleU = device.createBuffer( { size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST } );
     const bubbleBind = device.createBindGroup( {
-        layout: linePipeline.getBindGroupLayout( 0 ),
+        layout: bubblePipeline.getBindGroupLayout( 0 ),
         entries: [
             { binding: 0, resource: { buffer: uniBuf } },
-            { binding: 1, resource: { buffer: bubbleLU } },
-            { binding: 2, resource: { buffer: bubbleBuf } }
+            { binding: 1, resource: { buffer: bubbleU } }
         ]
     } );
-    let bubbleR = -1;
-    function updateBubble( r ) {
-        if ( Math.abs( r - bubbleR ) < bubbleR * 0.002 ) { return; }
-        bubbleR = r;
-        let vp = 0;
-        for ( const cb of BUBBLE_CIRCLES ) {
-            const u = cb[ 0 ], w = cb[ 1 ];
-            for ( let s = 0; s < BUBBLE_SEGS; s++ ) {
-                for ( const th of [ s / BUBBLE_SEGS * 2 * Math.PI, ( s + 1 ) / BUBBLE_SEGS * 2 * Math.PI ] ) {
-                    const ct = Math.cos( th ), st = Math.sin( th );
-                    bubbleVerts[ vp ] = ( u[ 0 ] * ct + w[ 0 ] * st ) * r;
-                    bubbleVerts[ vp + 1 ] = ( u[ 1 ] * ct + w[ 1 ] * st ) * r;
-                    bubbleVerts[ vp + 2 ] = ( u[ 2 ] * ct + w[ 2 ] * st ) * r;
-                    vp += 4;
-                }
-            }
-        }
-        device.queue.writeBuffer( bubbleBuf, 0, bubbleVerts );
-    }
+    const BUBBLE_VERTS = 32 * 20 * 6;
 
     const markerModule = device.createShaderModule( { code: MARKER_WGSL } );
     const markerPipeline = device.createRenderPipeline( {
@@ -1247,6 +1275,20 @@ async function main() {
     let audio = null;
     let lastV = null;
 
+    function chordSnap( f ) {
+        const n = Math.round( 12 * Math.log2( f / 110 ) );
+        const oct = Math.floor( n / 12 );
+        let bestN = n, bd = 99;
+        for ( const c of [ 0, 4, 7 ] ) {
+            for ( const o of [ oct - 1, oct, oct + 1 ] ) {
+                const cand = o * 12 + c;
+                const d = Math.abs( cand - n );
+                if ( d < bd ) { bd = d; bestN = cand; }
+            }
+        }
+        return 110 * Math.pow( 2, bestN / 12 );
+    }
+
     function ensureAudio() {
         if ( audio ) { return; }
         const actx = new ( window.AudioContext || window.webkitAudioContext )();
@@ -1254,17 +1296,25 @@ async function main() {
         master.gain.value = 0;
         master.connect( actx.destination );
         const voices = [];
+        const types = [ "sine", "triangle", "sawtooth" ];
         for ( let i = 0; i < 12; i++ ) {
+            const bell = Math.random() < 0.4;
             const osc = actx.createOscillator();
-            osc.type = "sine";
+            osc.type = bell ? "sine" : types[ Math.floor( Math.random() * types.length ) ];
+            osc.detune.value = ( Math.random() - 0.5 ) * 7;
+            const filt = actx.createBiquadFilter();
+            filt.type = "lowpass";
+            filt.frequency.value = 500 + Math.random() * 1600;
+            filt.Q.value = 0.4;
             const gain = actx.createGain();
             gain.gain.value = 0;
             const pan = actx.createStereoPanner();
-            osc.connect( gain );
+            osc.connect( filt );
+            filt.connect( gain );
             gain.connect( pan );
             pan.connect( master );
             osc.start();
-            voices.push( { osc: osc, gain: gain, pan: pan } );
+            voices.push( { osc: osc, gain: gain, pan: pan, bell: bell, nextStrike: 0 } );
         }
         audio = { ctx: actx, master: master, voices: voices };
     }
@@ -1277,7 +1327,7 @@ async function main() {
                 const idx = cand[ k ][ 1 ];
                 const bv = Math.min( Math.max( 0.92 * cis[ idx ], -0.35 ), 5 );
                 const temp = 4600 * ( 1 / ( bv + 1.7 ) + 1 / ( bv + 0.62 ) );
-                const freq = Math.min( Math.max( 50 + ( temp - 2500 ) * 0.028, 50 ), 1000 );
+                const freq = chordSnap( Math.min( Math.max( 50 + ( temp - 2500 ) * 0.028, 50 ), 1000 ) );
                 const bright = exposure * Math.pow( 10, 1.8 ) / Math.sqrt( cand[ k ][ 0 ] );
                 const g = Math.min( 0.5, Math.pow( Math.min( bright, 60 ) / 60, 0.6 ) * 0.45 ) / 3;
                 const p = starPosAt( idx );
@@ -1285,10 +1335,22 @@ async function main() {
                 const vx = m4[ 0 ] * p[ 0 ] + m4[ 4 ] * p[ 1 ] + m4[ 8 ] * p[ 2 ] + m4[ 12 ];
                 const vz = m4[ 2 ] * p[ 0 ] + m4[ 6 ] * p[ 1 ] + m4[ 10 ] * p[ 2 ] + m4[ 14 ];
                 const pan = Math.max( -1, Math.min( 1, vx / ( Math.abs( vz ) + Math.abs( vx ) + 1e-6 ) ) );
-                vo.osc.frequency.setTargetAtTime( freq, t, 0.12 );
-                vo.gain.gain.setTargetAtTime( g, t, 0.18 );
                 vo.pan.pan.setTargetAtTime( pan, t, 0.12 );
-            } else {
+                if ( vo.bell ) {
+                    if ( t >= vo.nextStrike ) {
+                        const peak = Math.max( g * 2.2, 1e-4 );
+                        vo.osc.frequency.setValueAtTime( freq, t );
+                        vo.gain.gain.cancelScheduledValues( t );
+                        vo.gain.gain.setValueAtTime( 1e-4, t );
+                        vo.gain.gain.exponentialRampToValueAtTime( peak, t + 0.04 );
+                        vo.gain.gain.exponentialRampToValueAtTime( 1e-4, t + 3.2 );
+                        vo.nextStrike = t + 2.5 + Math.random() * 5;
+                    }
+                } else {
+                    vo.osc.frequency.setTargetAtTime( freq, t, 0.12 );
+                    vo.gain.gain.setTargetAtTime( g, t, 0.18 );
+                }
+            } else if ( !vo.bell ) {
                 vo.gain.gain.setTargetAtTime( 0, t, 0.2 );
             }
         } );
@@ -1683,12 +1745,13 @@ async function main() {
         if ( radioOn ) {
             const radioR = ( 126 + tYears ) / 3.26156;
             if ( radioR > 0.001 ) {
-                updateBubble( radioR );
-                const blw = Math.max( canvas.width / canvas.clientWidth, 1 );
-                device.queue.writeBuffer( bubbleLU, 0, new Float32Array( [ 1, 0.69, 0, 0.20, 1.6 * blw, 0, 0, 0 ] ) );
-                pass.setPipeline( linePipeline );
+                device.queue.writeBuffer( bubbleU, 0, new Float32Array( [
+                    radioR, 1, 0, 0,
+                    cam.pos[ 0 ], cam.pos[ 1 ], cam.pos[ 2 ], 0
+                ] ) );
+                pass.setPipeline( bubblePipeline );
                 pass.setBindGroup( 0, bubbleBind );
-                pass.draw( 6, bubbleSegCount );
+                pass.draw( BUBBLE_VERTS );
             }
         }
 
