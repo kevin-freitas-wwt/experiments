@@ -59,6 +59,13 @@
     .bar.bottom {
         align-items: flex-end;
         bottom: 24px;
+        overflow-x: auto;
+        padding-bottom: 6px;
+        scrollbar-color: rgba(255, 176, 0, 0.4) transparent;
+        scrollbar-width: thin;
+    }
+    .bar.bottom > * {
+        flex-shrink: 0;
     }
     .panel {
         background: rgba(10, 7, 0, 0.55);
@@ -168,28 +175,6 @@
     #timeval {
         color: #ffb000;
     }
-    #bkmlist {
-        max-height: 30vh;
-        overflow-y: auto;
-    }
-    #bkmlist .bk {
-        cursor: pointer;
-        display: flex;
-        font-size: 10px;
-        gap: 12px;
-        justify-content: space-between;
-        margin-top: 5px;
-        pointer-events: auto;
-    }
-    #bkmlist .bk:hover {
-        color: #fff;
-    }
-    #bkmlist .bkdel {
-        color: rgba(255, 176, 0, 0.5);
-    }
-    #bkmlist .bkdel:hover {
-        color: #ff3b1f;
-    }
     #insp .value {
         font-size: 14px;
     }
@@ -227,7 +212,7 @@
         border-color: rgba(255, 176, 0, 0.2);
         color: rgba(255, 176, 0, 0.35);
     }
-    #ovr, #shot, #full, #ovl {
+    #shot, #full, #ovl {
         background: rgba(10, 7, 0, 0.55);
         border: 1px solid rgba(255, 176, 0, 0.6);
         color: #ffb000;
@@ -238,11 +223,24 @@
         pointer-events: auto;
         text-transform: uppercase;
     }
-    #ovr:hover, #shot:hover, #full:hover, #ovl:hover {
+    #shot, #full {
+        padding: 11px 13px;
+    }
+    #shot svg, #full svg {
+        display: block;
+        fill: none;
+        height: 17px;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 2px;
+        width: 17px;
+    }
+    #shot:hover, #full:hover, #ovl:hover {
         background: #ffb000;
         color: #000;
     }
-    #filter .row {
+    #filter .row, #modes .row {
         display: flex;
         gap: 5px;
         margin-top: 4px;
@@ -335,13 +333,6 @@
                 <h1>COSMOS</h1>
                 <div class="label" id="count">&mdash;</div>
             </div>
-            <div class="panel" id="bkm">
-                <div class="label">ROUTE
-                    <button class="mini" id="mark" type="button">MARK</button>
-                    <button class="mini" id="tourbtn" type="button">TOUR</button>
-                </div>
-                <div id="bkmlist"></div>
-            </div>
         </div>
         <div class="panel" id="timep">
             <div class="label">TIME OFFSET <span id="timeval">NOW</span>
@@ -353,7 +344,6 @@
             <div class="panel" id="nearest">
                 <div class="label">NEAREST NAMED STAR</div>
                 <div class="value" id="starname">&mdash;</div>
-                <div class="label" id="stardist">&mdash;</div>
             </div>
             <div class="panel hidden" id="insp">
                 <div class="label">TARGET <button class="mini" id="inspx" type="button">CLOSE</button></div>
@@ -367,13 +357,16 @@
     <div class="bar bottom">
         <div class="panel" id="nav">
             <div class="row">
-                <div><div class="label">POS&middot;PC</div><div class="value" id="pos">&mdash;</div></div>
                 <div><div class="label">SPEED</div><div class="value" id="spd">&mdash;</div></div>
             </div>
         </div>
         <div class="panel" id="filter">
             <div class="label">SPECTRAL TYPE</div>
             <div class="row" id="chips"></div>
+        </div>
+        <div class="panel" id="modes">
+            <div class="label">MODES</div>
+            <div class="row" id="modechips"></div>
         </div>
         <div id="navwrap">
             <select id="navsel">
@@ -387,8 +380,12 @@
             </select>
         </div>
         <button id="ovl" type="button">OVERLAYS</button>
-        <button id="shot" type="button">SNAPSHOT</button>
-        <button id="full" type="button">FULLSCREEN</button>
+        <button id="shot" type="button" title="Snapshot (P)" aria-label="Snapshot">
+            <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </button>
+        <button id="full" type="button" title="Fullscreen (V)" aria-label="Fullscreen">
+            <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+        </button>
         <div id="keys">
             FWD<b>E</b> BACK<b>D</b> LEFT<b>S</b> RIGHT<b>F</b> UP<b>SPACE</b> DOWN<b>C</b><br>
             BOOST<b>SHIFT</b> OVERVIEW<b>O</b> OVERLAYS<b>L</b> INSPECT<b>I</b> SNAP<b>P</b> FULL<b>V</b> TYPE<b>1&ndash;7</b> LOOK<b>MOUSE</b>
@@ -923,6 +920,49 @@ async function main() {
     const lineDimBind = lineBind( lineDimBuf );
     const lineHiBind = lineBind( lineHiBuf );
 
+    const BUBBLE_SEGS = 64;
+    const BUBBLE_CIRCLES = [
+        [ [ 1, 0, 0 ], [ 0, 1, 0 ] ],
+        [ [ 1, 0, 0 ], [ 0, 0, 1 ] ],
+        [ [ 0, 1, 0 ], [ 0, 0, 1 ] ],
+        [ [ 0.7071, 0.7071, 0 ], [ 0, 0, 1 ] ],
+        [ [ 0.7071, -0.7071, 0 ], [ 0, 0, 1 ] ]
+    ];
+    const bubbleSegCount = BUBBLE_CIRCLES.length * BUBBLE_SEGS;
+    const bubbleVerts = new Float32Array( bubbleSegCount * 8 );
+    const bubbleBuf = device.createBuffer( {
+        size: bubbleVerts.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+    } );
+    const bubbleLU = device.createBuffer( { size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST } );
+    const bubbleBind = device.createBindGroup( {
+        layout: linePipeline.getBindGroupLayout( 0 ),
+        entries: [
+            { binding: 0, resource: { buffer: uniBuf } },
+            { binding: 1, resource: { buffer: bubbleLU } },
+            { binding: 2, resource: { buffer: bubbleBuf } }
+        ]
+    } );
+    let bubbleR = -1;
+    function updateBubble( r ) {
+        if ( Math.abs( r - bubbleR ) < bubbleR * 0.002 ) { return; }
+        bubbleR = r;
+        let vp = 0;
+        for ( const cb of BUBBLE_CIRCLES ) {
+            const u = cb[ 0 ], w = cb[ 1 ];
+            for ( let s = 0; s < BUBBLE_SEGS; s++ ) {
+                for ( const th of [ s / BUBBLE_SEGS * 2 * Math.PI, ( s + 1 ) / BUBBLE_SEGS * 2 * Math.PI ] ) {
+                    const ct = Math.cos( th ), st = Math.sin( th );
+                    bubbleVerts[ vp ] = ( u[ 0 ] * ct + w[ 0 ] * st ) * r;
+                    bubbleVerts[ vp + 1 ] = ( u[ 1 ] * ct + w[ 1 ] * st ) * r;
+                    bubbleVerts[ vp + 2 ] = ( u[ 2 ] * ct + w[ 2 ] * st ) * r;
+                    vp += 4;
+                }
+            }
+        }
+        device.queue.writeBuffer( bubbleBuf, 0, bubbleVerts );
+    }
+
     const markerModule = device.createShaderModule( { code: MARKER_WGSL } );
     const markerPipeline = device.createRenderPipeline( {
         layout: "auto",
@@ -1159,49 +1199,95 @@ async function main() {
         setTimeTarget( 0 );
     } );
 
-    let bookmarks = [];
-    try {
-        bookmarks = JSON.parse( localStorage.getItem( "cosmos.bookmarks" ) ) || [];
-    } catch ( e ) { }
-    function saveBk() {
-        try { localStorage.setItem( "cosmos.bookmarks", JSON.stringify( bookmarks ) ); } catch ( e ) { }
+    const C_PCS = 0.30660139;
+    let radioOn = false, lightOn = false, audioOn = false, driftOn = false;
+    let lsYears = 0, driftDwell = 0;
+    let audio = null;
+    let lastV = null;
+
+    function ensureAudio() {
+        if ( audio ) { return; }
+        const actx = new ( window.AudioContext || window.webkitAudioContext )();
+        const master = actx.createGain();
+        master.gain.value = 0;
+        master.connect( actx.destination );
+        const voices = [];
+        for ( let i = 0; i < 12; i++ ) {
+            const osc = actx.createOscillator();
+            osc.type = "sine";
+            const gain = actx.createGain();
+            gain.gain.value = 0;
+            const pan = actx.createStereoPanner();
+            osc.connect( gain );
+            gain.connect( pan );
+            pan.connect( master );
+            osc.start();
+            voices.push( { osc: osc, gain: gain, pan: pan } );
+        }
+        audio = { ctx: actx, master: master, voices: voices };
     }
-    const bkmList = document.getElementById( "bkmlist" );
-    let tour = null;
-    function renderBk() {
-        bkmList.innerHTML = "";
-        bookmarks.forEach( function( b, i ) {
-            const row = document.createElement( "div" );
-            row.className = "bk";
-            const go = document.createElement( "span" );
-            go.textContent = ( i + 1 ) + " " + b.n;
-            const del = document.createElement( "span" );
-            del.className = "bkdel";
-            del.textContent = "✕";
-            row.appendChild( go );
-            row.appendChild( del );
-            row.addEventListener( "click", function() {
-                tour = null;
-                startFlight( b.p.slice(), [ b.y, b.pi ] );
-            } );
-            del.addEventListener( "click", function( e ) {
-                e.stopPropagation();
-                bookmarks.splice( i, 1 );
-                saveBk();
-                renderBk();
-            } );
-            bkmList.appendChild( row );
+
+    function updateVoices( cand ) {
+        if ( !audio || !audioOn ) { return; }
+        const t = audio.ctx.currentTime;
+        audio.voices.forEach( function( vo, k ) {
+            if ( k < cand.length && lastV ) {
+                const idx = cand[ k ][ 1 ];
+                const bv = Math.min( Math.max( 0.92 * cis[ idx ], -0.35 ), 5 );
+                const temp = 4600 * ( 1 / ( bv + 1.7 ) + 1 / ( bv + 0.62 ) );
+                const freq = Math.min( Math.max( 50 + ( temp - 2500 ) * 0.028, 50 ), 1000 );
+                const bright = exposure * Math.pow( 10, 1.8 ) / Math.sqrt( cand[ k ][ 0 ] );
+                const g = Math.min( 0.5, Math.pow( Math.min( bright, 60 ) / 60, 0.6 ) * 0.45 ) / 3;
+                const p = starPosAt( idx );
+                const m4 = lastV.m;
+                const vx = m4[ 0 ] * p[ 0 ] + m4[ 4 ] * p[ 1 ] + m4[ 8 ] * p[ 2 ] + m4[ 12 ];
+                const vz = m4[ 2 ] * p[ 0 ] + m4[ 6 ] * p[ 1 ] + m4[ 10 ] * p[ 2 ] + m4[ 14 ];
+                const pan = Math.max( -1, Math.min( 1, vx / ( Math.abs( vz ) + Math.abs( vx ) + 1e-6 ) ) );
+                vo.osc.frequency.setTargetAtTime( freq, t, 0.12 );
+                vo.gain.gain.setTargetAtTime( g, t, 0.18 );
+                vo.pan.pan.setTargetAtTime( pan, t, 0.12 );
+            } else {
+                vo.gain.gain.setTargetAtTime( 0, t, 0.2 );
+            }
         } );
     }
-    renderBk();
-    document.getElementById( "mark" ).addEventListener( "click", function() {
-        const nn = nearestNamed();
-        bookmarks.push( { n: nn[ 0 ], p: cam.pos.slice(), y: cam.yaw, pi: cam.pitch } );
-        saveBk();
-        renderBk();
-    } );
-    document.getElementById( "tourbtn" ).addEventListener( "click", function() {
-        if ( bookmarks.length ) { tour = { i: 0, dwell: 0 }; }
+
+    const modeChipEls = {};
+    function setMode( name, on ) {
+        if ( name === "RADIO" ) { radioOn = on; }
+        if ( name === "1C" ) {
+            lightOn = on;
+            if ( on ) { lsYears = 0; }
+        }
+        if ( name === "AUDIO" ) {
+            audioOn = on;
+            if ( on ) {
+                ensureAudio();
+                audio.ctx.resume();
+                audio.master.gain.setTargetAtTime( 0.14, audio.ctx.currentTime, 0.3 );
+            } else if ( audio ) {
+                audio.master.gain.setTargetAtTime( 0, audio.ctx.currentTime, 0.15 );
+            }
+        }
+        if ( name === "DRIFT" ) {
+            driftOn = on;
+            if ( on ) { driftDwell = 0; }
+        }
+        modeChipEls[ name ].classList.toggle( "off", !on );
+    }
+    function modeState( name ) {
+        return name === "RADIO" ? radioOn : name === "1C" ? lightOn : name === "AUDIO" ? audioOn : driftOn;
+    }
+    [ "RADIO", "1C", "AUDIO", "DRIFT" ].forEach( function( name ) {
+        const btn = document.createElement( "button" );
+        btn.className = "chip off";
+        btn.type = "button";
+        btn.textContent = name;
+        btn.addEventListener( "click", function() {
+            setMode( name, !modeState( name ) );
+        } );
+        document.getElementById( "modechips" ).appendChild( btn );
+        modeChipEls[ name ] = btn;
     } );
 
     const inspEl = document.getElementById( "insp" );
@@ -1280,7 +1366,7 @@ async function main() {
     document.addEventListener( "mousemove", function( e ) {
         if ( !locked ) { return; }
         flight = null;
-        tour = null;
+        if ( driftOn ) { setMode( "DRIFT", false ); }
         cam.yaw += e.movementX * 0.0022;
         cam.pitch -= e.movementY * 0.0022;
         cam.pitch = Math.max( -1.55, Math.min( 1.55, cam.pitch ) );
@@ -1337,10 +1423,8 @@ async function main() {
         };
     }
 
-    const posEl = document.getElementById( "pos" );
     const spdEl = document.getElementById( "spd" );
     const nameEl = document.getElementById( "starname" );
-    const distEl = document.getElementById( "stardist" );
 
     function nearestNamed() {
         let best = -1, bd = Infinity;
@@ -1378,6 +1462,7 @@ async function main() {
     function scanFlares() {
         const limit = Math.pow( exposure * Math.pow( 10, 1.8 ) / 4, 2 );
         const cand = [];
+        const aud = [];
         for ( let i = 0; i < starCount; i++ ) {
             if ( !( specMask >> classes[ i ] & 1 ) ) { continue; }
             const o = i * 4, vo = i * 3;
@@ -1386,7 +1471,13 @@ async function main() {
             const dz = f32[ o + 2 ] + velJS[ vo + 2 ] * tYears - cam.pos[ 2 ];
             const s = ( dx * dx + dy * dy + dz * dz ) * lumfac2[ i ];
             if ( s < limit ) { cand.push( [ s, i ] ); }
+            if ( audioOn && ( aud.length < 12 || s < aud[ aud.length - 1 ][ 0 ] ) ) {
+                aud.push( [ s, i ] );
+                aud.sort( function( a, b ) { return a[ 0 ] - b[ 0 ]; } );
+                if ( aud.length > 12 ) { aud.pop(); }
+            }
         }
+        if ( audioOn ) { updateVoices( aud ); }
         cand.sort( function( a, b ) { return a[ 0 ] - b[ 0 ]; } );
         const top = cand.slice( 0, MAXF ).map( function( c ) { return c[ 1 ]; } );
         for ( const slot of flareSlots ) {
@@ -1423,21 +1514,24 @@ async function main() {
             if ( r >= 1 ) { timeAnim = null; }
         }
 
-        if ( tour && !flight ) {
-            tour.dwell -= dt;
-            if ( tour.dwell <= 0 ) {
-                if ( tour.i < bookmarks.length ) {
-                    const b = bookmarks[ tour.i++ ];
-                    startFlight( b.p.slice(), [ b.y, b.pi ] );
-                    tour.dwell = 1.2;
-                } else {
-                    tour = null;
-                }
+        if ( driftOn && !flight ) {
+            driftDwell -= dt;
+            if ( driftDwell <= 0 ) {
+                const pick = NAMES[ Math.floor( Math.random() * NAMES.length ) ][ 0 ];
+                const p = starPosAt( pick );
+                const th = Math.random() * 2 * Math.PI;
+                const ph = ( Math.random() - 0.5 ) * 2;
+                const off = [ Math.cos( th ) * Math.cos( ph ), Math.sin( ph ), Math.sin( th ) * Math.cos( ph ) ];
+                const tp = [ p[ 0 ] + off[ 0 ] * 1.4, p[ 1 ] + off[ 1 ] * 1.4, p[ 2 ] + off[ 2 ] * 1.4 ];
+                startFlight( tp, dirAngles( p[ 0 ] - tp[ 0 ], p[ 1 ] - tp[ 1 ], p[ 2 ] - tp[ 2 ] ) );
+                driftDwell = 3 + Math.random() * 3;
             }
         }
 
         const v = viewMatrix( cam.pos, cam.yaw, cam.pitch );
-        const speed = baseSpeed * ( keys[ "ShiftLeft" ] || keys[ "ShiftRight" ] ? 10 : 1 );
+        lastV = v;
+        const boost = keys[ "ShiftLeft" ] || keys[ "ShiftRight" ] ? 10 : 1;
+        const speed = ( lightOn ? C_PCS : baseSpeed ) * boost;
         const mv = [ 0, 0, 0 ];
         if ( keys[ "KeyE" ] ) { mv[ 0 ] += v.fwd[ 0 ]; mv[ 1 ] += v.fwd[ 1 ]; mv[ 2 ] += v.fwd[ 2 ]; }
         if ( keys[ "KeyD" ] ) { mv[ 0 ] -= v.fwd[ 0 ]; mv[ 1 ] -= v.fwd[ 1 ]; mv[ 2 ] -= v.fwd[ 2 ]; }
@@ -1448,10 +1542,11 @@ async function main() {
         const ml = Math.hypot( mv[ 0 ], mv[ 1 ], mv[ 2 ] );
         if ( ml > 0 ) {
             flight = null;
-            tour = null;
+            if ( driftOn ) { setMode( "DRIFT", false ); }
             cam.pos[ 0 ] += mv[ 0 ] / ml * speed * dt;
             cam.pos[ 1 ] += mv[ 1 ] / ml * speed * dt;
             cam.pos[ 2 ] += mv[ 2 ] / ml * speed * dt;
+            if ( lightOn ) { lsYears += boost * dt; }
         }
 
         const aspect = canvas.width / canvas.height;
@@ -1513,6 +1608,18 @@ async function main() {
                 pass.setPipeline( markerPipeline );
                 pass.setBindGroup( 0, markerBind );
                 pass.draw( 6, mcount );
+            }
+        }
+
+        if ( radioOn ) {
+            const radioR = ( 126 + tYears ) / 3.26156;
+            if ( radioR > 0.001 ) {
+                updateBubble( radioR );
+                const blw = Math.max( canvas.width / canvas.clientWidth, 1 );
+                device.queue.writeBuffer( bubbleLU, 0, new Float32Array( [ 1, 0.69, 0, 0.20, 1.6 * blw, 0, 0, 0 ] ) );
+                pass.setPipeline( linePipeline );
+                pass.setBindGroup( 0, bubbleBind );
+                pass.draw( 6, bubbleSegCount );
             }
         }
 
@@ -1660,11 +1767,12 @@ async function main() {
         hudT -= dt;
         if ( hudT <= 0 ) {
             hudT = 0.15;
-            posEl.textContent = cam.pos.map( function( n ) { return fmtNum( n ); } ).join( " / " );
-            spdEl.textContent = fmtNum( ml > 0 ? speed : baseSpeed ) + " PC/S";
-            const nn = nearestNamed();
-            nameEl.textContent = nn[ 0 ];
-            distEl.textContent = fmtNum( nn[ 1 ] ) + " PC · " + fmtNum( nn[ 1 ] * 3.262 ) + " LY";
+            if ( lightOn ) {
+                spdEl.textContent = "1.0 C · +" + lsYears.toFixed( 1 ) + " YR";
+            } else {
+                spdEl.textContent = fmtNum( ml > 0 ? speed : baseSpeed ) + " PC/S";
+            }
+            nameEl.textContent = nearestNamed()[ 0 ];
             if ( inspIdx >= 0 ) { updateInsp(); }
             if ( ml === 0 ) { saveHash(); }
         }
