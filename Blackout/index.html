@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blackout</title>
+<style>
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+    body {
+        background: #faf8f3;
+        color: #1e1c18;
+        font-family: Charter, Georgia, "Times New Roman", serif;
+        font-size: 20px;
+        line-height: 1.65;
+    }
+    article {
+        margin: 0 auto;
+        max-width: 42rem;
+        padding: 5rem 1.5rem 8rem;
+    }
+    h1 {
+        font-size: 2.6rem;
+        font-weight: 700;
+        letter-spacing: -0.015em;
+        line-height: 1.15;
+        margin-bottom: 1rem;
+    }
+    .byline {
+        border-bottom: 1px solid #d9d4c8;
+        color: #8a8375;
+        font-family: -apple-system, "Segoe UI", Helvetica, sans-serif;
+        font-size: 0.8rem;
+        letter-spacing: 0.06em;
+        margin-bottom: 2.5rem;
+        padding-bottom: 1.5rem;
+        text-transform: uppercase;
+    }
+    p {
+        margin-bottom: 1.4rem;
+    }
+    blockquote {
+        border-left: 3px solid #1e1c18;
+        color: #55503f;
+        font-style: italic;
+        margin: 2rem 0;
+        padding-left: 1.4rem;
+    }
+    h2 {
+        font-size: 1.5rem;
+        margin: 2.6rem 0 1rem;
+    }
+    .w {
+        border-radius: 1px;
+        position: relative;
+    }
+    .w.cover {
+        background: #000;
+        color: transparent;
+    }
+    #controls {
+        background: #fff;
+        border: 1px solid #e2ddd1;
+        border-radius: 10px;
+        bottom: 20px;
+        box-shadow: 0 6px 24px rgba(30, 28, 24, 0.12);
+        font-family: -apple-system, "Segoe UI", Helvetica, sans-serif;
+        font-size: 12px;
+        padding: 16px 18px;
+        position: fixed;
+        right: 20px;
+        width: 240px;
+    }
+    #controls h3 {
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        margin-bottom: 12px;
+        text-transform: uppercase;
+    }
+    #controls label {
+        color: #8a8375;
+        display: flex;
+        font-size: 11px;
+        justify-content: space-between;
+        letter-spacing: 0.04em;
+        margin-bottom: 4px;
+        text-transform: uppercase;
+    }
+    #controls label span {
+        color: #1e1c18;
+        font-variant-numeric: tabular-nums;
+    }
+    #controls input[type="range"] {
+        accent-color: #1e1c18;
+        display: block;
+        margin-bottom: 14px;
+        width: 100%;
+    }
+    #controls .toggle {
+        align-items: center;
+        display: flex;
+        gap: 8px;
+    }
+    #controls .toggle input {
+        accent-color: #1e1c18;
+    }
+    #controls .toggle label {
+        margin: 0;
+    }
+</style>
+</head>
+<body>
+<article id="post">
+    <h1>De Finibus Bonorum et Malorum</h1>
+    <div class="byline">By Marcus Tullius &middot; 45 BC &middot; 6 min read</div>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+    <p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.</p>
+    <blockquote>Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt.</blockquote>
+    <p>Ut labore et dolore magnam aliquam quaerat voluptatem. Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex ea commodi consequatur. Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur, vel illum qui dolorem eum fugiat quo voluptas nulla pariatur.</p>
+    <h2>Quis Autem Vel Eum</h2>
+    <p>At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint occaecati cupiditate non provident, similique sunt in culpa qui officia deserunt mollitia animi, id est laborum et dolorum fuga.</p>
+    <p>Et harum quidem rerum facilis est et expedita distinctio. Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit quo minus id quod maxime placeat facere possimus, omnis voluptas assumenda est, omnis dolor repellendus. Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe eveniet ut et voluptates repudiandae sint et molestiae non recusandae.</p>
+    <p>Itaque earum rerum hic tenetur a sapiente delectus, ut aut reiciendis voluptatibus maiores alias consequatur aut perferendis doloribus asperiores repellat. Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit quo minus id quod maxime placeat facere possimus.</p>
+</article>
+
+<div id="controls">
+    <h3>Blackout</h3>
+    <label>Words covered <span id="countval">12</span></label>
+    <input type="range" id="count" min="1" max="80" value="12">
+    <label>Flash interval <span id="speedval">50 ms</span></label>
+    <input type="range" id="speed" min="16" max="400" step="2" value="50">
+    <div class="toggle">
+        <input type="checkbox" id="active" checked>
+        <label for="active">Active</label>
+    </div>
+</div>
+
+<script>
+( function() {
+    const post = document.getElementById( "post" );
+    const words = [];
+
+    function wrapWords( node ) {
+        if ( node.nodeType === 3 ) {
+            const frag = document.createDocumentFragment();
+            for ( const part of node.textContent.split( /(\s+)/ ) ) {
+                if ( /\S/.test( part ) ) {
+                    const span = document.createElement( "span" );
+                    span.className = "w";
+                    span.textContent = part;
+                    frag.appendChild( span );
+                    words.push( span );
+                } else {
+                    frag.appendChild( document.createTextNode( part ) );
+                }
+            }
+            node.parentNode.replaceChild( frag, node );
+        } else if ( node.nodeType === 1 ) {
+            for ( const child of [ ...node.childNodes ] ) {
+                wrapWords( child );
+            }
+        }
+    }
+    wrapWords( post );
+
+    const countEl = document.getElementById( "count" );
+    const speedEl = document.getElementById( "speed" );
+    const activeEl = document.getElementById( "active" );
+    const countVal = document.getElementById( "countval" );
+    const speedVal = document.getElementById( "speedval" );
+
+    let covered = [];
+    let last = 0;
+
+    function uncover() {
+        for ( const w of covered ) {
+            w.classList.remove( "cover" );
+        }
+        covered = [];
+    }
+
+    function shuffle() {
+        uncover();
+        const n = Math.min( Number( countEl.value ), words.length );
+        for ( let i = 0; i < n; i++ ) {
+            const w = words[ Math.floor( Math.random() * words.length ) ];
+            if ( w.classList.contains( "cover" ) ) { continue; }
+            w.classList.add( "cover" );
+            covered.push( w );
+        }
+    }
+
+    function tick( now ) {
+        requestAnimationFrame( tick );
+        if ( !activeEl.checked ) { return; }
+        if ( now - last >= Number( speedEl.value ) ) {
+            last = now;
+            shuffle();
+        }
+    }
+    requestAnimationFrame( tick );
+
+    countEl.addEventListener( "input", function() {
+        countVal.textContent = countEl.value;
+    } );
+    speedEl.addEventListener( "input", function() {
+        speedVal.textContent = speedEl.value + " ms";
+    } );
+    activeEl.addEventListener( "change", function() {
+        if ( !activeEl.checked ) { uncover(); }
+    } );
+} )();
+</script>
+</body>
+</html>
