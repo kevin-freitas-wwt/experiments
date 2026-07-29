@@ -104,6 +104,23 @@
         display: flex;
         gap: 8px;
     }
+    #pause {
+        background: #1e1c18;
+        border: 0;
+        border-radius: 6px;
+        color: #faf8f3;
+        cursor: pointer;
+        font: inherit;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        margin-bottom: 12px;
+        padding: 8px 0;
+        text-transform: uppercase;
+        width: 100%;
+    }
+    #pause:hover {
+        background: #3a362e;
+    }
     #controls .toggle input {
         accent-color: #1e1c18;
     }
@@ -134,6 +151,7 @@
     <input type="range" id="speed" min="16" max="400" step="2" value="50">
     <label>Cover duration <span id="durval">50 ms</span></label>
     <input type="range" id="dur" min="1" max="400" step="1" value="50">
+    <button id="pause" type="button">Pause</button>
     <div class="toggle">
         <input type="checkbox" id="active" checked>
         <label for="active">Active</label>
@@ -179,6 +197,7 @@
     let covered = [];
     let last = 0;
     let coveredAt = 0;
+    let paused = false;
 
     function uncover() {
         for ( const w of covered ) {
@@ -200,7 +219,7 @@
 
     function tick( now ) {
         requestAnimationFrame( tick );
-        if ( !activeEl.checked ) { return; }
+        if ( paused || !activeEl.checked ) { return; }
         if ( covered.length && now - coveredAt >= Number( durEl.value ) ) {
             uncover();
         }
@@ -223,6 +242,11 @@
     } );
     activeEl.addEventListener( "change", function() {
         if ( !activeEl.checked ) { uncover(); }
+    } );
+    const pauseEl = document.getElementById( "pause" );
+    pauseEl.addEventListener( "click", function() {
+        paused = !paused;
+        pauseEl.textContent = paused ? "Resume" : "Pause";
     } );
 } )();
 </script>
