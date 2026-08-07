@@ -1377,6 +1377,7 @@ async function main() {
     }
     let driftTarget = null, driftDir = null, driftSpeed = 0;
     let driftTurn = 0.4, driftTurnCur = 0, driftSpeedTgt = 1.2, driftLegT = 0;
+    let driftPhase = "cruise", slingPrevR = null, slingSwung = 0, slingGoal = 0, slingR = 0;
 
     function pickDriftTarget() {
         const cands = [];
@@ -1400,6 +1401,7 @@ async function main() {
         driftTurnCur = 0;
         driftSpeedTgt = 0.9 + Math.random() * 0.8;
         driftLegT = 14 + Math.random() * 10;
+        driftPhase = "cruise";
     }
     let audio = null;
     let lastV = null;
@@ -1926,11 +1928,39 @@ async function main() {
             const tdz = driftTarget ? driftTarget[ 2 ] - cam.pos[ 2 ] : 0;
             const tdist = driftTarget ? Math.hypot( tdx, tdy, tdz ) : 0;
             driftLegT -= dt;
-            if ( !driftTarget || tdist < 0.8 || driftLegT <= 0 ) {
+            if ( !driftTarget || ( driftPhase === "cruise" && driftLegT <= 0 ) ) {
                 pickDriftTarget();
             } else {
-                const des = [ tdx / tdist, tdy / tdist, tdz / tdist ];
-                driftTurnCur += ( driftTurn - driftTurnCur ) * Math.min( dt * 0.5, 1 );
+                let des;
+                if ( driftPhase === "cruise" && tdist < 3 ) {
+                    driftPhase = "sling";
+                    slingPrevR = [ -tdx / tdist, -tdy / tdist, -tdz / tdist ];
+                    slingSwung = 0;
+                    slingGoal = 2 + Math.random() * 1.5;
+                    slingR = Math.max( 0.8, Math.min( tdist * 0.8, 2.2 ) );
+                }
+                if ( driftPhase === "sling" ) {
+                    const rhat = [ -tdx / tdist, -tdy / tdist, -tdz / tdist ];
+                    const swing = Math.acos( Math.max( -1, Math.min( 1,
+                        rhat[ 0 ] * slingPrevR[ 0 ] + rhat[ 1 ] * slingPrevR[ 1 ] + rhat[ 2 ] * slingPrevR[ 2 ] ) ) );
+                    slingSwung += swing;
+                    slingPrevR = rhat;
+                    const rdot = driftDir[ 0 ] * rhat[ 0 ] + driftDir[ 1 ] * rhat[ 1 ] + driftDir[ 2 ] * rhat[ 2 ];
+                    let tx = driftDir[ 0 ] - rdot * rhat[ 0 ];
+                    let ty = driftDir[ 1 ] - rdot * rhat[ 1 ];
+                    let tz = driftDir[ 2 ] - rdot * rhat[ 2 ];
+                    let tl = Math.hypot( tx, ty, tz );
+                    if ( tl < 1e-4 ) { tx = rhat[ 1 ]; ty = -rhat[ 0 ]; tz = 0; tl = Math.hypot( tx, ty, tz ) || 1; }
+                    const corr = ( slingR - tdist ) / slingR * 0.9;
+                    des = [ tx / tl + rhat[ 0 ] * corr, ty / tl + rhat[ 1 ] * corr, tz / tl + rhat[ 2 ] * corr ];
+                    const del = Math.hypot( des[ 0 ], des[ 1 ], des[ 2 ] ) || 1;
+                    for ( let a = 0; a < 3; a++ ) { des[ a ] /= del; }
+                    driftTurnCur += ( 1.0 - driftTurnCur ) * Math.min( dt * 0.7, 1 );
+                    if ( slingSwung >= slingGoal ) { pickDriftTarget(); }
+                } else {
+                    des = [ tdx / tdist, tdy / tdist, tdz / tdist ];
+                    driftTurnCur += ( driftTurn - driftTurnCur ) * Math.min( dt * 0.5, 1 );
+                }
                 const kd = Math.min( dt * driftTurnCur, 1 );
                 for ( let a = 0; a < 3; a++ ) {
                     driftDir[ a ] += ( des[ a ] - driftDir[ a ] ) * kd;
