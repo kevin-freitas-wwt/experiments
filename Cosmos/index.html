@@ -1546,7 +1546,7 @@ async function main() {
                         if ( motionOn && !orient ) {
                             toast( "NO MOTION DATA — CHECK MOTION ACCESS IN BROWSER SETTINGS" );
                         } else if ( motionOn ) {
-                            toast( "MOTION ON · TILT BACK = SPEED · ROLL = TURN" );
+                            toast( "MOTION ON · TILT AWAY = SPEED · DRAG = LOOK" );
                         }
                     }, 1500 );
                 };
@@ -1944,9 +1944,7 @@ async function main() {
 
         let motionSpeed = 0;
         if ( motionOn && orient && orientBase && !flight && ml === 0 ) {
-            const tilt = Math.min( Math.max( ( orient.b - orientBase.b ) / 22.5, 0 ), 1 );
-            const bank = orient.g - orientBase.g;
-            cam.yaw += bank * ( Math.PI / 180 ) * 1.4 * dt;
+            const tilt = Math.min( Math.max( ( orientBase.b - orient.b ) / 22.5, 0 ), 1 );
             motionSpeed = ( lightOn ? C_PCS : baseSpeed ) * ( 1 + 9 * tilt );
             cam.pos[ 0 ] += v.fwd[ 0 ] * motionSpeed * dt;
             cam.pos[ 1 ] += v.fwd[ 1 ] * motionSpeed * dt;
