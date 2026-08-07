@@ -404,6 +404,28 @@
         top: 45%;
         transform: translate(-50%, -50%);
     }
+    #toast {
+        background: rgba(10, 7, 0, 0.85);
+        border: 1px solid rgba(255, 176, 0, 0.6);
+        bottom: 90px;
+        color: #ffb000;
+        font-size: 11px;
+        left: 50%;
+        letter-spacing: 0.15em;
+        opacity: 0;
+        padding: 10px 18px;
+        pointer-events: none;
+        position: fixed;
+        text-align: center;
+        text-transform: uppercase;
+        transform: translateX(-50%);
+        transition: opacity 0.3s;
+        white-space: nowrap;
+        z-index: 20;
+    }
+    #toast.show {
+        opacity: 1;
+    }
     .hidden {
         display: none;
     }
@@ -411,6 +433,7 @@
 </head>
 <body>
 <canvas id="gl"></canvas>
+<div id="toast"></div>
 <div class="hud">
     <div class="bar top">
         <div class="col">
@@ -1338,6 +1361,15 @@ async function main() {
     let radioOn = false, lightOn = false, audioOn = false, driftOn = false, motionOn = false;
     let lsYears = 0;
     let orient = null, orientBase = null;
+
+    const toastEl = document.getElementById( "toast" );
+    let toastT = null;
+    function toast( msg ) {
+        toastEl.textContent = msg;
+        toastEl.classList.add( "show" );
+        clearTimeout( toastT );
+        toastT = setTimeout( function() { toastEl.classList.remove( "show" ); }, 4000 );
+    }
     function onOrient( e ) {
         if ( typeof e.beta !== "number" || typeof e.gamma !== "number" ) { return; }
         orient = { b: e.beta, g: e.gamma };
@@ -1510,12 +1542,32 @@ async function main() {
                 flight = null;
                 const wire = function() {
                     window.addEventListener( "deviceorientation", onOrient );
+                    setTimeout( function() {
+                        if ( motionOn && !orient ) {
+                            toast( "NO MOTION DATA — CHECK MOTION ACCESS IN BROWSER SETTINGS" );
+                        } else if ( motionOn ) {
+                            toast( "MOTION ON · TILT BACK = SPEED · ROLL = TURN" );
+                        }
+                    }, 1500 );
                 };
+                const reqs = [];
                 if ( window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission ) {
-                    DeviceOrientationEvent.requestPermission().then( function( state ) {
-                        if ( state === "granted" ) { wire(); }
-                        else { setMode( "MOTION", false ); }
-                    } ).catch( function() { setMode( "MOTION", false ); } );
+                    reqs.push( DeviceOrientationEvent.requestPermission() );
+                }
+                if ( window.DeviceMotionEvent && DeviceMotionEvent.requestPermission ) {
+                    reqs.push( DeviceMotionEvent.requestPermission() );
+                }
+                if ( reqs.length ) {
+                    Promise.all( reqs ).then( function( states ) {
+                        if ( states.every( function( s ) { return s === "granted"; } ) ) { wire(); }
+                        else {
+                            setMode( "MOTION", false );
+                            toast( "MOTION PERMISSION DENIED" );
+                        }
+                    } ).catch( function() {
+                        setMode( "MOTION", false );
+                        toast( "MOTION PERMISSION BLOCKED — RELOAD AND TAP MOTION FLIGHT AGAIN" );
+                    } );
                 } else {
                     wire();
                 }
@@ -1607,10 +1659,16 @@ async function main() {
     }
 
     function toggleFull() {
-        if ( !document.fullscreenElement ) {
-            ( document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen ).call( document.documentElement );
+        const el = document.documentElement;
+        if ( el.requestFullscreen || el.webkitRequestFullscreen ) {
+            if ( !document.fullscreenElement ) {
+                ( el.requestFullscreen || el.webkitRequestFullscreen ).call( el );
+            } else {
+                document.exitFullscreen();
+            }
         } else {
-            document.exitFullscreen();
+            const clean = document.body.classList.toggle( "clean" );
+            if ( clean ) { toast( "DOUBLE-TAP TO SHOW UI" ); }
         }
     }
     document.getElementById( "full" ).addEventListener( "click", toggleFull );
@@ -1649,8 +1707,14 @@ async function main() {
     } );
 
     let touchDrag = null;
+    let lastTap = 0;
     canvas.addEventListener( "pointerdown", function( e ) {
         if ( e.pointerType === "mouse" ) { return; }
+        const now = performance.now();
+        if ( now - lastTap < 350 && document.body.classList.contains( "clean" ) && !document.fullscreenElement ) {
+            document.body.classList.remove( "clean" );
+        }
+        lastTap = now;
         touchDrag = { x: e.clientX, y: e.clientY, id: e.pointerId };
         canvas.setPointerCapture( e.pointerId );
     } );
