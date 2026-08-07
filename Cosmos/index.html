@@ -1429,13 +1429,20 @@ async function main() {
         audio = { ctx: actx, master: master, live: 0, cooldown: new Map() };
     }
 
+    function pickKind() {
+        const r = Math.random();
+        if ( r < 0.35 ) { return "bell"; }
+        if ( r < 0.50 ) { return "chime"; }
+        if ( r < 0.65 ) { return "pluck"; }
+        if ( r < 0.85 ) { return "pad"; }
+        return "string";
+    }
+
     function triggerNote( freq, g, pan ) {
         const actx = audio.ctx;
         const t = actx.currentTime;
-        const kinds = [ "bell", "pluck", "pad", "string" ];
-        const kind = kinds[ Math.floor( Math.random() * kinds.length ) ];
+        const kind = pickKind();
         const osc = actx.createOscillator();
-        osc.frequency.value = freq;
         osc.detune.value = ( Math.random() - 0.5 ) * 6;
         const filt = actx.createBiquadFilter();
         filt.type = "lowpass";
@@ -1449,20 +1456,34 @@ async function main() {
         env.connect( panner );
         panner.connect( audio.master );
         let attack = 0.3, hold = 0, release = 3;
+        let partialRatio = 0, partialGain = 0, partialRelease = 0;
         if ( kind === "bell" ) {
             osc.type = "sine";
-            filt.frequency.value = 3000;
-            attack = 0.02; release = 3.5 + Math.random() * 1.5;
+            if ( freq < 220 ) { freq *= 2; }
+            osc.frequency.value = freq;
+            filt.frequency.value = 4000;
+            attack = 0.015; release = 4 + Math.random() * 2;
+            partialRatio = 2.756; partialGain = 0.22; partialRelease = 1.2;
+        } else if ( kind === "chime" ) {
+            osc.type = "sine";
+            if ( freq < 330 ) { freq *= 2; }
+            osc.frequency.value = freq;
+            filt.frequency.value = 5000;
+            attack = 0.01; release = 3 + Math.random();
+            partialRatio = 3.0; partialGain = 0.15; partialRelease = 0.8;
         } else if ( kind === "pluck" ) {
             osc.type = "triangle";
+            osc.frequency.value = freq;
             filt.frequency.value = 1600;
             attack = 0.01; release = 1.4;
         } else if ( kind === "pad" ) {
             osc.type = "triangle";
+            osc.frequency.value = freq;
             filt.frequency.value = 900 + Math.random() * 600;
             attack = 0.5 + Math.random() * 0.4; hold = 0.6; release = 2.5;
         } else {
             osc.type = "sawtooth";
+            osc.frequency.value = freq;
             filt.frequency.value = 600 + Math.random() * 700;
             attack = 0.7 + Math.random() * 0.5; hold = 0.5; release = 2.8;
         }
@@ -1471,8 +1492,23 @@ async function main() {
         env.gain.exponentialRampToValueAtTime( peak, t + attack );
         env.gain.setValueAtTime( peak, t + attack + hold );
         env.gain.exponentialRampToValueAtTime( 1e-4, t + attack + hold + release );
+        const end = t + attack + hold + release + 0.1;
+        if ( partialRatio > 0 ) {
+            const p2 = actx.createOscillator();
+            p2.type = "sine";
+            p2.frequency.value = freq * partialRatio;
+            p2.detune.value = ( Math.random() - 0.5 ) * 10;
+            const g2 = actx.createGain();
+            g2.gain.setValueAtTime( 1e-4, t );
+            g2.gain.exponentialRampToValueAtTime( Math.max( peak * partialGain, 1e-4 ), t + attack );
+            g2.gain.exponentialRampToValueAtTime( 1e-4, t + attack + partialRelease );
+            p2.connect( g2 );
+            g2.connect( panner );
+            p2.start( t );
+            p2.stop( end );
+        }
         osc.start( t );
-        osc.stop( t + attack + hold + release + 0.1 );
+        osc.stop( end );
         audio.live++;
         osc.onended = function() {
             audio.live--;
