@@ -83,6 +83,15 @@
     .bar > * {
         flex-shrink: 0;
     }
+    @media ( hover: none ) {
+        .bar {
+            pointer-events: auto;
+            touch-action: pan-x;
+        }
+        #keyswrap {
+            display: none;
+        }
+    }
     @media ( max-width: 720px ) {
         .bar {
             gap: 10px;
@@ -462,7 +471,7 @@
         <button id="full" type="button" title="Fullscreen (V)" aria-label="Fullscreen">
             <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
         </button>
-        <div class="dropwrap">
+        <div class="dropwrap" id="keyswrap">
             <button class="dropbtn" id="keysbtn" type="button">KEYS</button>
             <div class="droplist hidden" id="keyslist">
                 <div class="keyrow">FORWARD<b>E</b></div>
