@@ -491,7 +491,7 @@
         <button id="shot" type="button" title="Snapshot (P)" aria-label="Snapshot">
             <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
         </button>
-        <button id="full" type="button" title="Fullscreen (V)" aria-label="Fullscreen">
+        <button id="full" type="button" title="Hide UI (V)" aria-label="Hide UI">
             <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
         </button>
         <div class="dropwrap" id="keyswrap">
@@ -1659,21 +1659,12 @@ async function main() {
     }
 
     function toggleFull() {
-        const el = document.documentElement;
-        if ( el.requestFullscreen || el.webkitRequestFullscreen ) {
-            if ( !document.fullscreenElement ) {
-                ( el.requestFullscreen || el.webkitRequestFullscreen ).call( el );
-            } else {
-                document.exitFullscreen();
-            }
-        } else {
-            const clean = document.body.classList.toggle( "clean" );
-            if ( clean ) { toast( "DOUBLE-TAP TO SHOW UI" ); }
-        }
+        const clean = document.body.classList.toggle( "clean" );
+        if ( clean ) { toast( "DOUBLE-TAP OR DOUBLE-CLICK TO SHOW UI" ); }
     }
     document.getElementById( "full" ).addEventListener( "click", toggleFull );
-    document.addEventListener( "fullscreenchange", function() {
-        document.body.classList.toggle( "clean", !!document.fullscreenElement );
+    canvas.addEventListener( "dblclick", function() {
+        document.body.classList.remove( "clean" );
     } );
 
     let shotReq = false;
@@ -1711,7 +1702,7 @@ async function main() {
     canvas.addEventListener( "pointerdown", function( e ) {
         if ( e.pointerType === "mouse" ) { return; }
         const now = performance.now();
-        if ( now - lastTap < 350 && document.body.classList.contains( "clean" ) && !document.fullscreenElement ) {
+        if ( now - lastTap < 350 && document.body.classList.contains( "clean" ) ) {
             document.body.classList.remove( "clean" );
         }
         lastTap = now;
