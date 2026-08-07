@@ -1376,7 +1376,7 @@ async function main() {
         if ( !orientBase ) { orientBase = { b: e.beta, g: e.gamma }; }
     }
     let driftTarget = null, driftDir = null, driftSpeed = 0;
-    let driftTurn = 0.4, driftSpeedTgt = 1.2, driftLegT = 0;
+    let driftTurn = 0.4, driftTurnCur = 0, driftSpeedTgt = 1.2, driftLegT = 0;
 
     function pickDriftTarget() {
         const cands = [];
@@ -1397,6 +1397,7 @@ async function main() {
             ? cands[ Math.floor( Math.random() * cands.length ) ]
             : starPosAt( NAMES[ Math.floor( Math.random() * NAMES.length ) ][ 0 ] );
         driftTurn = 0.25 + Math.random() * 0.45;
+        driftTurnCur = 0;
         driftSpeedTgt = 0.9 + Math.random() * 0.8;
         driftLegT = 14 + Math.random() * 10;
     }
@@ -1893,7 +1894,8 @@ async function main() {
                 pickDriftTarget();
             } else {
                 const des = [ tdx / tdist, tdy / tdist, tdz / tdist ];
-                const kd = Math.min( dt * driftTurn, 1 );
+                driftTurnCur += ( driftTurn - driftTurnCur ) * Math.min( dt * 0.5, 1 );
+                const kd = Math.min( dt * driftTurnCur, 1 );
                 for ( let a = 0; a < 3; a++ ) {
                     driftDir[ a ] += ( des[ a ] - driftDir[ a ] ) * kd;
                 }
