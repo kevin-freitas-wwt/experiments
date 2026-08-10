@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panes — One Scene, Many Windows</title>
+    <meta name="description" content="One aquarium spread across every browser window on your desktop. Fish swim in real screen coordinates, so moving a window moves the water. No server, no plugin — just screenX, screenY and a BroadcastChannel.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="experiments by Kevin">
+    <meta property="og:title" content="Panes — One Scene, Many Windows">
+    <meta property="og:description" content="One aquarium spread across every browser window on your desktop. Fish swim in real screen coordinates, so moving a window moves the water. No server, no plugin — just screenX, screenY and a BroadcastChannel.">
+    <meta property="og:url" content="https://kevin-freitas-wwt.github.io/experiments/Panes/">
+    <meta property="og:image" content="https://kevin-freitas-wwt.github.io/experiments/Panes/thumb.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Panes — One Scene, Many Windows">
+    <meta name="twitter:description" content="One aquarium spread across every browser window on your desktop. Fish swim in real screen coordinates, so moving a window moves the water.">
+    <meta name="twitter:image" content="https://kevin-freitas-wwt.github.io/experiments/Panes/thumb.png">
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <style>
+        :root {
+            --edge: #232a2e;
+            --grid: #14191c;
+            --ink: #e8efe9;
+            --mute: #5d6b70;
+            --sea: #070a0b;
+            --warn: #ff5c3a;
+            --wire: #1f7a5e;
+            --wire-hi: #43f5b0;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        html, body {
+            height: 100%;
+        }
+        body {
+            background: var( --sea );
+            color: var( --ink );
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            margin: 0;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            height: 100%;
+            inset: 0;
+            position: fixed;
+            width: 100%;
+        }
+        .hud {
+            font-size: 10px;
+            letter-spacing: 0.08em;
+            line-height: 1.5;
+            pointer-events: none;
+            position: fixed;
+            text-transform: uppercase;
+            z-index: 2;
+        }
+        .hud--tl {
+            left: 10px;
+            top: 9px;
+        }
+        .hud--br {
+            bottom: 9px;
+            right: 10px;
+            text-align: right;
+        }
+        .hud b {
+            color: var( --wire-hi );
+            font-weight: 400;
+        }
+        .hud i {
+            color: var( --mute );
+            font-style: normal;
+        }
+        .lead {
+            color: var( --warn );
+        }
+        .panel {
+            background: rgba( 7, 10, 11, 0.88 );
+            border: 1px solid var( --edge );
+            left: 50%;
+            max-width: calc( 100% - 32px );
+            padding: 22px 24px 20px;
+            position: fixed;
+            top: 50%;
+            transform: translate( -50%, -50% );
+            transition: opacity 0.4s ease, visibility 0.4s;
+            width: 430px;
+            z-index: 3;
+        }
+        .panel[hidden] {
+            display: block;
+            opacity: 0;
+            pointer-events: none;
+            visibility: hidden;
+        }
+        .panel h1 {
+            font-size: 13px;
+            letter-spacing: 0.22em;
+            margin: 0 0 14px;
+            text-transform: uppercase;
+        }
+        .panel p {
+            color: var( --mute );
+            font-size: 11px;
+            line-height: 1.75;
+            margin: 0 0 14px;
+        }
+        .panel kbd {
+            border: 1px solid var( --edge );
+            color: var( --ink );
+            font: inherit;
+            padding: 1px 4px;
+        }
+        button {
+            background: none;
+            border: 1px solid var( --wire );
+            color: var( --wire-hi );
+            cursor: pointer;
+            font: inherit;
+            font-size: 11px;
+            letter-spacing: 0.14em;
+            padding: 9px 14px;
+            text-transform: uppercase;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+        button:hover {
+            background: var( --wire );
+            color: var( --sea );
+        }
+        .rowbtn {
+            display: flex;
+            gap: 8px;
+        }
+        @media ( prefers-reduced-motion: reduce ) {
+            .panel {
+                transition: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="stage"></canvas>
+
+    <div class="hud hud--tl">
+        <div>pane <b id="tag">–</b> <span id="role"></span></div>
+        <div><i id="pose">0,0 0×0</i></div>
+    </div>
+    <div class="hud hud--br">
+        <div><b id="count">1</b> pane<span id="plural"></span> · <i id="fps">–</i></div>
+        <div><i>panes · screenX + broadcastchannel</i></div>
+    </div>
+
+    <div class="panel" id="intro">
+        <h1>Panes</h1>
+        <p>One aquarium, many windows. The fish live in your <em>desktop's</em> coordinate space, not the page's. Every window is a pane of glass looking into the same tank.</p>
+        <p>Open a second window, then drag them around. The water moves. Press <kbd>N</kbd> any time for another pane, <kbd>H</kbd> to hide this.</p>
+        <div class="rowbtn">
+            <button id="spawn">Open a pane</button>
+            <button id="dismiss">Dive in</button>
+        </div>
+    </div>
+
+    <script>
+    ( function() {
+        "use strict";
+
+        const CH = "panes-v1";
+        const FISH = 44;
+        const TIMEOUT = 1400;
+        const bus = new BroadcastChannel( CH );
+
+        /* Fresh identity per load. sessionStorage is cloned into windows opened
+           with window.open(), so persisting it would hand out duplicate ids. */
+        const wid = Math.random().toString( 36 ).slice( 2, 7 );
+        const born = Date.now();
+
+        const cv = document.getElementById( "stage" );
+        const cx = cv.getContext( "2d" );
+        const el = {
+            count: document.getElementById( "count" ),
+            fps: document.getElementById( "fps" ),
+            intro: document.getElementById( "intro" ),
+            plural: document.getElementById( "plural" ),
+            pose: document.getElementById( "pose" ),
+            role: document.getElementById( "role" ),
+            tag: document.getElementById( "tag" )
+        };
+        el.tag.textContent = wid;
+
+        const peers = new Map();
+        let fish = [];
+        let rings = [];
+        let leader = false;
+        let dpr = 1;
+        let last = performance.now();
+        let fpsAvg = 60;
+        let prevPose = null;
+
+        function chromeOffset() {
+            return {
+                x: window.screenX + Math.max( 0, ( window.outerWidth - window.innerWidth ) / 2 ),
+                y: window.screenY + Math.max( 0, window.outerHeight - window.innerHeight )
+            };
+        }
+
+        function pose() {
+            const o = chromeOffset();
+            return { h: window.innerHeight, w: window.innerWidth, x: o.x, y: o.y };
+        }
+
+        function resize() {
+            dpr = Math.min( 2, window.devicePixelRatio || 1 );
+            cv.width = Math.floor( window.innerWidth * dpr );
+            cv.height = Math.floor( window.innerHeight * dpr );
+            cx.setTransform( dpr, 0, 0, dpr, 0, 0 );
+        }
+        window.addEventListener( "resize", resize );
+        resize();
+
+        function seed() {
+            const p = pose();
+            fish = Array.from( { length: FISH }, function( _, i ) {
+                const a = Math.random() * Math.PI * 2;
+                const s = 26 + Math.random() * 34;
+                return {
+                    hue: i % 7 === 0 ? 1 : 0,
+                    r: 3 + Math.random() * 5,
+                    vx: Math.cos( a ) * s,
+                    vy: Math.sin( a ) * s,
+                    x: p.x + Math.random() * p.w,
+                    y: p.y + Math.random() * p.h
+                };
+            } );
+        }
+
+        function bounds() {
+            let b = null;
+            peers.forEach( function( p ) {
+                const r = { x0: p.x, x1: p.x + p.w, y0: p.y, y1: p.y + p.h };
+                b = b ? {
+                    x0: Math.min( b.x0, r.x0 ), x1: Math.max( b.x1, r.x1 ),
+                    y0: Math.min( b.y0, r.y0 ), y1: Math.max( b.y1, r.y1 )
+                } : r;
+            } );
+            if ( !b ) {
+                const p = pose();
+                b = { x0: p.x, x1: p.x + p.w, y0: p.y, y1: p.y + p.h };
+            }
+            const pad = 90;
+            return { x0: b.x0 - pad, x1: b.x1 + pad, y0: b.y0 - pad, y1: b.y1 + pad };
+        }
+
+        function centroid() {
+            let n = 0, x = 0, y = 0;
+            peers.forEach( function( p ) {
+                x += p.x + p.w / 2;
+                y += p.y + p.h / 2;
+                n++;
+            } );
+            return n ? { x: x / n, y: y / n } : null;
+        }
+
+        function step( dt ) {
+            const b = bounds();
+            const c = centroid();
+            for ( const f of fish ) {
+                if ( c ) {
+                    const dx = c.x - f.x, dy = c.y - f.y;
+                    const d = Math.hypot( dx, dy ) || 1;
+                    const pull = d > 620 ? 26 : 5;
+                    f.vx += ( dx / d ) * pull * dt;
+                    f.vy += ( dy / d ) * pull * dt;
+                }
+                for ( const r of rings ) {
+                    const dx = f.x - r.x, dy = f.y - r.y;
+                    const d = Math.hypot( dx, dy ) || 1;
+                    if ( Math.abs( d - r.age * 620 ) < 70 ) {
+                        f.vx += ( dx / d ) * 240 * dt;
+                        f.vy += ( dy / d ) * 240 * dt;
+                    }
+                }
+                f.vx += ( Math.random() - 0.5 ) * 46 * dt;
+                f.vy += ( Math.random() - 0.5 ) * 46 * dt;
+                const sp = Math.hypot( f.vx, f.vy ) || 1;
+                const cap = Math.min( 132, Math.max( 30, sp ) );
+                f.vx = ( f.vx / sp ) * cap;
+                f.vy = ( f.vy / sp ) * cap;
+                f.x += f.vx * dt;
+                f.y += f.vy * dt;
+                if ( f.x < b.x0 ) { f.x = b.x0; f.vx = Math.abs( f.vx ); }
+                if ( f.x > b.x1 ) { f.x = b.x1; f.vx = -Math.abs( f.vx ); }
+                if ( f.y < b.y0 ) { f.y = b.y0; f.vy = Math.abs( f.vy ); }
+                if ( f.y > b.y1 ) { f.y = b.y1; f.vy = -Math.abs( f.vy ); }
+            }
+            rings = rings.filter( function( r ) {
+                r.age += dt;
+                return r.age < 1;
+            } );
+        }
+
+        function draw( now ) {
+            const o = pose();
+            cx.fillStyle = "#070a0b";
+            cx.fillRect( 0, 0, o.w, o.h );
+
+            cx.strokeStyle = "#14191c";
+            cx.lineWidth = 1;
+            cx.beginPath();
+            for ( let gx = -( o.x % 60 ); gx < o.w; gx += 60 ) {
+                cx.moveTo( Math.floor( gx ) + 0.5, 0 );
+                cx.lineTo( Math.floor( gx ) + 0.5, o.h );
+            }
+            for ( let gy = -( o.y % 60 ); gy < o.h; gy += 60 ) {
+                cx.moveTo( 0, Math.floor( gy ) + 0.5 );
+                cx.lineTo( o.w, Math.floor( gy ) + 0.5 );
+            }
+            cx.stroke();
+
+            const c = centroid();
+            if ( c && peers.size > 1 ) {
+                cx.save();
+                cx.setLineDash( [ 3, 5 ] );
+                cx.strokeStyle = "#1f7a5e";
+                peers.forEach( function( p ) {
+                    cx.beginPath();
+                    cx.moveTo( c.x - o.x, c.y - o.y );
+                    cx.lineTo( p.x + p.w / 2 - o.x, p.y + p.h / 2 - o.y );
+                    cx.stroke();
+                } );
+                cx.restore();
+
+                const pulse = 30 + Math.sin( now / 620 ) * 5;
+                cx.strokeStyle = "#43f5b0";
+                cx.beginPath();
+                cx.arc( c.x - o.x, c.y - o.y, pulse, 0, Math.PI * 2 );
+                cx.stroke();
+                cx.fillStyle = "#5d6b70";
+                cx.font = "10px ui-monospace, monospace";
+                cx.fillText( "CENTROID", c.x - o.x + pulse + 8, c.y - o.y + 3 );
+            }
+
+            cx.strokeStyle = "#232a2e";
+            peers.forEach( function( p, id ) {
+                if ( id === wid ) {
+                    return;
+                }
+                cx.strokeRect( p.x - o.x + 0.5, p.y - o.y + 0.5, p.w, p.h );
+                cx.fillStyle = "#5d6b70";
+                cx.font = "10px ui-monospace, monospace";
+                cx.fillText( id.toUpperCase(), p.x - o.x + 6, p.y - o.y + 14 );
+            } );
+
+            for ( const r of rings ) {
+                cx.globalAlpha = 1 - r.age;
+                cx.strokeStyle = "#1f7a5e";
+                cx.beginPath();
+                cx.arc( r.x - o.x, r.y - o.y, r.age * 620, 0, Math.PI * 2 );
+                cx.stroke();
+                cx.globalAlpha = 1;
+            }
+
+            for ( const f of fish ) {
+                const a = Math.atan2( f.vy, f.vx );
+                const x = f.x - o.x, y = f.y - o.y;
+                if ( x < -60 || y < -60 || x > o.w + 60 || y > o.h + 60 ) {
+                    continue;
+                }
+                cx.save();
+                cx.translate( x, y );
+                cx.rotate( a );
+                cx.fillStyle = f.hue ? "#ff5c3a" : "#43f5b0";
+                cx.globalAlpha = 0.13;
+                cx.beginPath();
+                cx.moveTo( f.r, f.r * 0.8 );
+                cx.lineTo( -f.r * 7, 0 );
+                cx.lineTo( f.r, -f.r * 0.8 );
+                cx.closePath();
+                cx.fill();
+                cx.globalAlpha = 1;
+                cx.beginPath();
+                cx.moveTo( f.r * 3.1, 0 );
+                cx.lineTo( -f.r * 1.5, f.r );
+                cx.lineTo( -f.r * 0.6, 0 );
+                cx.lineTo( -f.r * 1.5, -f.r );
+                cx.closePath();
+                cx.fill();
+                cx.restore();
+            }
+
+            cx.strokeStyle = "#232a2e";
+            cx.strokeRect( 0.5, 0.5, o.w - 1, o.h - 1 );
+        }
+
+        function announce() {
+            const p = pose();
+            bus.postMessage( { born: born, type: "pose", wid: wid, ...p } );
+            peers.set( wid, { born: born, seen: performance.now(), ...p } );
+        }
+
+        function prune() {
+            const t = performance.now();
+            peers.forEach( function( p, id ) {
+                if ( id !== wid && t - p.seen > TIMEOUT ) {
+                    peers.delete( id );
+                }
+            } );
+        }
+
+        function electing() {
+            let best = null;
+            peers.forEach( function( p, id ) {
+                if ( !best || p.born < best.born || ( p.born === best.born && id < best.id ) ) {
+                    best = { born: p.born, id: id };
+                }
+            } );
+            return !best || best.id === wid;
+        }
+
+        bus.onmessage = function( e ) {
+            const m = e.data;
+            if ( m.wid === wid ) {
+                return;
+            }
+            if ( m.type === "pose" ) {
+                peers.set( m.wid, { born: m.born, h: m.h, seen: performance.now(), w: m.w, x: m.x, y: m.y } );
+            } else if ( m.type === "state" && !leader ) {
+                fish = m.fish;
+                rings = m.rings;
+            } else if ( m.type === "ring" ) {
+                rings.push( { age: 0, x: m.x, y: m.y } );
+            } else if ( m.type === "bye" ) {
+                peers.delete( m.wid );
+            }
+        };
+
+        window.addEventListener( "pagehide", function() {
+            bus.postMessage( { type: "bye", wid: wid } );
+        } );
+
+        let poseClock = 0, stateClock = 0;
+
+        function frame( now ) {
+            const dt = Math.min( 0.05, ( now - last ) / 1000 );
+            last = now;
+            fpsAvg += ( 1 / Math.max( dt, 0.001 ) - fpsAvg ) * 0.05;
+
+            poseClock += dt;
+            if ( poseClock > 0.06 ) {
+                poseClock = 0;
+                announce();
+                prune();
+                leader = electing();
+            }
+
+            const p = pose();
+            if ( prevPose ) {
+                const shove = Math.hypot( p.x - prevPose.x, p.y - prevPose.y );
+                if ( shove > 14 ) {
+                    const r = { x: p.x + p.w / 2, y: p.y + p.h / 2 };
+                    rings.push( { age: 0, ...r } );
+                    bus.postMessage( { type: "ring", wid: wid, ...r } );
+                }
+            }
+            prevPose = p;
+
+            if ( leader ) {
+                step( dt );
+                stateClock += dt;
+                if ( stateClock > 0.05 ) {
+                    stateClock = 0;
+                    bus.postMessage( { fish: fish, rings: rings, type: "state", wid: wid } );
+                }
+            } else {
+                step( dt );
+            }
+
+            draw( now );
+
+            el.count.textContent = peers.size;
+            el.plural.textContent = peers.size === 1 ? "" : "s";
+            el.fps.textContent = Math.round( fpsAvg ) + " fps";
+            el.pose.textContent = Math.round( p.x ) + "," + Math.round( p.y ) + " " + p.w + "×" + p.h;
+            el.role.innerHTML = leader ? '<span class="lead">· simulating</span>' : '<i>· mirroring</i>';
+
+            requestAnimationFrame( frame );
+        }
+
+        function spawn() {
+            const w = 520, h = 400;
+            window.open(
+                location.href,
+                "_blank",
+                "popup=1,width=" + w + ",height=" + h +
+                ",left=" + ( window.screenX + 120 ) + ",top=" + ( window.screenY + 120 )
+            );
+        }
+
+        document.getElementById( "spawn" ).addEventListener( "click", spawn );
+        document.getElementById( "dismiss" ).addEventListener( "click", function() {
+            el.intro.hidden = true;
+        } );
+        window.addEventListener( "keydown", function( e ) {
+            const k = e.key.toLowerCase();
+            if ( k === "n" ) {
+                spawn();
+            } else if ( k === "h" ) {
+                el.intro.hidden = !el.intro.hidden;
+            }
+        } );
+
+        if ( window.opener ) {
+            el.intro.hidden = true;
+        }
+
+        seed();
+        announce();
+        requestAnimationFrame( frame );
+    } )();
+    </script>
+</body>
+</html>
