@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>pdf-to-html — Skill Showcase</title>
+    <meta name="description" content="A Claude skill that converts PDFs into clean, semantic HTML/CSS with mobile and print stylesheets, carried-over images and palette, and automated flow verification. Four real conversions, side by side.">
+    <meta property="og:title" content="pdf-to-html — Skill Showcase">
+    <meta property="og:description" content="PDFs converted to clean, semantic HTML/CSS with verified content flow. Four real examples, PDF vs HTML, side by side.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="showcase-assets/pdf-to-html-showcase-og.jpg">
+    <style>
+        /* ---------- base ---------- */
+        :root {
+            --color-accent: #2563eb;
+            --color-border: #e4e4e7;
+            --color-ink: #18181b;
+            --color-muted: #71717a;
+            --color-pass: #16a34a;
+            --color-surface: #fafafa;
+            --color-warn: #d97706;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            background: var(--color-surface);
+            color: var(--color-ink);
+            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+            line-height: 1.6;
+            margin: 0;
+        }
+        header {
+            background: #fff;
+            border-bottom: 1px solid var(--color-border);
+            padding: 4rem 1.5rem 3rem;
+            text-align: center;
+        }
+        header h1 {
+            font-size: 2.4rem;
+            letter-spacing: -0.02em;
+            margin: 0 0 0.5rem;
+        }
+        header h1 code {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 0.4rem;
+            font-size: 0.9em;
+            padding: 0.05em 0.3em;
+        }
+        header p {
+            color: var(--color-muted);
+            margin: 0 auto;
+            max-width: 46rem;
+        }
+        .get-skill {
+            align-items: center;
+            display: flex;
+            gap: 0.75rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+        .get-skill a {
+            background: var(--color-accent);
+            border-radius: 0.5rem;
+            color: #fff;
+            font-weight: 500;
+            padding: 0.55rem 1.1rem;
+            text-decoration: none;
+        }
+        .get-skill a:hover {
+            background: #1d4ed8;
+        }
+        .get-skill span {
+            font-size: 0.85rem;
+        }
+        main {
+            margin: 0 auto;
+            max-width: 72rem;
+            padding: 0 1.5rem 4rem;
+        }
+        h2 {
+            font-size: 1.5rem;
+            letter-spacing: -0.01em;
+            margin: 3rem 0 1rem;
+        }
+        .how {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: repeat( auto-fit, minmax( 15rem, 1fr ) );
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        .how li {
+            background: #fff;
+            border: 1px solid var(--color-border);
+            border-radius: 0.75rem;
+            padding: 1.1rem 1.25rem;
+        }
+        .how li strong {
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+        .how li span {
+            color: var(--color-muted);
+            font-size: 0.92rem;
+        }
+        /* ---------- example cards ---------- */
+        .example {
+            background: #fff;
+            border: 1px solid var(--color-border);
+            border-radius: 1rem;
+            margin: 1.5rem 0;
+            overflow: hidden;
+            padding: 1.75rem;
+        }
+        .example h3 {
+            font-size: 1.2rem;
+            margin: 0 0 0.25rem;
+        }
+        .example .meta {
+            color: var(--color-muted);
+            font-size: 0.92rem;
+            margin: 0 0 1.25rem;
+        }
+        .example .meta .score {
+            color: var(--color-pass);
+            font-weight: 600;
+        }
+        .example .meta .score.adjusted {
+            color: var(--color-warn);
+        }
+        .compare {
+            display: grid;
+            gap: 1.25rem;
+            grid-template-columns: 1fr 1fr;
+        }
+        .compare figure {
+            margin: 0;
+        }
+        .compare figcaption {
+            color: var(--color-muted);
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+        }
+        .compare .shot {
+            align-items: start;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 0.6rem;
+            display: flex;
+            height: 24rem;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .compare img {
+            display: block;
+            height: auto;
+            width: 100%;
+        }
+        .compare .pdf-shot img {
+            margin: 0 auto;
+            width: auto;
+            max-height: 24rem;
+            max-width: 100%;
+        }
+        .links {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.25rem;
+        }
+        .links a {
+            border: 1px solid var(--color-border);
+            border-radius: 0.5rem;
+            color: var(--color-accent);
+            font-size: 0.92rem;
+            font-weight: 500;
+            padding: 0.45rem 0.9rem;
+            text-decoration: none;
+        }
+        .links a:hover {
+            background: var(--color-surface);
+        }
+        .links a.primary {
+            background: var(--color-accent);
+            border-color: var(--color-accent);
+            color: #fff;
+        }
+        footer {
+            color: var(--color-muted);
+            font-size: 0.85rem;
+            padding: 2rem 1.5rem 3rem;
+            text-align: center;
+        }
+        /* ---------- mobile ---------- */
+        @media (max-width: 720px) {
+            header {
+                padding: 2.5rem 1.25rem 2rem;
+            }
+            header h1 {
+                font-size: 1.7rem;
+            }
+            .compare {
+                grid-template-columns: 1fr;
+            }
+            .compare .shot {
+                height: 17rem;
+            }
+            .example {
+                padding: 1.25rem;
+            }
+        }
+        /* ---------- print ---------- */
+        @media print {
+            body {
+                background: #fff;
+                color: #000;
+            }
+            .example {
+                page-break-inside: avoid;
+            }
+            .links a {
+                color: #000;
+            }
+            .links a::after {
+                content: " (" attr(href) ")";
+                font-size: 0.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1><code>pdf-to-html</code></h1>
+        <p>A Claude skill that converts any PDF into a clean, semantic HTML/CSS document — no markup soup, no absolute positioning. Content images and the source palette carry over, every page ships with mobile and print stylesheets, and an automated verification loop diffs the HTML's content flow against the PDF until it matches.</p>
+        <p class="get-skill"><a download href="pdf-to-html.skill">Download the skill</a><span>.skill file — install in Claude via Save skill</span></p>
+    </header>
+    <main>
+        <h2>How it works</h2>
+        <ol class="how">
+            <li><strong>1 · Read the PDF</strong><span>Text, tables, and page renders are extracted and inspected; scanned documents get OCR first.</span></li>
+            <li><strong>2 · Carry images &amp; palette</strong><span>Content images are triaged from decorative artifacts and placed in reading order; dominant colors become CSS custom properties.</span></li>
+            <li><strong>3 · Author semantic HTML</strong><span>Real headings, tables, lists, and figures in the PDF's reading order — with base, mobile, and print CSS tiers. Optional sticky section nav.</span></li>
+            <li><strong>4 · Verify the flow</strong><span>A comparison script aligns both documents word-by-word (column-aware) and iterates until the flow score passes, with every exclusion documented.</span></li>
+        </ol>
+
+        <h2>Examples</h2>
+
+        <article class="example">
+            <h3>WWT 401(k) Plan Highlights</h3>
+            <p class="meta">4-page benefits document · text layer · two-column pages and tables · flow score <span class="score">0.9813</span>, first pass</p>
+            <div class="compare">
+                <figure>
+                    <figcaption>Original PDF</figcaption>
+                    <div class="shot pdf-shot"><img src="showcase-assets/wwt-401k-plan-highlights-pdf.jpg" alt="First page of the 401k plan highlights PDF"></div>
+                </figure>
+                <figure>
+                    <figcaption>Converted HTML</figcaption>
+                    <div class="shot"><img src="showcase-assets/wwt-401k-plan-highlights-html.jpg" alt="Converted HTML page with hero photo and semantic layout"></div>
+                </figure>
+            </div>
+            <div class="links">
+                <a class="primary" href="wwt-401k-plan-highlights.html">View HTML</a>
+                <a href="wwt-401k-plan-highlights.pdf">Original PDF</a>
+            </div>
+        </article>
+
+        <article class="example">
+            <h3>WWT Information Security Policy 2025</h3>
+            <p class="meta">22-page scanned slide deck · OCR required · 14 graphics carried over · navy/yellow palette sampled · flow score <span class="score adjusted">0.9091 raw / 0.988 adjusted</span> (documented OCR exclusions)</p>
+            <div class="compare">
+                <figure>
+                    <figcaption>Original PDF</figcaption>
+                    <div class="shot pdf-shot"><img src="showcase-assets/wwt-information-security-policy-2025-pdf.jpg" alt="Title slide of the scanned information security policy deck"></div>
+                </figure>
+                <figure>
+                    <figcaption>Converted HTML</figcaption>
+                    <div class="shot"><img src="showcase-assets/wwt-information-security-policy-2025-html.jpg" alt="Converted HTML with navy hero, cover art, and policy sections"></div>
+                </figure>
+            </div>
+            <div class="links">
+                <a class="primary" href="wwt-information-security-policy-2025.html">View HTML</a>
+                <a href="wwt-information-security-policy-2025.pdf">Original PDF</a>
+            </div>
+        </article>
+
+        <article class="example">
+            <h3>NASA Artemis Multimedia Catalog</h3>
+            <p class="meta">39-page image-heavy catalog · 203 product images re-cropped and carried over · 300+ download links wired up · flow score <span class="score adjusted">0.7282 raw / 0.9822 card-order</span> (grid text-layer artifacts documented)</p>
+            <div class="compare">
+                <figure>
+                    <figcaption>Original PDF</figcaption>
+                    <div class="shot pdf-shot"><img src="showcase-assets/artemis-multimedia-catalog-pdf.jpg" alt="Cover of the Artemis multimedia catalog PDF"></div>
+                </figure>
+                <figure>
+                    <figcaption>Converted HTML</figcaption>
+                    <div class="shot"><img src="showcase-assets/artemis-multimedia-catalog-html.jpg" alt="Converted HTML catalog with Artemis palette and asset grid"></div>
+                </figure>
+            </div>
+            <div class="links">
+                <a class="primary" href="artemis-multimedia-catalog.html">View HTML</a>
+                <a href="artemis-multimedia-catalog.pdf">Original PDF</a>
+            </div>
+        </article>
+
+        <article class="example">
+            <h3>TMO Einstein Workshop — Sessions Lineup</h3>
+            <p class="meta">7-slide deck · T-Mobile magenta palette confirmed against text colors · sticky section nav (opt-in) · flow score <span class="score">0.9693</span>, first pass</p>
+            <div class="compare">
+                <figure>
+                    <figcaption>Original PDF</figcaption>
+                    <div class="shot pdf-shot"><img src="showcase-assets/tmo-einstein-workshop-sessions-pdf.jpg" alt="Black title slide of the workshop deck with Einstein line art"></div>
+                </figure>
+                <figure>
+                    <figcaption>Converted HTML</figcaption>
+                    <div class="shot"><img src="showcase-assets/tmo-einstein-workshop-sessions-html.jpg" alt="Converted HTML with magenta accents and sticky session nav"></div>
+                </figure>
+            </div>
+            <div class="links">
+                <a class="primary" href="tmo-einstein-workshop-sessions.html">View HTML</a>
+                <a href="tmo-einstein-workshop-sessions.pdf">Original PDF</a>
+            </div>
+        </article>
+    </main>
+    <footer>
+        Built with the <code>pdf-to-html</code> skill · flow scores measure word-level content alignment between PDF and HTML (threshold 0.95; adjusted scores document OCR and layout artifacts)
+    </footer>
+</body>
+</html>

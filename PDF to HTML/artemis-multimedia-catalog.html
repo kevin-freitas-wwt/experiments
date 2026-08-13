@@ -1,0 +1,1948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Web edition of NASA's Artemis Multimedia Catalog: a visual guide to Artemis branding graphics, logos, patches, concept imagery, photography, print products, videos and virtual meeting backgrounds, with download links for every asset.">
+<title>Artemis Multimedia Catalog</title>
+<style>
+/* ==================== Base ==================== */
+:root {
+    --color-accent: #ef3e42;
+    --color-cosmic: #36059c;
+    --color-cyan: #37b4e5;
+    --color-ink: #17181c;
+    --color-muted: #5a6472;
+    --color-primary: #18468a;
+    --color-space: #0c1035;
+    --color-surface: #eef2f8;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    background: #fff;
+    color: var(--color-ink);
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    margin: 0;
+}
+
+.cover {
+    background: linear-gradient(155deg, var(--color-space) 0%, var(--color-cosmic) 42%, #a11e8c 72%, #f7941e 105%);
+    color: #fff;
+    padding: 3.5rem 1.5rem 3rem;
+}
+
+.cover-inner {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2.5rem;
+    margin: 0 auto;
+    max-width: 1160px;
+}
+
+h1 {
+    font-size: clamp(2.4rem, 5vw, 3.6rem);
+    letter-spacing: -0.01em;
+    line-height: 1.08;
+    margin: 0;
+    max-width: 12ch;
+}
+
+.hero {
+    margin: 0;
+}
+
+.hero img {
+    border-radius: 8px;
+    box-shadow: 0 12px 40px rgba(6, 4, 30, 0.45);
+    display: block;
+    height: auto;
+    width: min(340px, 100%);
+}
+
+main {
+    margin: 0 auto;
+    max-width: 1160px;
+    padding: 1rem 1.5rem 3rem;
+}
+
+p {
+    max-width: 70ch;
+}
+
+h2 {
+    border-bottom: 3px solid var(--color-surface);
+    font-size: 1.65rem;
+    line-height: 1.25;
+    margin: 0 0 1rem;
+    padding-bottom: 0.5rem;
+    scroll-margin-top: 1rem;
+}
+
+h3.group {
+    border-left: 4px solid var(--color-accent);
+    font-size: 1.15rem;
+    margin: 2.25rem 0 0.75rem;
+    padding-left: 0.6rem;
+}
+
+section {
+    margin: 3.25rem 0;
+}
+
+section:target h2 {
+    border-bottom-color: var(--color-cyan);
+}
+
+a {
+    color: var(--color-primary);
+}
+
+/* --- table of contents (document's own contents pages) --- */
+.toc {
+    margin: 2rem 0 0;
+}
+
+.toc ol {
+    display: grid;
+    gap: 0.35rem 2.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.toc a {
+    text-decoration: none;
+}
+
+.toc a:hover {
+    text-decoration: underline;
+}
+
+.sec-num {
+    color: var(--color-accent);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+
+/* --- asset grids and cards --- */
+.grid {
+    display: grid;
+    gap: 1.75rem 1.25rem;
+    grid-template-columns: repeat(auto-fill, minmax(235px, 1fr));
+    margin-top: 1.25rem;
+}
+
+.feature-row {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.asset {
+    display: flex;
+    flex-direction: column;
+}
+
+.asset h3,
+.asset h4 {
+    font-size: 0.95rem;
+    line-height: 1.35;
+    margin: 0 0 0.2rem;
+}
+
+.format {
+    color: var(--color-muted);
+    font-size: 0.8rem;
+    margin: 0 0 0.55rem;
+}
+
+.asset figure {
+    margin: 0;
+}
+
+.asset img,
+.spread img,
+.inline-figure img,
+.solo img {
+    background: var(--color-surface);
+    border-radius: 4px;
+    display: block;
+    height: auto;
+    width: 100%;
+}
+
+.asset figure + figure {
+    margin-top: 0.5rem;
+}
+
+figcaption {
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    margin-top: 0.4rem;
+}
+
+.downloads {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0.65rem 0 0;
+}
+
+.dl-label {
+    color: var(--color-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.chip {
+    background: var(--color-primary);
+    border-radius: 3px;
+    color: #fff;
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    line-height: 1.4;
+    padding: 0.22em 0.6em;
+    text-decoration: none;
+    text-transform: uppercase;
+}
+
+.chip:hover {
+    background: var(--color-cosmic);
+}
+
+.note {
+    background: var(--color-surface);
+    border-left: 4px solid var(--color-accent);
+    border-radius: 0 4px 4px 0;
+    font-size: 0.85rem;
+    margin: 0.75rem 0 0;
+    padding: 0.7rem 0.9rem;
+}
+
+/* --- figures outside grids --- */
+.spread {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
+    margin: 1.5rem 0 0;
+}
+
+.maps {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.solo {
+    margin: 1.5rem 0 0;
+}
+
+.solo img {
+    width: min(440px, 100%);
+}
+
+.inline-figure {
+    margin: 1.25rem 0;
+}
+
+.inline-figure img {
+    width: min(300px, 100%);
+}
+
+.certificate p {
+    max-width: 70ch;
+}
+
+/* --- type specimen --- */
+.specimen {
+    background: linear-gradient(140deg, var(--color-space), var(--color-cosmic));
+    border-radius: 8px;
+    color: #fff;
+    margin: 1.75rem 0 0;
+    padding: 2rem 2.25rem;
+}
+
+.specimen p {
+    margin: 0 0 1rem;
+}
+
+.wordmark {
+    font-size: clamp(1.7rem, 4.5vw, 2.8rem);
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+}
+
+.glyphs {
+    color: var(--color-cyan);
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+}
+
+.naming {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.28em;
+    margin-bottom: 0.4rem;
+    text-transform: uppercase;
+}
+
+.naming span {
+    color: var(--color-cyan);
+}
+
+.specimen figcaption {
+    color: rgba(255, 255, 255, 0.75);
+    margin-top: 1.25rem;
+}
+
+/* --- footer / back cover --- */
+footer {
+    background: linear-gradient(155deg, var(--color-cosmic) 0%, #a11e8c 55%, #f7941e 115%);
+    color: #fff;
+    padding: 3rem 1.5rem;
+}
+
+.footer-inner {
+    margin: 0 auto;
+    max-width: 1160px;
+}
+
+footer p {
+    margin: 0.35rem 0;
+}
+
+footer a {
+    color: #fff;
+}
+
+.pub-number {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.8rem;
+    margin-top: 1.5rem;
+}
+
+/* ==================== Mobile ==================== */
+@media (max-width: 640px) {
+    .cover {
+        padding: 2.5rem 1rem 2rem;
+    }
+
+    .cover-inner {
+        gap: 1.5rem;
+    }
+
+    main {
+        padding: 0.5rem 1rem 2rem;
+    }
+
+    .grid,
+    .spread {
+        gap: 1.25rem 0.9rem;
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .feature-row,
+    .maps {
+        grid-template-columns: 1fr;
+    }
+
+    .toc ol {
+        grid-template-columns: 1fr;
+    }
+
+    h2 {
+        font-size: 1.35rem;
+    }
+
+    .asset h3,
+    .asset h4 {
+        font-size: 0.88rem;
+    }
+
+    .specimen {
+        padding: 1.25rem 1rem;
+    }
+
+    .downloads {
+        gap: 0.5rem;
+    }
+
+    .chip {
+        padding: 0.35em 0.75em;
+    }
+}
+
+/* ==================== Print ==================== */
+@media print {
+    @page {
+        margin: 2cm;
+    }
+
+    body {
+        color: #000;
+    }
+
+    .cover,
+    footer,
+    .specimen {
+        background: #fff !important;
+        color: #000;
+    }
+
+    .cover {
+        padding: 0 0 1rem;
+    }
+
+    footer a,
+    .glyphs,
+    .naming span,
+    .sec-num {
+        color: #000;
+    }
+
+    .specimen figcaption,
+    .pub-number {
+        color: #333;
+    }
+
+    .hero img {
+        box-shadow: none;
+    }
+
+    a {
+        color: #000;
+        text-decoration: none;
+    }
+
+    a[href^="http"]:not(.chip)::after {
+        content: " (" attr(href) ")";
+        font-size: 0.85em;
+    }
+
+    .asset,
+    figure,
+    .toc li {
+        page-break-inside: avoid;
+    }
+
+    h2,
+    h3 {
+        page-break-after: avoid;
+    }
+
+    .chip {
+        background: none;
+        border: 1px solid #000;
+        color: #000;
+    }
+
+}
+</style>
+</head>
+<body>
+<header class="cover">
+<div class="cover-inner">
+<h1>Artemis Multimedia Catalog</h1>
+<figure class="hero">
+<img alt="Artemis Multimedia Catalog cover: the Artemis logo glowing gold above an orange-to-violet gradient horizon" loading="lazy" src="artemis-catalog-images/p01-01.jpg">
+</figure>
+</div>
+</header>
+<main>
+<section id="about">
+<h2>About this Catalog</h2>
+<p>This catalog is a visual guide to the Artemis branding graphics which are
+available for download in multiple formats in Box and on the NASA website.
+If you are in need of a specific format that is unavailable, please contact
+the Artemis Brand Strategy Team:
+<a href="mailto:artemis-creative@mail.nasa.gov">artemis-creative@mail.nasa.gov</a>.</p>
+<div class="toc">
+<ol>
+<li><span class="sec-num">01</span> <a href="#graphics-standard-guide">Artemis Graphics Standard Guide and Graphics Assets</a></li>
+<li><span class="sec-num">02</span> <a href="#inspiration-guide">Artemis Inspiration Guide</a></li>
+<li><span class="sec-num">03</span> <a href="#logo">Artemis Logo</a></li>
+<li><span class="sec-num">04</span> <a href="#patch-and-pin">Artemis Patch and Pin</a></li>
+<li><span class="sec-num">05</span> <a href="#artemis-i-mission-patch">Artemis I Mission Patch</a></li>
+<li><span class="sec-num">06</span> <a href="#inter-typeface">Artemis Inter Typeface</a></li>
+<li><span class="sec-num">07</span> <a href="#presentation-templates">Artemis Presentation Templates</a></li>
+<li><span class="sec-num">08</span> <a href="#mission-maps">Artemis Mission Maps</a></li>
+<li><span class="sec-num">09</span> <a href="#concept-imagery">Concept Imagery</a></li>
+<li><span class="sec-num">10</span> <a href="#photography">Photography</a></li>
+<li><span class="sec-num">11</span> <a href="#print-products">Print Products</a></li>
+<li><span class="sec-num">12</span> <a href="#drawartemis">#DrawArtemis</a></li>
+<li><span class="sec-num">13</span> <a href="#you-are-going">You Are Going: Digital Book and Illustrations</a></li>
+<li><span class="sec-num">14</span> <a href="#videos">Videos</a></li>
+<li><span class="sec-num">15</span> <a href="#virtual-meeting-backgrounds">Virtual Meeting Backgrounds</a></li>
+</ol>
+</div>
+</section>
+
+<section id="graphics-standard-guide">
+<h2>Artemis Graphics Standard Guide and Graphics Assets</h2>
+<p>The goals of the Artemis Graphics Standard Guide and accompanying artwork
+assets are to help establish the visual identity for Artemis and provide a
+framework for developing materials that enhance public knowledge of
+NASA&rsquo;s work. All employees, commercial, and international partners
+should use these guidelines for Artemis mission efforts.</p>
+<p class="downloads"><span class="dl-label">Artemis Graphics Standard Guide download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/ig7cyneubc93iz3z40qzontocg3oj2i8">PDF</a></p>
+<p class="downloads"><span class="dl-label">Graphics assets download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/yn72psxgvjmnu3icmpk1wnrnro8xsezz">Box folder</a></p>
+<figure class="spread">
+<img alt="Cover of the Artemis Graphics Standard Guide" loading="lazy" src="artemis-catalog-images/p04-01.jpg">
+<img alt="Guide spread showing Artemis logo construction, background colors and artwork assets" loading="lazy" src="artemis-catalog-images/p04-02.jpg">
+<img alt="Guide spread showing typography rules and photographic style examples" loading="lazy" src="artemis-catalog-images/p04-03.jpg">
+<img alt="Guide spread showing social media applications of the Artemis brand" loading="lazy" src="artemis-catalog-images/p04-04.jpg">
+</figure>
+</section>
+<section id="inspiration-guide">
+<h2>Artemis Inspiration Guide</h2>
+<p>The Artemis Inspiration Guide is a document showcasing the Artemis brand
+personality, brand tone of voice, as well as serving as an introduction to
+the Torch Bearer Design System.</p>
+<p>Explorations in color, layout design and composition, as well as creative
+use of photography and typography give designers and communicators several
+tools to inspire.</p>
+<p class="downloads"><span class="dl-label">Artemis Inspiration Guide download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/p1txlwgkbrsge07xs8vbbn158odn6i1k">PDF</a></p>
+<figure class="spread">
+<img alt="Cover of the Artemis Inspiration Guide with a large letter A beside the Moon" loading="lazy" src="artemis-catalog-images/p05-01.jpg">
+<img alt="Inspiration Guide spread featuring Orion artwork on the Moon" loading="lazy" src="artemis-catalog-images/p05-02.jpg">
+<img alt="Inspiration Guide spread introducing the Torch Bearer Design System color and layout explorations" loading="lazy" src="artemis-catalog-images/p05-03.jpg">
+<img alt="Inspiration Guide spread showing typography grids and layout studies" loading="lazy" src="artemis-catalog-images/p05-04.jpg">
+</figure>
+</section>
+<section id="logo">
+<h2>Artemis Logo</h2>
+<p>For complete rules (including lock-up with the NASA Insignia) and examples
+on how to use the Artemis logo, please see the <strong>Artemis Graphics
+Standard Guide</strong>.</p>
+<p>The Artemis logo is available in AI, EPS, SVG, and PNG formats for print
+and digital use.</p>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/avg9bzky0cd8sfdun6lyfufvjbbugyt3">Box folder</a></p>
+<div class="grid">
+<article class="asset">
+<figure>
+<img alt="Artemis logo, color version on white" loading="lazy" src="artemis-catalog-images/p06-01.jpg">
+<figcaption>Color version positive</figcaption>
+</figure>
+</article>
+<article class="asset">
+<figure>
+<img alt="Artemis logo, color version on black" loading="lazy" src="artemis-catalog-images/p06-02.jpg">
+<figcaption>Color version reverse</figcaption>
+</figure>
+</article>
+<article class="asset">
+<figure>
+<img alt="Artemis logo, all-white version on a violet-to-orange gradient" loading="lazy" src="artemis-catalog-images/p06-03.jpg">
+<figcaption>White version</figcaption>
+</figure>
+</article>
+<article class="asset">
+<figure>
+<img alt="Artemis logo, all-black version on light gray" loading="lazy" src="artemis-catalog-images/p06-04.jpg">
+<figcaption>Black version</figcaption>
+</figure>
+</article>
+</div>
+</section>
+<section id="patch-and-pin">
+<h2>Artemis Patch and Pin</h2>
+<p>This logo version is specifically used for the patches and pins and in
+selective applications <strong>only</strong>.</p>
+<p><strong>Internal and external use of the Artemis patch and pin must
+reviewed and approved by the Artemis Brand Strategy Team at
+artemis-creative@mail.nasa.gov.</strong></p>
+<p>This will not replace the official Artemis mission patches.</p>
+<p>The Artemis patch and pin are available in AI format for print use.</p>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/f2teo4o9h3qk4achd29k7x99bm1u7iii">Box folder</a></p>
+<figure class="solo">
+<img alt="Artemis patch: the Artemis logo inside a triangular badge outline" loading="lazy" src="artemis-catalog-images/p07-01.jpg">
+</figure>
+</section>
+<section id="artemis-i-mission-patch">
+<h2>Artemis I Mission Patch</h2>
+<p>The Artemis I Mission Patch should be used in conjunction with, and not
+replace, the official Artemis logo.</p>
+<p><strong>Do not use the Artemis I Mission Patch in lockup with Artemis Logo
+and NASA Insignia.</strong></p>
+<figure class="inline-figure">
+<img alt="Crossed-out example showing the Artemis I Mission Patch locked up with the Artemis logo and NASA insignia, a prohibited combination" loading="lazy" src="artemis-catalog-images/p08-01.jpg">
+</figure>
+<p>The Artemis I mission patch and pin are available in AI format for print
+and digital use.</p>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/bbcoqdajsrq0uf8tratss65ajofms6il">Box folder</a></p>
+<figure class="solo">
+<img alt="Artemis I mission patch: an SLS rocket lifting off inside a triangular badge above the wordmark Artemis I" loading="lazy" src="artemis-catalog-images/p08-02.jpg">
+</figure>
+</section>
+<section id="inter-typeface">
+<h2>Artemis Inter Typeface</h2>
+<p>Artemis Inter is a display font. Its use is limited to large size text as
+one word (such as &lsquo;Artemis&rsquo;, &lsquo;Adapt&rsquo; or
+&lsquo;Visionary&rsquo;) or a headline of up to 3 words (for example
+&lsquo;Space Launch System&rsquo; or &lsquo;New Perspectives&rsquo;).</p>
+<p>For complete rules and examples on how to use the Artemis Inter Typeface,
+please see the <strong>Artemis Graphics Standard Guide</strong>.</p>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/1fq3lu6woqnzawg9hcgvr8p6upvy0ykb">OTF</a></p>
+<p>Artemis Mission names will use a roman numeral convention using the Inter
+font <strong>without</strong> the slash. Inter is available on
+<a href="https://fonts.google.com/specimen/Inter?query=Inter">Google Fonts</a>. Below are the naming conventions for
+Artemis I, II and III.</p>
+<figure class="specimen">
+<p class="wordmark">A r t e m i s</p>
+<p class="glyphs">A B C D e F G H i J K L N O P Q r s t U V W X Y Z</p>
+<p class="glyphs">1 2 3 4 5 6 7 8 9 0 ! ? , . : - + = @ $ %</p>
+<p class="naming">A r t e m i s <span>I</span></p>
+<p class="naming">A r t e m i s <span>I I</span></p>
+<p class="naming">A r t e m i s <span>I I I</span></p>
+</figure>
+</section>
+<section id="presentation-templates">
+<h2>Artemis Presentation Templates</h2>
+<p><strong>Presentation templates are for official NASA use only.</strong>
+Use of templates by partners or outside parties does not imply NASA
+endorsement.</p>
+<p>Template is available in high-resolution and low-resolution with
+compressed images formats.</p>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/lib0dqx8trvomfzgwvgm0trgzm5jw2hr">Box folder</a></p>
+<figure class="spread">
+<img alt="Artemis presentation title slide with Earth horizon artwork" loading="lazy" src="artemis-catalog-images/p10-01.jpg">
+<img alt="Speaker introduction slide beside a short bulleted list slide" loading="lazy" src="artemis-catalog-images/p10-02.jpg">
+<img alt="Agenda text slide with the Artemis wordmark" loading="lazy" src="artemis-catalog-images/p10-03.jpg">
+<img alt="Text slide with a photo of SLS at sunset" loading="lazy" src="artemis-catalog-images/p10-04.jpg">
+</figure>
+</section>
+<section id="mission-maps">
+<h2>Artemis Mission Maps</h2>
+<p>Mission maps are available in PowerPoint format.</p>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/31e1hyjdc4v0ubbznbznhjv38021zkts">PPT</a></p>
+<figure class="spread maps">
+<img alt="Artemis I mission map infographic showing the uncrewed flight path around the Moon" loading="lazy" src="artemis-catalog-images/p11-01.jpg">
+<img alt="Artemis II mission map infographic showing the first crewed flight test trajectory" loading="lazy" src="artemis-catalog-images/p11-02.jpg">
+<img alt="Artemis III mission map infographic for landing on the Moon" loading="lazy" src="artemis-catalog-images/p11-03.jpg">
+<img alt="Artemis IV mission map infographic showing I-Hab module delivery to Gateway" loading="lazy" src="artemis-catalog-images/p11-04.jpg">
+<img alt="Artemis V mission map infographic showing Gateway assembly and crewed landing" loading="lazy" src="artemis-catalog-images/p11-05.jpg">
+</figure>
+</section>
+<section id="concept-imagery">
+<h2>Concept Imagery</h2>
+<h3 class="group">Gateway</h3>
+<div class="grid">
+<article class="asset">
+<figure>
+<img alt="Gateway station with large roll-out solar arrays high above the Moon" loading="lazy" src="artemis-catalog-images/p12-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/i6pentcmr56h7ojh9dyaosldbmcvxkzh">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Gateway modules passing close over the lunar surface" loading="lazy" src="artemis-catalog-images/p12-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/8rde2y5ua7q1qrsqny4xrqvpcy5vheei">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Gateway with the Moon and distant Earth in frame" loading="lazy" src="artemis-catalog-images/p12-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/zriulcvmgwus00akj9c3hp90lc8jkf3m">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Close view of Gateway docking ports above the Moon" loading="lazy" src="artemis-catalog-images/p12-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/hpjibifjvap5ex01byg0vs7b2kfl7s9n">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Gateway firing its ion thrusters in lunar orbit" loading="lazy" src="artemis-catalog-images/p12-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/s0pypl1zxzytcjxmksq0s7zshngg7vu1">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Gateway silhouetted against the darkened Moon" loading="lazy" src="artemis-catalog-images/p12-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/8wuhbvv1ohqu6znd8hgt7cip3uu0rd09">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Gateway seen from behind an eclipsed Moon" loading="lazy" src="artemis-catalog-images/p12-07.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/l6bc90z1th6hqo6iejcf1dlm59raw9mn">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Gateway sweeping over lunar craters" loading="lazy" src="artemis-catalog-images/p12-08.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/92ie4zarg5ex51hluif7bq2tbhwhsx86">PNG</a></p>
+</article>
+</div>
+<h3 class="group">Gateway and SpaceX Dragon XL</h3>
+<div class="grid">
+<article class="asset">
+<figure>
+<img alt="Gateway with SpaceX Dragon XL approaching over the Moon at dusk" loading="lazy" src="artemis-catalog-images/p13-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/36312pkc97k52bwctbszqla0moztqn0h">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Dragon XL cargo craft nearing Gateway in lunar orbit" loading="lazy" src="artemis-catalog-images/p13-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/oe5i8dwn7htzh2ctqxjstljg0qgdtzyf">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Gateway and Dragon XL with the crescent Moon below" loading="lazy" src="artemis-catalog-images/p13-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/qd2ry8sfsso0r18ok1x26nqvumzzvlfm">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Dragon XL docked to Gateway above lunar craters" loading="lazy" src="artemis-catalog-images/p13-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/6i9myhqtza3vs0brm8qsgfq97jyh31p8">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Gateway and Dragon XL stacked view over the Moon" loading="lazy" src="artemis-catalog-images/p13-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/s6dauigpfp8ca5nifunrhvdpyil4yt62">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Wide view of Gateway and Dragon XL in the dark of space" loading="lazy" src="artemis-catalog-images/p13-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/50tao4s1daozc6cdcree5oakq4ekyy05">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Gateway and Dragon XL flying over the far side of the Moon" loading="lazy" src="artemis-catalog-images/p13-07.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/6br67lznwr2jbtx08xmnhyp9ifu8y040">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Dragon XL and Gateway with Earthrise in the distance" loading="lazy" src="artemis-catalog-images/p13-08.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/uwyyfkvdzln67kbgpcz400ura33kuk9j">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SpaceX Dragon XL with solar arrays deployed approaching the Moon" loading="lazy" src="artemis-catalog-images/p14-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/bxvtdh20un4dz8oor2e5cflh4koco3f6">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Dragon XL cargo spacecraft over the lunar terminator" loading="lazy" src="artemis-catalog-images/p14-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/7sdle3du21ikybbiw5v1o5x0mpspugvv">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Dragon XL near Gateway above the cratered surface" loading="lazy" src="artemis-catalog-images/p14-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/aao8jz0r1tkqg1v4sysgrajzpizie6m8">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Dragon XL crossing in front of the darkened Moon" loading="lazy" src="artemis-catalog-images/p14-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/09jpecxbnlr2hhbatkx3l7jzi88qyy18">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Dragon XL with Earth in the background" loading="lazy" src="artemis-catalog-images/p14-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/vrtzqi2sb2nu53lfl06kx1eusmbv86ww">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Dragon XL and Gateway in deep space" loading="lazy" src="artemis-catalog-images/p14-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/21vsh9bfpcih0lwo5az2e0tehzdx3iu4">JPG</a></p>
+</article>
+</div>
+<h3 class="group">Lunar Surface Activity and Astronauts</h3>
+<div class="grid">
+<article class="asset">
+<h3>Artemis Base Camp</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Artemis Base Camp concept: rovers and habitat lit up in lunar night" loading="lazy" src="artemis-catalog-images/p15-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/eumwl085nlfm26kj8y6d1hfx45tusj4l">JPG</a></p>
+</article>
+<article class="asset">
+<h3>SpaceX Starship — Human Landing System Artemis III (2 Crew)</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="SpaceX Starship human landing system standing on the Moon with two crew nearby" loading="lazy" src="artemis-catalog-images/p15-02.jpg">
+</figure>
+<p class="note">This SpaceX render should ONLY be used in reference to Artemis III and/or the first human landing of Artemis. NASA has not contracted SpaceX for any subsequent missions at this time and should not appear partial by (1) using the alternate image showing the SpaceX Starship with four crew and the LTV rover, or (2) showing a SpaceX Starship render in content relating to all Artemis landings or missions beyond Artemis III. Image should always show, &ldquo;Image Credit: SpaceX.&rdquo; Caption where appropriate should read, &ldquo;Illustration of SpaceX Starship human lander design that will carry NASA astronauts to the Moon&rsquo;s surface during the first Artemis crewed lunar landing.&rdquo;</p>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/f60e5ef4b2gqtok5hlj26ptjtebxkkgi">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Volatiles Investigating Polar Exploration Rover (VIPER)</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="VIPER rover with headlights on, exploring a dark polar crater" loading="lazy" src="artemis-catalog-images/p15-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/wwym9zd59rxykx2pmm21u1g8zhauy8hd">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Astronauts xEMU EVA</h3>
+<p class="format">(PNG)</p>
+<figure>
+<img alt="Two astronauts in xEMU suits working with surface instruments, cut out on white" loading="lazy" src="artemis-catalog-images/p15-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/lwywztzhde3liv1s6rpyamxc6jc7jly6">PNG</a></p>
+</article>
+<article class="asset">
+<h3>Artemis EVA</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Astronauts on EVA around base camp equipment on the lunar surface" loading="lazy" src="artemis-catalog-images/p15-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/cmliumyrmoej607xvrsin35g31uw5669">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Astronaut and Lunar Regolith</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Astronaut kneeling to examine lunar regolith by lamplight" loading="lazy" src="artemis-catalog-images/p15-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/5x506ofs1zrjlskznzqxqks7dxa09jm7">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Astronaut Step</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Astronaut bootprints trailing across the lunar soil" loading="lazy" src="artemis-catalog-images/p15-07.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/bddwxli25wncg9i0fgw1iqvbtp1s2xwh">JPG</a></p>
+</article>
+<article class="asset">
+<h3>xEMU Suit Flat Stanley</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="xEMU spacesuit standing upright, photographed straight on" loading="lazy" src="artemis-catalog-images/p15-08.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/oi6qhb5l7j2zah803ux9snrg5uy57rom">JPG</a></p>
+</article>
+</div>
+<h3 class="group">Orion</h3>
+<div class="grid">
+<article class="asset">
+<figure>
+<img alt="Orion sailing over the blue limb of Earth" loading="lazy" src="artemis-catalog-images/p16-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/udyc3vuvgj7f2r7q7jtpgfk58p8be9my">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion with solar arrays in an X above Earth" loading="lazy" src="artemis-catalog-images/p16-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/nohfn06oqa6ihxdp0vxiq2zax3kkycu1">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion crossing high above cloud tops" loading="lazy" src="artemis-catalog-images/p16-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/8s85jwoefx8wg0u82bn5jab6amg2s7vk">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion seen from directly above the Pacific" loading="lazy" src="artemis-catalog-images/p16-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/en16wh5leqxc16duz4wfvjk0la1ivdad">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion small against the sunlit Earth horizon" loading="lazy" src="artemis-catalog-images/p16-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/mpdhlb2zxcpsdo8uwe9m5wbyfzl5xaym">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion silhouetted in front of a crescent Moon" loading="lazy" src="artemis-catalog-images/p16-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/bdws9zf4p89qhq58o7gy2om1hde6sbob">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion service module engine view over Earth" loading="lazy" src="artemis-catalog-images/p16-07.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/eqv5e0bdt43lv8q98xxx7a3bvserdx8a">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion distant above Earth&#x27;s atmosphere at dawn" loading="lazy" src="artemis-catalog-images/p16-08.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/xb00hznk6bok18mew2kb5fghht7wq63d">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion approaching the Moon in low light" loading="lazy" src="artemis-catalog-images/p17-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/9lbwd46o6or9wty3klq8g0cm4xcao7lu">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion with the Moon looming large ahead" loading="lazy" src="artemis-catalog-images/p17-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/21w62wbs7fsi0boyi2qvmyp4rszqnk7j">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion in deep space with a bright star flare" loading="lazy" src="artemis-catalog-images/p17-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/y9c17obq82fr6pu8vadojaiu1u1dx4cz">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion drifting above lunar craters" loading="lazy" src="artemis-catalog-images/p17-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/8lo8xrqbib808aqx6hl63818fmgv205o">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion over the far side of the Moon" loading="lazy" src="artemis-catalog-images/p17-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/8oj11d3wywx71ksvv5d2rpyuhjjlbspm">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion crew module close-up with the NASA worm logo" loading="lazy" src="artemis-catalog-images/p17-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/ybowr87o5vuua49i0n1ltp03bb3aej7b">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion sweeping past the lunar surface" loading="lazy" src="artemis-catalog-images/p17-07.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/no3jxfyeue2npzvw4ygjne6zyv5sppzj">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion small against the full Moon" loading="lazy" src="artemis-catalog-images/p17-08.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/pxrsqg7crluxfe4mnqerickucxttgzwa">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion over the Moon&#x27;s north pole" loading="lazy" src="artemis-catalog-images/p18-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/p62jbh8jnv0lujfgu96wz7nbz4eqr2db">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion service module arrays over craters" loading="lazy" src="artemis-catalog-images/p18-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/lmkaankkifbsyihd6ycovpofx8zwwyq3">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion in transit between Earth and Moon" loading="lazy" src="artemis-catalog-images/p18-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/xcw5bb84ka2t7q8266kjzpqgw2wx3lgt">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion firing its main engine near the Moon" loading="lazy" src="artemis-catalog-images/p18-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/q1o7mh8rnoumflvput509cmg0m96gfzt">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion above the lunar terminator" loading="lazy" src="artemis-catalog-images/p18-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/l7jrwkgjtmhwodlc764vxbjlwqxgqohr">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion returning toward a distant Earth" loading="lazy" src="artemis-catalog-images/p18-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/e7wqpdz4xry7u16xvesybs60jfii8v03">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion with Earthrise beyond the Moon" loading="lazy" src="artemis-catalog-images/p18-07.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/5t45te9752dtbq6q15bt8k2rgqlugdk1">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion crossing the darkened lunar surface" loading="lazy" src="artemis-catalog-images/p18-08.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/x39sljj9cg8hicywrgo8bimw3nencw6u">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion high above Earth&#x27;s clouds and coastline" loading="lazy" src="artemis-catalog-images/p19-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/m1ph4aukfh56qh7ojcscitsxhmgs0b41">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion over a map-like view of Earth&#x27;s surface" loading="lazy" src="artemis-catalog-images/p19-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/89h06cnrrm3rrhifhqko6bnjyk55ikn1">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion streaking toward reentry above Earth at night" loading="lazy" src="artemis-catalog-images/p19-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/a8yk7jl4cdldul8oy50sz0bsof5tjqig">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion capsule during fiery atmospheric reentry" loading="lazy" src="artemis-catalog-images/p19-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/zfjadzrxvgbeeq8psz8hw6wbop9ibzs7">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion descending under three red-and-white parachutes" loading="lazy" src="artemis-catalog-images/p19-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/gb233ac3y6vsch8rhyei3yewjd7cp62v">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion under a single drogue chute in a clear sky" loading="lazy" src="artemis-catalog-images/p19-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/l9llb77f0nzhz31l24mhsiquwubdt8od">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion on final descent under full parachutes" loading="lazy" src="artemis-catalog-images/p19-07.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/pqmjilywixatxvc22i2184w3teh4z815">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion capsule splashing down under parachutes" loading="lazy" src="artemis-catalog-images/p19-08.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/7e74ppwswbcxx4xci8z0thlmq0fpxda4">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Orion capsule under parachutes just before splashdown" loading="lazy" src="artemis-catalog-images/p20-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/qu4z9wlovyoqhb0lkw2n26qah8qi55ku">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Collage of cut-out Orion spacecraft renders from the PNG series" loading="lazy" src="artemis-catalog-images/p20-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Orion PNG series:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/co4kbk6npjg0gr6gykqc1j8m4pew3ju2">ZIP</a></p>
+<p class="format">(27 total PNGs)</p>
+</article>
+</div>
+<h3 class="group">Space Launch System</h3>
+<div class="grid">
+<article class="asset">
+<figure>
+<img alt="SLS lifting off from the pad in a cloud of exhaust" loading="lazy" src="artemis-catalog-images/p21-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/qtbrbph85mfbia3biwpuc0mry7xdlrm3">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SLS climbing into a clear blue sky" loading="lazy" src="artemis-catalog-images/p21-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/xkte5l0b0nz9n4mzx3lz906a16we9tdg">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SLS on the mobile launcher between lightning towers" loading="lazy" src="artemis-catalog-images/p21-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/yoeb7ao7mdli0jlrb7rsiqvew95r60rd">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SLS on the pad framed by the launch tower" loading="lazy" src="artemis-catalog-images/p21-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/xoxjc0tqj2xbkz3eb6upmq3df1awmrqk">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SLS clearing the tower at sunrise" loading="lazy" src="artemis-catalog-images/p21-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/40ro0nvqu7oe74fpzmhjrwto2vab57k6">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="White NASA core stage detail beside the launch tower" loading="lazy" src="artemis-catalog-images/p21-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/bhj4iqkhwjirzyfb5d5651zk9yzn9jdk">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SLS on the pad in early morning fog" loading="lazy" src="artemis-catalog-images/p21-07.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/xctvqfrrgt4nkgbj4s1j9lvukqyc4j2d">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SLS illuminated on the pad at night" loading="lazy" src="artemis-catalog-images/p21-08.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/rucy0uc9u0twzhj02198yt8icjgy98fs">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SLS at the pad seen from below the tower" loading="lazy" src="artemis-catalog-images/p22-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/ik3n19o91h6skyvfz3osbuaxd4t66b30">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SLS boosters igniting at liftoff" loading="lazy" src="artemis-catalog-images/p22-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/frnjw9iu6021zx8srnnaa3s508szjdeh">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SLS climbing with a bright exhaust plume" loading="lazy" src="artemis-catalog-images/p22-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/6ebnmr1ilavpu9xfxkzwnc8mjmzob0yj">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SLS reflected in glass at the press site" loading="lazy" src="artemis-catalog-images/p22-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/yybn104zlk3pi7k4r6hrf58xnktmrtdh">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SLS core stage and boosters seen from the tower" loading="lazy" src="artemis-catalog-images/p22-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/yybn104zlk3pi7k4r6hrf58xnktmrtdh">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SLS ascending through scattered clouds" loading="lazy" src="artemis-catalog-images/p22-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/0vt3tx6x3kfa5s71sbenby185lu0niwt">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="Cutaway rendering of the full SLS stack" loading="lazy" src="artemis-catalog-images/p22-07.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/2z2aqdezfzsye9iaubj5p41l747vhs7w">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SLS Block 1 beside the mobile launcher tower, full stack view" loading="lazy" src="artemis-catalog-images/p23-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/1wqblc9rbkzfc77ofullaz28w1mhjyzl">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SLS launching through clouds, long vertical view" loading="lazy" src="artemis-catalog-images/p23-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/uwad4grqclleyc2k4svn2uoack1frz29">JPG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SLS Block 1 crew configuration render on white" loading="lazy" src="artemis-catalog-images/p23-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/fzgobft58a40g3oeaq9qz2mgbkmw3ln4">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SLS and mobile launcher rendered on white" loading="lazy" src="artemis-catalog-images/p23-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/4ivzs6cmtly5es7jjy528tzpmek42jlr">PNG</a></p>
+</article>
+<article class="asset">
+<figure>
+<img alt="SLS Block 1B cargo configuration on the launch platform" loading="lazy" src="artemis-catalog-images/p23-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/m7jz6xbthz667os2bl99065r4z29dcyu">PNG</a></p>
+</article>
+</div>
+</section>
+<section id="photography">
+<h2>Photography</h2>
+<div class="grid">
+<article class="asset">
+<h3>NASA Astronaut Kayla Barron</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Kayla Barron seated in an orange launch-and-entry suit" loading="lazy" src="artemis-catalog-images/p24-01.jpg">
+<img alt="Kayla Barron portrait wearing a communications-cap helmet" loading="lazy" src="artemis-catalog-images/p24-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/cvlnephqyyxk1vdefexmnrpsg4mn3tui">JPG</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/cllzoearn7k08hs0b8840iyzfvqpy9hf">JPG</a></p>
+</article>
+<article class="asset">
+<h3>NASA Astronaut Victor Glover</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Victor Glover in a blue flight jacket in front of a world map" loading="lazy" src="artemis-catalog-images/p24-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/awd3zveou7vhkgjyan9ukcraly33lsno">JPG</a></p>
+</article>
+<article class="asset">
+<h3>NASA Astronaut Frank Rubio</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Frank Rubio with arms crossed beside an Orion mock-up" loading="lazy" src="artemis-catalog-images/p24-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/1bhhfznha7uga6i04fg6b04a1tmiss6e">JPG</a></p>
+</article>
+<article class="asset">
+<h3>NASA Astronaut Jasmin Moghbeli</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Jasmin Moghbeli seated at a simulator console in blue lighting" loading="lazy" src="artemis-catalog-images/p24-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/w5xmnx86oztna6wkq1pqrfkj0bo5t0hv">JPG</a></p>
+</article>
+<article class="asset">
+<h3>NASA Astronaut Christina Koch</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Christina Koch standing before an SLS liquid oxygen tank" loading="lazy" src="artemis-catalog-images/p24-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/vu42gcibbp088dwdzpoz6btpl09bahzj">JPG</a></p>
+</article>
+<article class="asset">
+<h3>School Children Celebrating</h3>
+<p class="format">(TIF)</p>
+<figure>
+<img alt="School children in astronaut costumes cheering" loading="lazy" src="artemis-catalog-images/p24-07.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/hdj6ajppx7gr6r3r2czj61iu5boeh4ch">TIF</a></p>
+</article>
+<article class="asset">
+<h3>Michoud Assembly Facility Portrait - Dr. Terry Teal</h3>
+<p class="format">(TIF)</p>
+<figure>
+<img alt="Dr. Terry Teal photographed in a doorway at Michoud Assembly Facility" loading="lazy" src="artemis-catalog-images/p24-08.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/10z502l80o49otjk3gnxgvmq7kbxmp91">TIF</a></p>
+</article>
+<article class="asset">
+<h3>All 4 Engines Attached to the SLS Core Stage for Artemis I Mission</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Four RS-25 engines attached to the SLS core stage at Michoud" loading="lazy" src="artemis-catalog-images/p24-09.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/sja8yodbjskue9q09bty8u39sjbn7x48">JPG</a></p>
+</article>
+<article class="asset">
+<h3>RS-25 Engine (Credit: Aerojet Rocketdyne)</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="RS-25 engine wreathed in vapor during a hot-fire test" loading="lazy" src="artemis-catalog-images/p25-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/tj78k6zkardejabvapffa62vxm4lmtg5">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Artemis I SLS Core Stage</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="SLS core stage with four engines framed in a factory doorway" loading="lazy" src="artemis-catalog-images/p25-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/7we6c0qum5pidqzzy6qwuaywwgbnban7">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Welding on Orion Spacecraft</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Close-up of friction-stir welding on the Orion pressure vessel" loading="lazy" src="artemis-catalog-images/p25-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/jsv8xwg3vfgf9nbs8nl71jebh7uvg32n">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Mountains of the Moon</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Black-and-white photograph of rugged lunar mountains" loading="lazy" src="artemis-catalog-images/p25-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/tm868b5coxy6ual3b4sun7zohdd0s1rw">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Waxing Gibbous Moon</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Waxing gibbous Moon against black space" loading="lazy" src="artemis-catalog-images/p25-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/86loo2pemxjzox3upvrsuke4ooo6s946">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Crawler-Transporter 2 (CT-2)</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Crawler-Transporter 2 treads on the river-rock crawlerway" loading="lazy" src="artemis-catalog-images/p25-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/xxwsr8zfedjmweed1be3bsceer6crl2d">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Apollo 11 — View of Earth from the Moon</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Apollo 11 photograph of Earth rising over the lunar horizon" loading="lazy" src="artemis-catalog-images/p25-07.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/et6gbec89cycpflbwltemzxdfmly1tuq">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Partial Moon</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Partially lit Moon showing cratered terrain" loading="lazy" src="artemis-catalog-images/p25-08.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/l3amp984r71mzykhisyng0ix3ljwqscc">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Moon Rise From the Space Station</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="The Moon rising above Earth&#x27;s blue atmosphere, seen from the space station" loading="lazy" src="artemis-catalog-images/p25-09.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/r6ey6wf2z4vatr6lmju7jhoxve12cuod">JPG</a></p>
+</article>
+</div>
+</section>
+<section id="print-products">
+<h2>Print Products</h2>
+<h3 class="group">Bookmarks</h3>
+<div class="grid">
+<article class="asset">
+<h3>Artemis Bookmark</h3>
+<p class="format">(PSD — 2.5” x 8”)</p>
+<figure>
+<img alt="Front of the Artemis bookmark with the vertical Artemis wordmark" loading="lazy" src="artemis-catalog-images/p26-01.jpg">
+<img alt="Back of the Artemis bookmark with the Artemis logo and social media handles" loading="lazy" src="artemis-catalog-images/p26-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/onra485ikkpvuvt4xklqcfn4f0tgmp0d">PSD</a></p>
+</article>
+<article class="asset">
+<h3>Orion Bookmark</h3>
+<p class="format">(PSD — 2.5” x 8”)</p>
+<figure>
+<img alt="Front of the Orion bookmark with the spacecraft over the Moon" loading="lazy" src="artemis-catalog-images/p26-03.jpg">
+<img alt="Back of the Orion bookmark with the Artemis logo and social media handles" loading="lazy" src="artemis-catalog-images/p26-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/079er0ru4l9upt7jgd74ku62s2tbn3qd">PSD</a></p>
+</article>
+<article class="asset">
+<h3>SLS Bookmark</h3>
+<p class="format">(PSD — 2.5” x 8”)</p>
+<figure>
+<img alt="Front of the SLS bookmark with the rocket on a purple gradient" loading="lazy" src="artemis-catalog-images/p26-05.jpg">
+<img alt="Back of the SLS bookmark with the Artemis logo and social media handles" loading="lazy" src="artemis-catalog-images/p26-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/to35wkqrdwzbb72ml5q23ipp16ojwszz">PSD</a></p>
+</article>
+</div>
+<h3 class="group">Artemis Pioneer Certificate</h3>
+<article class="asset certificate">
+<h4>Artemis Pioneer Certificate</h4>
+<p class="format">(PSD — 8.5” x 11”)</p>
+<p>The Artemis Pioneer Certificate is a customizable certificate template
+that was created to be used in conjunction with the standard 4” Artemis
+patch (see printed sample below).</p>
+<p>The template is available in .PSD format.</p>
+<figure class="spread certs">
+<img alt="Artemis Pioneer Certificate template with the Artemis patch and a recipient name line" loading="lazy" src="artemis-catalog-images/p27-01.jpg">
+<img alt="Certificate variant with SLS launch artwork" loading="lazy" src="artemis-catalog-images/p27-02.jpg">
+<img alt="Certificate variant with lunar surface artwork" loading="lazy" src="artemis-catalog-images/p27-04.jpg">
+</figure>
+<figure class="inline-figure">
+<img alt="Framed, printed Artemis Pioneer Certificate with a 4-inch embroidered Artemis patch" loading="lazy" src="artemis-catalog-images/p27-03.jpg">
+<figcaption>Artemis Pioneer Certificate print sample</figcaption>
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/kodaxj43399izv9w2xvo6wtvh78opx5t">PSD</a></p>
+</article>
+<h3 class="group">Pull-up Banners</h3>
+<div class="grid">
+<article class="asset">
+<h3>EGS Pull-up Banner</h3>
+<p class="format">(PSD, PDF — 34” x 86”)</p>
+<figure>
+<img alt="Exploration Ground Systems pull-up banner showing SLS launching" loading="lazy" src="artemis-catalog-images/p28-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/36fkdifug0t1jfdmhgav02fz1j8g74uv">PSD</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/wh25qbuke1e4iuv21mwpcs4b9j1pt71z">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Gateway Pull-up Banner</h3>
+<p class="format">(PSD, PDF — 34” x 86”)</p>
+<figure>
+<img alt="Gateway pull-up banner with the station above the Moon" loading="lazy" src="artemis-catalog-images/p28-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/5m8y5z19h4qfz5yjc3va7or0oal4pcik">PSD</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/dl5bivgeuz4wptbsr74opt8nvt0cdjml">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Orion Pull-up Banner</h3>
+<p class="format">(PSD, PDF — 34” x 86”)</p>
+<figure>
+<img alt="Orion pull-up banner with the capsule in dark space" loading="lazy" src="artemis-catalog-images/p28-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/u2mi8sme1neznu2lzy3xjydmuxfnwqoo">PSD</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/p2dyt25i9zojia1ceiaou6bblbxdshun">PDF</a></p>
+</article>
+<article class="asset">
+<h3>SLS Pull-up Banner</h3>
+<p class="format">(PSD, PDF — 34” x 86”)</p>
+<figure>
+<img alt="SLS pull-up banner with the rocket climbing over Earth" loading="lazy" src="artemis-catalog-images/p28-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/w7eigd11q629b5xoiq1r6c5q5qphpjek">PSD</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/ox71v3mzk9qfhy8le1utnylusqsfwikf">PDF</a></p>
+</article>
+</div>
+<h3 class="group">Step-N-Repeat</h3>
+<div class="grid">
+<article class="asset">
+<h3>Artemis Step-N-Repeat — A</h3>
+<p class="format">(AI, PDF — 118.3” x 89.2”)</p>
+<figure>
+<img alt="White step-and-repeat backdrop of NASA and Artemis marks with a large color Artemis logo" loading="lazy" src="artemis-catalog-images/p29-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/xdr45sb0dd5tt81idw4vm6r3w3jl5cik">AI</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/hpljoe7j4n5qqyeygiafudrmgf5wtvxj">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Artemis Step-N-Repeat — B</h3>
+<p class="format">(AI, PDF — 118.3” x 89.2”)</p>
+<figure>
+<img alt="White step-and-repeat backdrop pattern of NASA insignia and Artemis wordmarks" loading="lazy" src="artemis-catalog-images/p29-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/k399dmr20vl32km5cttolzxacey967jn">AI</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/87j4astwyf3ocn3evq8vu4eb7kbyk9d6">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Artemis I Step-N-Repeat</h3>
+<p class="format">(AI, PDF — 118.3” x 89.2”)</p>
+<figure>
+<img alt="White step-and-repeat backdrop pattern of NASA insignia and Artemis I mission patches" loading="lazy" src="artemis-catalog-images/p29-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/5rdo3udj5pij5v4ah0fbt86wzy6k9286">AI</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/bu9r1kir3pw0l3hju0eld3kh02ml880y">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Artemis Step-N-Repeat — A (Alternate)</h3>
+<p class="format">(AI, PDF — 118.3” x 89.2”)</p>
+<figure>
+<img alt="Black step-and-repeat backdrop with a large color Artemis logo" loading="lazy" src="artemis-catalog-images/p29-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/zvdy320joej9dk0nlsy7ji2v25x4me3c">AI</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/9s9e905rxlk1xvqd5pozsxjbfvn0eden">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Artemis Step-N-Repeat — B (Alternate)</h3>
+<p class="format">(AI, PDF — 118.3” x 89.2”)</p>
+<figure>
+<img alt="Black step-and-repeat backdrop pattern of NASA insignia and Artemis wordmarks" loading="lazy" src="artemis-catalog-images/p29-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/v8vvs9r65lpfp85z7w3mkdk9k84exyzo">AI</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/lfcbsm2ovs14jy1uh3mudcjxbxrb6lvq">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Artemis I Step-N-Repeat (Alternate)</h3>
+<p class="format">(AI, PDF — 118.3” x 89.2”)</p>
+<figure>
+<img alt="Black step-and-repeat backdrop pattern of NASA insignia and Artemis I mission patches" loading="lazy" src="artemis-catalog-images/p29-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/sbqiynfkjsmp0fpu0urbvwz8hn9z01g1">AI</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/bupwldvkns3ifoaqj582wn76v5i66nru">PDF</a></p>
+</article>
+</div>
+</section>
+<section id="drawartemis">
+<h2>#DrawArtemis</h2>
+<p>#DrawArtemis is a learn-to-draw series of activies based on a fleet of
+sophisticated space hardware that will be used on Artemis Missions.</p>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://www.nasa.gov/drawartemis">NASA website</a></p>
+<div class="grid">
+<article class="asset">
+<h3>Draw Orion Spacecraft</h3>
+<p class="format">(PDF)</p>
+<figure>
+<img alt="Pencil sketch worksheet of the Orion spacecraft" loading="lazy" src="artemis-catalog-images/p30-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://www.nasa.gov/sites/default/files/atoms/files/draw_orion_0.pdf">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Draw Orion Crew Survival System Suit (OCSS)</h3>
+<p class="format">(PDF)</p>
+<figure>
+<img alt="Worksheet for drawing the orange Orion Crew Survival System suit" loading="lazy" src="artemis-catalog-images/p30-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://www.nasa.gov/sites/default/files/atoms/files/draw_ocss_0.pdf">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Draw Crawler-Transporter</h3>
+<p class="format">(PDF)</p>
+<figure>
+<img alt="Worksheet for drawing the crawler-transporter" loading="lazy" src="artemis-catalog-images/p30-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://www.nasa.gov/sites/default/files/atoms/files/how_to_draw_crawler_booklet-web.pdf">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Draw Launch Pad 39B</h3>
+<p class="format">(PDF)</p>
+<figure>
+<img alt="Worksheet for drawing Launch Pad 39B" loading="lazy" src="artemis-catalog-images/p30-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://www.nasa.gov/sites/default/files/atoms/files/draw_pad39b_v2_1.pdf">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Draw Space Launch System (SLS)</h3>
+<p class="format">(PDF)</p>
+<figure>
+<img alt="Worksheet for drawing the SLS rocket" loading="lazy" src="artemis-catalog-images/p30-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://www.nasa.gov/sites/default/files/atoms/files/draw_sls_0.pdf">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Draw Exploration Extravehicular Mobility Unit (xEMU)</h3>
+<p class="format">(PDF)</p>
+<figure>
+<img alt="Worksheet for drawing the xEMU spacesuit" loading="lazy" src="artemis-catalog-images/p30-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://www.nasa.gov/sites/default/files/atoms/files/xemu_suit_0.pdf">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Draw Lunar Terrain Vehicle (LTV)</h3>
+<p class="format">(PDF)</p>
+<figure>
+<img alt="Worksheet for drawing the lunar terrain vehicle" loading="lazy" src="artemis-catalog-images/p30-07.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://www.nasa.gov/sites/default/files/atoms/files/draw_ltv_final.pdf">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Draw Gateway — HALO &amp; PPE</h3>
+<p class="format">(PDF)</p>
+<figure>
+<img alt="Worksheet for drawing the Gateway HALO and PPE modules" loading="lazy" src="artemis-catalog-images/p30-08.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://www.nasa.gov/sites/default/files/atoms/files/draw_gateway_0.pdf">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Draw Mobile Launcher</h3>
+<p class="format">(PDF)</p>
+<figure>
+<img alt="Worksheet for drawing the mobile launcher" loading="lazy" src="artemis-catalog-images/p30-09.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://www.nasa.gov/sites/default/files/atoms/files/draw_mobile_launcher_1.pdf">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Draw Deep Space Network (DSN) Antenna</h3>
+<p class="format">(PDF)</p>
+<figure>
+<img alt="Worksheet for drawing a Deep Space Network antenna" loading="lazy" src="artemis-catalog-images/p30-10.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://www.nasa.gov/sites/default/files/atoms/files/draw_dsn_antenna.pdf">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Draw Vehicle Assembly Building (VAB)</h3>
+<p class="format">(PDF)</p>
+<figure>
+<img alt="Worksheet for drawing the Vehicle Assembly Building" loading="lazy" src="artemis-catalog-images/p30-11.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://www.nasa.gov/sites/default/files/atoms/files/draw_vab.pdf">PDF</a></p>
+</article>
+</div>
+</section>
+<section id="you-are-going">
+<h2>You Are Going: Digital Book and Illustrations</h2>
+<p><em>You Are Going</em> is a digital illustrated storybook aimed at a
+younger audience to educate them on the elements that will help make Artemis
+possible.</p>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://www.nasa.gov/youaregoing/">NASA website</a></p>
+<div class="grid">
+<article class="asset">
+<h3>You Are Going Cover</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Cover of You Are Going: a rocket sketch over a watercolor sky with the subtitle A Story About Artemis" loading="lazy" src="artemis-catalog-images/p31-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/dd29xxubq8qdkalyva3wrpzzs833isf7">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Illustration 1</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="A parent reads to a child by a window as the Moon shines outside" loading="lazy" src="artemis-catalog-images/p31-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/bvhca647yqb3cu8pnbyatek246zjsqfh">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Illustration 2</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Children tour a hangar where the Orion spacecraft is being built" loading="lazy" src="artemis-catalog-images/p31-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/ru1xcg3vd0p2ds25k66g3gp1kzfz4506">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Illustration 3</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="A spacecraft swings around the Moon" loading="lazy" src="artemis-catalog-images/p31-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/808uf4zflhh87t4ehk387izrdl3zrcw9">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Illustration 4</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Crowds gather at a monument under dramatic clouds to watch a launch" loading="lazy" src="artemis-catalog-images/p31-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/9c6j578jnc2cx67oux0ctqnoodwrbl4r">JPG</a></p>
+</article>
+<article class="asset">
+<h3>You Are Going: Digital Book</h3>
+<p class="format">(PDF)</p>
+<figure>
+<img alt="Cover of the You Are Going digital book" loading="lazy" src="artemis-catalog-images/p31-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://www.nasa.gov/youaregoing/">PDF</a></p>
+</article>
+<article class="asset">
+<h3>Illustration 5</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Astronauts look up at an SLS rocket on the pad at dusk" loading="lazy" src="artemis-catalog-images/p31-07.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/idxpi1k9rju6ripfj5mtkznujsh2laua">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Illustration 6</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="A child rides on a parent&#x27;s shoulders wearing a NASA shirt in a crowd" loading="lazy" src="artemis-catalog-images/p31-08.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/hst2q0w12ezpz6u1nybm6hgcpdbvb4gu">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Illustration 7</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Astronauts float inside a crew capsule in flight" loading="lazy" src="artemis-catalog-images/p31-09.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/a8mfl6co038trs5kbdw2wwwfubkxpvx8">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Illustration 8</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="The crescent Moon wrapped in a ribbon of handwritten words" loading="lazy" src="artemis-catalog-images/p31-10.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/pbsklud9fgfr8vv9l4ym9z8gk1f4870b">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Illustration 9</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="A city crowd watches astronauts on giant screens" loading="lazy" src="artemis-catalog-images/p31-11.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/bo12j3311p5n8hmnns01a4otvz6tmquo">JPG</a></p>
+</article>
+<article class="asset">
+<h3>You Are Going: Astronaut Read Aloud</h3>
+<p class="format">(Youtube)</p>
+<figure>
+<img alt="An astronaut holds up the You Are Going book for a read-aloud video" loading="lazy" src="artemis-catalog-images/p31-12.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Website:</span><a class="chip" href="https://www.youtube.com/watch?v=KATEY1-dDh4">YouTube</a></p>
+</article>
+<article class="asset">
+<h3>Illustration 10</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="People on a hilltop watch Earth hang in the night sky" loading="lazy" src="artemis-catalog-images/p31-13.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/lz2ntelotzxnup9yv8kxpu77ashwhgim">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Illustration 11</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="A space station module orbits high above the Moon" loading="lazy" src="artemis-catalog-images/p31-14.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/bfrqto6php48gv4ylpd5dz4o803tyqro">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Illustration 12</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="A child looks out a rover window at a lunar base" loading="lazy" src="artemis-catalog-images/p31-15.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/v6ms1n0i89as3wcfy1l4ro61kuebnzdx">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Illustration 13</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="A family gathers inside a greenhouse dome on the Moon" loading="lazy" src="artemis-catalog-images/p31-16.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/p73zzf61su0xjyjvq8xzitrscduojmqu">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Illustration 14</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Children paint a mural of a rocket launch" loading="lazy" src="artemis-catalog-images/p31-17.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/go3w27ym8dcxda8l821zqbzd2ion6giq">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Illustration 15</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Campers by a lake point to the Moon over evening trees" loading="lazy" src="artemis-catalog-images/p32-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/8opzlnl37g5d245aactsizax9g2g3f65">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Illustration 16</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Portrait of a smiling astronaut in a white spacesuit" loading="lazy" src="artemis-catalog-images/p32-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/zb1qbkhea14i040nvu9jwh5371xku1qr">JPG</a></p>
+</article>
+<article class="asset">
+<h3>You Are Going Coloring Book</h3>
+<p class="format">(PDF)</p>
+<figure>
+<img alt="Cover of the You Are Going coloring book" loading="lazy" src="artemis-catalog-images/p32-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://www.nasa.gov/youaregoing/img/YouAreGoing_Coloring_Book.pdf">PDF</a></p>
+</article>
+<article class="asset">
+<h3>You Are Going Comprehension Guide</h3>
+<p class="format">(PDF)</p>
+<figure>
+<img alt="First page of the You Are Going comprehension guide with discussion questions" loading="lazy" src="artemis-catalog-images/p32-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://www.nasa.gov/youaregoing/img/Comprehension%20Guide_FINAL.pdf">PDF</a></p>
+</article>
+</div>
+</section>
+<section id="videos">
+<h2>Videos</h2>
+<h3 class="group">Inspirational Videos</h3>
+<div class="grid">
+<article class="asset">
+<h3>Why the Moon?</h3>
+<p class="format">(MOV — Full: 4:33, Part 1: 2:27, Part 2: 2:13)</p>
+<figure>
+<img alt="Title card reading Why the Moon over a lunar limb" loading="lazy" src="artemis-catalog-images/p33-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/jhsjr6h72h688uiw72a43ln5eemg3fjw">Full MOV</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/d59es54yzgbg8ogs6hucuvreflw33vfh">Part 1 MOV</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/ip02julsydh9y5xz923potsemvpkd1z4">Part 2 MOV</a></p>
+</article>
+<article class="asset">
+<h3>We Are Focused</h3>
+<p class="format">(MP4, MXF)</p>
+<figure>
+<img alt="Masked NASA team members pose with flight hardware" loading="lazy" src="artemis-catalog-images/p33-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/h7k0txgzne3ox7v9nbm4hnsgv8xkinsb">MP4</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/s1nou3vpqv4svaf0icqxgf4haax4100d">MXF</a></p>
+</article>
+<article class="asset">
+<h3>We Are Tested</h3>
+<p class="format">(MP4, MOV)</p>
+<figure>
+<img alt="Orion test article and American flag in a darkened facility" loading="lazy" src="artemis-catalog-images/p33-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/nfley91ek642ar63sg7e9saxs4xilz1d">MP4</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/kwcv7e2r9ec0lrxtw4csdp69fl7uxdct">MOV</a></p>
+</article>
+<article class="asset">
+<h3>NASA 2021: Let's Go to the Moon</h3>
+<p class="format">(MP4)</p>
+<figure>
+<img alt="Frame reading Taking the Next Steps to the Moon" loading="lazy" src="artemis-catalog-images/p33-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://images.nasa.gov/details-NASA%202021%20Let&#x27;s%20Go%20to%20the%20Moon">MP4</a></p>
+</article>
+<article class="asset">
+<h3>Artemis I: NASA's Plans to Travel Beyond the Moon</h3>
+<p class="format">(MP4)</p>
+<figure>
+<img alt="Frame with SLS on the pad captioned 8.8 million pounds of thrust" loading="lazy" src="artemis-catalog-images/p33-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://images.nasa.gov/details-Artemis%20I%20NASA%E2%80%99s%20Plans%20to%20Travel%20Beyond%20the%20Moon">MP4</a></p>
+</article>
+<article class="asset">
+<h3>We Go as the Artemis Generation</h3>
+<p class="format">(MP4)</p>
+<figure>
+<img alt="A young woman smiles in blue mission-control lighting" loading="lazy" src="artemis-catalog-images/p33-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/w7l4zwdidu97m7t9ffgz130hw8acpg1i">MP4</a></p>
+</article>
+<article class="asset">
+<h3>Gateway Introduction</h3>
+<p class="format">(MP4)</p>
+<figure>
+<img alt="Title frame reading Gateway beside the station over the Moon" loading="lazy" src="artemis-catalog-images/p34-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/3oaxvqb3xdi6bouqddwwe4ly638ctxnh">MP4</a></p>
+</article>
+<article class="asset">
+<h3>Space is Hard</h3>
+<p class="format">(MP4)</p>
+<figure>
+<img alt="An astronaut in an orange suit reclines during training" loading="lazy" src="artemis-catalog-images/p34-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/z169zotu1e9vuco9tvfxi5k9fqgl70rm">MP4</a></p>
+</article>
+</div>
+<h3 class="group">Timelapse Videos</h3>
+<div class="grid">
+<article class="asset">
+<h3>South Pole Timelapse — Zoom In</h3>
+<p class="format">(MP4)</p>
+<figure>
+<img alt="Full Moon frame from the south pole timelapse zoom" loading="lazy" src="artemis-catalog-images/p35-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/4o0ghvh65vozv1z8rci2lqiatn4nqv4y">MP4</a></p>
+</article>
+<article class="asset">
+<h3>South Pole Timelapse — Tilted View</h3>
+<p class="format">(MP4)</p>
+<figure>
+<img alt="Tilted view across shadowed south-pole terrain" loading="lazy" src="artemis-catalog-images/p35-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/z54tu97qxfur94ocquma33rjnc5me5gk">MP4</a></p>
+</article>
+<article class="asset">
+<h3>South Pole Timelapse — Bird's Eye View</h3>
+<p class="format">(MP4)</p>
+<figure>
+<img alt="Overhead view of cratered south-pole terrain" loading="lazy" src="artemis-catalog-images/p35-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/yiug96g93an66s0l6py6102rdt2x3hp0">MP4</a></p>
+</article>
+<article class="asset">
+<h3>Artemis I Core Stage Arrival</h3>
+<p class="format">(MP4)</p>
+<figure>
+<img alt="Fisheye view up the dome of the Artemis I core stage" loading="lazy" src="artemis-catalog-images/p35-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/zixdb3p3oda7p4f8tmj7vx4hkrc0mkuy">MP4</a></p>
+</article>
+</div>
+<h3 class="group">Artemis Logo Animations</h3>
+<div class="grid">
+<article class="asset">
+<h3>Artemis Logo into NASA Insignia</h3>
+<p class="format">(MP4, MOV)</p>
+<figure>
+<img alt="NASA insignia frame from the logo transition animation" loading="lazy" src="artemis-catalog-images/p36-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/jgaehkys6urkow6bokjsokf5hce9ain3">MP4 (720p)</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/7hp4mj36lbgb181m2t6f9h0o5wyhnzaa">MP4 (4k)</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/5e3ttw7bc6jci23xyvj5fdgb0ro3l1gh">MOV (4k)</a></p>
+</article>
+<article class="asset">
+<h3>Artemis Logo Reveal</h3>
+<p class="format">(MP4, MOV)</p>
+<figure>
+<img alt="Artemis logo frame from the reveal animation" loading="lazy" src="artemis-catalog-images/p36-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/81csd32nrlpx4hfucrgekpxegdzwuduj">MP4 (720p)</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/grzu8mfelz8qsus6ojef1by5sht920tc">MP4 (4k)</a><a class="chip" href="https://nasa-external-ocomm.box.com/s/55whd2r1obmmfpjze0xnal141lf6f6ik">MOV (4k)</a></p>
+</article>
+</div>
+</section>
+<section id="virtual-meeting-backgrounds">
+<h2>Virtual Meeting Backgrounds</h2>
+<div class="grid">
+<article class="asset">
+<h3>Artemis Illustration</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Playful flat illustration of rockets, the Moon and Earth with the Artemis wordmark" loading="lazy" src="artemis-catalog-images/p37-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/ic1xczxlgb6dfa9v841al5lcnypxhreu">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Astronaut Step</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Astronaut stepping onto the lunar surface beside a rover" loading="lazy" src="artemis-catalog-images/p37-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/ny6ebzkm8uyd0tuzze7t785vgknkm4uj">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Large Moon and Mars</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="The Moon in shadow with Mars glowing beyond" loading="lazy" src="artemis-catalog-images/p37-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/e1x5d7ylng88m4gndwb3zzrvwgycn1li">JPG</a></p>
+</article>
+<article class="asset">
+<h3>SLS Boosters</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="SLS booster segments stacked inside the assembly building" loading="lazy" src="artemis-catalog-images/p37-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/y8q1b26vthh46tprpvx1mnvc5zm0a54s">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Moon Phases</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Phases of the Moon in a row under the Artemis wordmark" loading="lazy" src="artemis-catalog-images/p37-05.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/h5q2wl8zy1gl2qv1disdcvkuwoi849uv">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Orion</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Orion spacecraft with solar arrays against dark space" loading="lazy" src="artemis-catalog-images/p37-06.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/f2u8ozvt7hsjgbk3xr5wsc5al41o9q5a">JPG</a></p>
+</article>
+<article class="asset">
+<h3>SLS</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Close view of the SLS core stage and boosters with the Artemis logo" loading="lazy" src="artemis-catalog-images/p38-01.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/aprm41g1u2d52uait089khs8xclqyhcv">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Astronaut Regolith</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Astronaut examining regolith in lunar darkness" loading="lazy" src="artemis-catalog-images/p38-02.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/8by1y4kqm3ru8o563i2eal73l6moscpm">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Crawler and Mobile Launcher</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Crawler-transporter carrying the mobile launcher tower" loading="lazy" src="artemis-catalog-images/p38-03.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/cvi19mnxct2xhytfdioob06a57de7nnk">JPG</a></p>
+</article>
+<article class="asset">
+<h3>Gateway</h3>
+<p class="format">(JPG)</p>
+<figure>
+<img alt="Gateway station beside the shadowed Moon" loading="lazy" src="artemis-catalog-images/p38-04.jpg">
+</figure>
+<p class="downloads"><span class="dl-label">Download:</span><a class="chip" href="https://nasa-external-ocomm.box.com/s/hfxq5wigomk6vpn24irxg35bygh6ed9h">JPG</a></p>
+</article>
+</div>
+</section>
+</main>
+<footer>
+<div class="footer-inner">
+<p><strong>National Aeronautics and Space Administration</strong></p>
+<p>Headquarters<br>300 E Street SW<br>Washington, DC 20546</p>
+<p><a href="https://www.nasa.gov">www.nasa.gov</a> | #Artemis</p>
+<p class="pub-number">NP-2021-02-2932-HQ Rev 3</p>
+</div>
+</footer>
+</body>
+</html>
