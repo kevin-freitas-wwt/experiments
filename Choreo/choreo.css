@@ -1,0 +1,627 @@
+/* Choreo — every movement here is declarative. No JavaScript anywhere. */
+
+@view-transition {
+    navigation: auto;
+}
+
+:root {
+    --accent: #e2231a;
+    --edge: #d6d3cd;
+    --grid: 1.5rem;
+    --ink: #111110;
+    --paper: #f2f1ed;
+    --soft: #7a776f;
+    --ui: "Helvetica Neue", Helvetica, Inter, "Segoe UI", Arial, sans-serif;
+}
+
+@media ( prefers-color-scheme: dark ) {
+    :root {
+        --accent: #ff4b3e;
+        --edge: #2b2b28;
+        --ink: #f0efea;
+        --paper: #100f0e;
+        --soft: #8c887e;
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    -webkit-font-smoothing: antialiased;
+    background: var( --paper );
+    color: var( --ink );
+    font-family: var( --ui );
+    font-weight: 400;
+    margin: 0;
+    overflow-x: hidden;
+}
+
+code {
+    background: color-mix( in oklab, var( --ink ) 8%, transparent );
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.86em;
+    padding: 0.1em 0.3em;
+}
+
+em {
+    font-style: normal;
+    text-decoration: 1px underline var( --accent );
+    text-underline-offset: 3px;
+}
+
+/* ---------- scroll progress: one keyframe, the document as its clock ---------- */
+
+@keyframes wipe {
+    from { transform: scaleX( 0 ); }
+    to { transform: scaleX( 1 ); }
+}
+
+.rail {
+    background: var( --edge );
+    height: 3px;
+    left: 0;
+    position: fixed;
+    right: 0;
+    top: 0;
+    z-index: 40;
+}
+
+.rail i {
+    animation: wipe linear both;
+    animation-timeline: scroll( root block );
+    background: var( --accent );
+    display: block;
+    height: 100%;
+    transform-origin: left;
+    width: 100%;
+}
+
+/* ---------- masthead ---------- */
+
+.masthead {
+    align-items: baseline;
+    border-bottom: 1px solid var( --ink );
+    display: flex;
+    justify-content: space-between;
+    margin: 0 var( --grid );
+    padding: 1.1rem 0 0.6rem;
+}
+
+.kicker {
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+.kicker--r {
+    color: var( --soft );
+    font-weight: 400;
+}
+
+/* ---------- hero ---------- */
+
+@keyframes recede {
+    to {
+        letter-spacing: -0.05em;
+        opacity: 0.12;
+        transform: translateY( -3vh ) scale( 0.9 );
+    }
+}
+
+.hero {
+    display: grid;
+    gap: var( --grid );
+    grid-template-columns: 1fr;
+    padding: clamp( 3rem, 9vh, 8rem ) var( --grid ) clamp( 5rem, 16vh, 12rem );
+}
+
+.hero__title {
+    animation: recede linear both;
+    animation-range: 0 90vh;
+    animation-timeline: scroll( root block );
+    font-size: clamp( 3.4rem, 15vw, 13rem );
+    font-weight: 700;
+    letter-spacing: -0.045em;
+    line-height: 0.86;
+    margin: 0;
+    text-transform: none;
+    transform-origin: left top;
+    view-transition-name: choreo-title;
+}
+
+.hero__meta {
+    border-top: 1px solid var( --edge );
+    display: grid;
+    gap: var( --grid );
+    grid-template-columns: 1fr;
+    padding-top: 1rem;
+}
+
+.lede {
+    font-size: clamp( 1rem, 1.5vw, 1.22rem );
+    line-height: 1.5;
+    margin: 0;
+    max-width: 46ch;
+    text-wrap: pretty;
+}
+
+.rule {
+    color: var( --soft );
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+@media ( min-width: 900px ) {
+    .hero {
+        grid-template-columns: 1fr;
+    }
+    .hero__meta {
+        grid-template-columns: 1fr auto;
+    }
+}
+
+/* ---------- word-by-word, each word its own view timeline ---------- */
+
+@keyframes ignite {
+    from { color: var( --edge ); }
+    to { color: var( --ink ); }
+}
+
+.band {
+    border-block: 1px solid var( --ink );
+    padding: clamp( 4rem, 12vh, 9rem ) var( --grid );
+}
+
+.colorize {
+    font-size: clamp( 1.6rem, 5.2vw, 4rem );
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    margin: 0;
+    max-width: 26ch;
+}
+
+.colorize span {
+    animation: ignite linear both;
+    animation-range: entry 10% cover 34%;
+    animation-timeline: view();
+    color: var( --edge );
+}
+
+.colorize span:last-child {
+    color: var( --accent );
+}
+
+/* ---------- editorial grid ---------- */
+
+.grid,
+.crossing {
+    border-bottom: 1px solid var( --edge );
+    display: grid;
+    gap: 0.6rem var( --grid );
+    grid-template-columns: 1fr;
+    padding: clamp( 3rem, 9vh, 7rem ) var( --grid );
+}
+
+.col-num {
+    color: var( --accent );
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+}
+
+.col-head h2 {
+    font-size: clamp( 1.5rem, 3.4vw, 2.6rem );
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.02;
+    margin: 0 0 1.4rem;
+    text-wrap: balance;
+}
+
+.col-body {
+    max-width: 62ch;
+}
+
+.col-body p {
+    font-size: 1.02rem;
+    line-height: 1.62;
+    margin: 0 0 1.35rem;
+    text-wrap: pretty;
+}
+
+@media ( min-width: 900px ) {
+    .grid,
+    .crossing {
+        grid-template-columns: 4rem 15rem 1fr;
+    }
+    .col-head h2 {
+        margin-bottom: 0;
+    }
+}
+
+/* ---------- reveals on view timelines ---------- */
+
+@keyframes rise {
+    from {
+        opacity: 0;
+        transform: translateY( 1.6rem );
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.reveal {
+    animation: rise linear both;
+    animation-range: entry 0% entry 90%;
+    animation-timeline: view();
+}
+
+/* ---------- four slabs, one keyframe, four ranges ---------- */
+
+@keyframes swell {
+    from {
+        opacity: 0.15;
+        transform: scaleY( 0.12 );
+    }
+    to {
+        opacity: 1;
+        transform: scaleY( 1 );
+    }
+}
+
+.figure {
+    padding: clamp( 3rem, 10vh, 8rem ) var( --grid );
+}
+
+.figure--wide {
+    border-bottom: 1px solid var( --edge );
+}
+
+.stack {
+    align-items: end;
+    display: grid;
+    gap: 3px;
+    grid-template-columns: repeat( 4, 1fr );
+    height: 44vh;
+}
+
+.slab {
+    align-items: end;
+    animation: swell linear both;
+    animation-timeline: view();
+    background: var( --ink );
+    color: var( --paper );
+    display: flex;
+    height: 100%;
+    padding: 0.6rem;
+    transform-origin: bottom;
+}
+
+.slab span {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    writing-mode: vertical-rl;
+}
+
+.slab:nth-child( 1 ) { animation-range: entry 0% entry 60%; }
+.slab:nth-child( 2 ) { animation-range: entry 40% cover 20%; }
+.slab:nth-child( 3 ) { animation-range: entry 70% cover 50%; background: var( --accent ); }
+.slab:nth-child( 4 ) { animation-range: cover 10% exit 100%; }
+
+.caption {
+    color: var( --soft );
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    margin: 1rem 0 0;
+}
+
+.caption--pad {
+    padding: 0 var( --grid );
+}
+
+/* ---------- sticky that knows it is stuck ---------- */
+
+.sticky-head {
+    container-type: scroll-state;
+    position: sticky;
+    top: 1.6rem;
+}
+
+.sticky-head h2 {
+    transition: color 240ms ease, font-size 240ms ease, letter-spacing 240ms ease;
+}
+
+@container scroll-state( stuck: top ) {
+    .sticky-head h2 {
+        color: var( --accent );
+        font-size: 1.2rem;
+        letter-spacing: 0.02em;
+    }
+}
+
+/* ---------- horizontal strip driving an outside bar ---------- */
+
+.stripwrap {
+    border-bottom: 1px solid var( --edge );
+    padding: clamp( 3rem, 9vh, 7rem ) 0;
+    timeline-scope: --strip;
+}
+
+.stripbar {
+    background: var( --edge );
+    height: 2px;
+    margin: 0 var( --grid ) 1.2rem;
+}
+
+.stripbar i {
+    animation: wipe linear both;
+    animation-timeline: --strip;
+    background: var( --accent );
+    display: block;
+    height: 100%;
+    transform-origin: left;
+    width: 100%;
+}
+
+.strip {
+    display: flex;
+    gap: 3px;
+    overflow-x: auto;
+    padding: 0 var( --grid );
+    scroll-snap-type: x proximity;
+    scroll-timeline-axis: inline;
+    scroll-timeline-name: --strip;
+    scrollbar-width: thin;
+}
+
+.tile {
+    background: color-mix( in oklab, var( --ink ) 5%, transparent );
+    border-top: 2px solid var( --ink );
+    flex: 0 0 17rem;
+    padding: 1.1rem 1.1rem 1.5rem;
+    scroll-snap-align: start;
+}
+
+.tile h3 {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+    font-weight: 400;
+    margin: 0 0 0.6rem;
+}
+
+.tile p {
+    color: var( --soft );
+    font-size: 0.84rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.tile--end {
+    border-top-color: var( --accent );
+}
+
+/* ---------- anchored footnotes, popover, no script ---------- */
+
+.mark {
+    anchor-name: --m;
+    color: var( --accent );
+    cursor: pointer;
+    font-size: 0.7em;
+    font-weight: 700;
+    text-decoration: none;
+    vertical-align: super;
+}
+
+.mark--in {
+    border-bottom: 2px solid var( --accent );
+    font-size: 1em;
+    vertical-align: baseline;
+}
+
+#m1 { anchor-name: --m1; }
+#m2 { anchor-name: --m2; }
+#m3 { anchor-name: --m3; }
+
+.fn {
+    background: var( --paper );
+    border: 1px solid var( --ink );
+    color: var( --ink );
+    inset: auto;
+    margin: 0;
+    max-width: 22rem;
+    padding: 0.85rem 1rem;
+    position: fixed;
+    position-area: block-end span-inline-end;
+    position-try-fallbacks: block-start span-inline-end, block-end span-inline-start;
+}
+
+#fn1 { position-anchor: --m1; }
+#fn2 { position-anchor: --m2; }
+#fn3 { position-anchor: --m3; }
+
+.fn p {
+    font-size: 0.84rem;
+    line-height: 1.55;
+    margin: 0;
+}
+
+/* ---------- the plate that crosses documents ---------- */
+
+.crossing {
+    border-bottom: none;
+}
+
+.plate {
+    aspect-ratio: 16 / 7;
+    background: var( --ink );
+    color: var( --paper );
+    display: grid;
+    grid-column: 1 / -1;
+    margin-top: 2rem;
+    padding: 1.4rem;
+    position: relative;
+    text-decoration: none;
+    transition: background 200ms ease;
+    view-transition-name: plate;
+}
+
+.plate:hover {
+    background: var( --accent );
+}
+
+.plate__label {
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+}
+
+.plate__title {
+    align-self: center;
+    font-size: clamp( 2.4rem, 9vw, 7rem );
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1;
+}
+
+.plate__note {
+    align-self: end;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    opacity: 0.7;
+}
+
+::view-transition-group( plate ) {
+    animation-duration: 520ms;
+    animation-timing-function: cubic-bezier( 0.22, 0.61, 0.36, 1 );
+}
+
+::view-transition-group( choreo-title ),
+::view-transition-group( plate-title ) {
+    animation-duration: 520ms;
+    animation-timing-function: cubic-bezier( 0.22, 0.61, 0.36, 1 );
+}
+
+/* ---------- support readout, computed by the engine itself ---------- */
+
+.foot {
+    align-items: end;
+    border-top: 1px solid var( --ink );
+    display: grid;
+    gap: 2rem var( --grid );
+    grid-template-columns: 1fr;
+    margin: 0 var( --grid );
+    padding: 2rem 0 3rem;
+}
+
+.support ul {
+    list-style: none;
+    margin: 0.8rem 0 0;
+    padding: 0;
+}
+
+.chk {
+    color: var( --soft );
+    font-size: 0.8rem;
+    line-height: 1.9;
+}
+
+.chk::before {
+    content: "✕ ";
+    color: var( --soft );
+}
+
+@supports ( animation-timeline: scroll() ) {
+    .chk--sda { color: var( --ink ); }
+    .chk--sda::before { color: var( --accent ); content: "✓ "; }
+}
+
+@supports ( anchor-name: --a ) {
+    .chk--anchor { color: var( --ink ); }
+    .chk--anchor::before { color: var( --accent ); content: "✓ "; }
+}
+
+@supports ( view-transition-name: a ) {
+    .chk--vt { color: var( --ink ); }
+    .chk--vt::before { color: var( --accent ); content: "✓ "; }
+}
+
+@supports ( container-type: scroll-state ) {
+    .chk--ss { color: var( --ink ); }
+    .chk--ss::before { color: var( --accent ); content: "✓ "; }
+}
+
+.colophon {
+    color: var( --soft );
+    font-size: 0.72rem;
+    line-height: 1.7;
+    margin: 0;
+}
+
+.colophon a {
+    color: var( --accent );
+}
+
+@media ( min-width: 900px ) {
+    .foot {
+        grid-template-columns: 1fr 1fr;
+    }
+    .colophon {
+        text-align: right;
+    }
+}
+
+/* ---------- no timeline support: show everything, plainly ---------- */
+
+@supports not ( animation-timeline: view() ) {
+    .colorize span,
+    .reveal,
+    .slab {
+        animation: none;
+        color: var( --ink );
+        opacity: 1;
+        transform: none;
+    }
+    .slab {
+        color: var( --paper );
+    }
+    .hero__title {
+        animation: none;
+    }
+}
+
+@media ( prefers-reduced-motion: reduce ) {
+    html {
+        scroll-behavior: auto;
+    }
+    .colorize span,
+    .hero__title,
+    .reveal,
+    .slab {
+        animation: none;
+        opacity: 1;
+        transform: none;
+    }
+    .colorize span {
+        color: var( --ink );
+    }
+    ::view-transition-group( * ) {
+        animation-duration: 1ms;
+    }
+}

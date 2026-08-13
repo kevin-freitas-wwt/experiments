@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choreo — Motion Without JavaScript</title>
+    <meta name="description" content="A Swiss editorial page choreographed entirely in CSS. Scroll-driven animations, view timelines, anchor positioning and cross-document view transitions, with zero lines of JavaScript. View source and count the script tags: none.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="experiments by Kevin">
+    <meta property="og:title" content="Choreo — Motion Without JavaScript">
+    <meta property="og:description" content="A Swiss editorial page choreographed entirely in CSS. Scroll-driven animations, view timelines, anchor positioning and cross-document view transitions, with zero lines of JavaScript.">
+    <meta property="og:url" content="https://kevin-freitas-wwt.github.io/experiments/Choreo/">
+    <meta property="og:image" content="https://kevin-freitas-wwt.github.io/experiments/Choreo/thumb.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Choreo — Motion Without JavaScript">
+    <meta name="twitter:description" content="A Swiss editorial page choreographed entirely in CSS. Zero lines of JavaScript.">
+    <meta name="twitter:image" content="https://kevin-freitas-wwt.github.io/experiments/Choreo/thumb.png">
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <link rel="stylesheet" href="choreo.css">
+</head>
+<body>
+    <div class="rail"><i></i></div>
+
+    <header class="masthead">
+        <p class="kicker">Choreo</p>
+        <p class="kicker kicker--r">No.&nbsp;01 &nbsp;/&nbsp; Motion</p>
+    </header>
+
+    <section class="hero">
+        <h1 class="hero__title">Motion<br>without<br>JavaScript.</h1>
+        <div class="hero__meta">
+            <p class="lede">Every movement on this page is declared in a stylesheet. Scroll timelines, view timelines, anchor positioning, cross&#8209;document view transitions. There is not one <code>&lt;script&gt;</code> tag in this document. Check.</p>
+            <p class="rule">Scroll</p>
+        </div>
+    </section>
+
+    <section class="band">
+        <p class="colorize">
+            <span>For</span> <span>thirty</span> <span>years</span> <span>the</span> <span>browser</span>
+            <span>asked</span> <span>a</span> <span>scripting</span> <span>language</span> <span>to</span>
+            <span>do</span> <span>a</span> <span>job</span> <span>that</span> <span>belonged</span>
+            <span>to</span> <span>the</span> <span>compositor.</span>
+        </p>
+    </section>
+
+    <section class="grid">
+        <div class="col-num">01</div>
+        <div class="col-head">
+            <h2>Scroll is a timeline</h2>
+        </div>
+        <div class="col-body">
+            <p class="reveal">The bar at the top of this window is not being updated by a listener. It is an animation whose clock is the document's own scroll position: <code>animation-timeline: scroll( root block )</code>. The browser runs it off the main thread, which is why it never stutters while the page is busy.<a class="mark" id="m1" popovertarget="fn1">1</a></p>
+            <p class="reveal">Each paragraph in this column fades and rises on a <em>view</em> timeline instead: a clock that starts when the element enters the viewport and ends when it leaves. The element is its own scroll driver, so nothing needs to know where anything else is.</p>
+            <p class="reveal">This used to be a library. Then it was an <code>IntersectionObserver</code> and forty lines of state. Now it is two declarations that ship in the browser.</p>
+        </div>
+    </section>
+
+    <div class="fn" id="fn1" popover>
+        <p><b>1.</b> Scroll-driven animations landed in Chromium&nbsp;115 and are progressively shipping elsewhere. This footnote is a <code>popover</code> positioned with <code>position-anchor</code> &mdash; also no script.</p>
+    </div>
+
+    <section class="figure figure--wide">
+        <div class="stack">
+            <div class="slab reveal-scale"><span>entry 0%</span></div>
+            <div class="slab reveal-scale"><span>entry 40%</span></div>
+            <div class="slab reveal-scale"><span>cover 50%</span></div>
+            <div class="slab reveal-scale"><span>exit 100%</span></div>
+        </div>
+        <p class="caption">Four slabs, one keyframe rule, four <code>animation-range</code> values.</p>
+    </section>
+
+    <section class="grid">
+        <div class="col-num">02</div>
+        <div class="col-head sticky-head">
+            <h2>Sticky knows it&rsquo;s stuck</h2>
+        </div>
+        <div class="col-body">
+            <p class="reveal">This heading is <code>position: sticky</code>, and it is also a <code>container-type: scroll-state</code> container. That means the stylesheet can ask whether it is currently pinned &mdash; <code>@container scroll-state( stuck: top )</code> &mdash; and restyle it accordingly. Scroll slowly and watch it change weight as it catches.</p>
+            <p class="reveal">Before this, &ldquo;is the sticky thing stuck?&rdquo; required a sentinel element, an observer, and a class toggle. It was the single most common reason a static page needed JavaScript at all.</p>
+            <p class="reveal">The pattern generalises. A container can ask whether it is scrollable, whether it is snapped, whether there is content hidden above or below the fold. All of it queryable in CSS.</p>
+            <p class="reveal">Which reframes the whole thing: these features are not new tricks for animators. They are the browser finally exposing the state it always had, so that the presentation layer can stop guessing.</p>
+        </div>
+    </section>
+
+    <section class="stripwrap">
+        <p class="stripbar"><i></i></p>
+        <div class="strip">
+            <article class="tile"><h3>scroll()</h3><p>An anonymous timeline bound to the nearest scroll container, or the root.</p></article>
+            <article class="tile"><h3>view()</h3><p>A timeline bound to one element&rsquo;s trip across its scrollport.</p></article>
+            <article class="tile"><h3>animation-range</h3><p>Which slice of that trip the animation actually occupies.</p></article>
+            <article class="tile"><h3>timeline-scope</h3><p>Lets a named timeline reach elements outside the scroller. That thin bar above is driven by this strip.</p></article>
+            <article class="tile"><h3>anchor-name</h3><p>Tethers one box to another, across stacking contexts, with fallback positions.</p></article>
+            <article class="tile"><h3>@view-transition</h3><p>Animates between two whole documents. Declarative, cross&#8209;page, no framework.</p></article>
+            <article class="tile tile--end"><h3>&mdash;</h3><p>Drag this strip sideways. The bar above it is a different element in a different subtree.</p></article>
+        </div>
+        <p class="caption caption--pad">Horizontal scroll drives a progress bar outside its own container, via <code>timeline-scope</code>.</p>
+    </section>
+
+    <section class="grid">
+        <div class="col-num">03</div>
+        <div class="col-head">
+            <h2>Anchors, not coordinates</h2>
+        </div>
+        <div class="col-body">
+            <p class="reveal">Tooltips, footnotes, menus, callouts: every one of them used to mean measuring a rectangle in script and writing pixels into a style attribute. Then re-measuring on resize, on scroll, on zoom.</p>
+            <p class="reveal">Anchor positioning replaces that with a relationship. This word &mdash; <a class="mark mark--in" id="m2" popovertarget="fn2">here</a> &mdash; declares an <code>anchor-name</code>, and the note attaches itself to it with <code>position-area</code>, flipping to a fallback when it would leave the screen.<a class="mark" id="m3" popovertarget="fn3">2</a></p>
+            <p class="reveal">The browser is doing the layout maths, at layout time, where it belongs. Nothing is measured twice.</p>
+        </div>
+    </section>
+
+    <div class="fn" id="fn2" popover>
+        <p>Anchored to the word, not to a computed <code>top</code> and <code>left</code>. Resize the window and it stays honest.</p>
+    </div>
+    <div class="fn" id="fn3" popover>
+        <p><b>2.</b> <code>position-try-fallbacks</code> handles the case where the preferred side has no room, which is the part everyone&rsquo;s hand-rolled implementation got wrong.</p>
+    </div>
+
+    <section class="crossing">
+        <div class="col-num">04</div>
+        <div class="col-head">
+            <h2>Across documents</h2>
+        </div>
+        <div class="col-body">
+            <p class="reveal">The last piece is the one that still surprises people. A single at&#8209;rule, <code>@view-transition { navigation: auto }</code>, and two separate HTML files will animate into each other on a normal link click. No router, no single-page app, no hydration.</p>
+            <p class="reveal">The plate below carries a <code>view-transition-name</code>. The next page has an element with the same name. Click it and the browser morphs one into the other across a real page navigation.</p>
+        </div>
+        <a class="plate" href="plates.html">
+            <span class="plate__label">Continue</span>
+            <span class="plate__title">Plates</span>
+            <span class="plate__note">Same name, next document &rarr;</span>
+        </a>
+    </section>
+
+    <footer class="foot">
+        <div class="support">
+            <p class="kicker">Your browser</p>
+            <ul>
+                <li class="chk chk--sda">Scroll-driven animations</li>
+                <li class="chk chk--anchor">Anchor positioning</li>
+                <li class="chk chk--vt">View transitions</li>
+                <li class="chk chk--ss">Scroll-state queries</li>
+            </ul>
+        </div>
+        <p class="colophon">
+            Choreo &middot; one stylesheet, two documents, zero scripts.<br>
+            <a href="../">experiments by Kevin</a>
+        </p>
+    </footer>
+</body>
+</html>

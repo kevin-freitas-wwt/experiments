@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choreo — Plates</title>
+    <meta name="description" content="The second document in Choreo. Arriving here morphs one page into the next with a single CSS at-rule, no router and no JavaScript.">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="experiments by Kevin">
+    <meta property="og:title" content="Choreo — Plates">
+    <meta property="og:description" content="The second document in Choreo. Arriving here morphs one page into the next with a single CSS at-rule, no router and no JavaScript.">
+    <meta property="og:url" content="https://kevin-freitas-wwt.github.io/experiments/Choreo/plates.html">
+    <meta property="og:image" content="https://kevin-freitas-wwt.github.io/experiments/Choreo/thumb.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Choreo — Plates">
+    <meta name="twitter:description" content="One CSS at-rule animates between two whole documents.">
+    <meta name="twitter:image" content="https://kevin-freitas-wwt.github.io/experiments/Choreo/thumb.png">
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <link rel="stylesheet" href="choreo.css">
+    <link rel="stylesheet" href="plates.css">
+</head>
+<body class="plates">
+    <div class="rail"><i></i></div>
+
+    <header class="masthead">
+        <p class="kicker"><a class="back" href="index.html">&larr; Choreo</a></p>
+        <p class="kicker kicker--r">No.&nbsp;01 &nbsp;/&nbsp; Plates</p>
+    </header>
+
+    <section class="slabhero">
+        <span class="slabhero__label">Arrived</span>
+        <h1 class="slabhero__title">Plates</h1>
+        <span class="slabhero__note">The block you clicked is the block you landed on</span>
+    </section>
+
+    <section class="note">
+        <p class="lede reveal">You just watched two separate HTML files animate into one another. The black plate on the previous page and the black plate above share a <code>view-transition-name</code>, and the browser matched them across a real navigation. The only thing that made it happen was <code>@view-transition&nbsp;{ navigation: auto }</code> in the shared stylesheet.</p>
+        <p class="lede reveal">Reload this page. Press back. Press forward. Every one of those is animated, and none of it is being coordinated by script, because there is no script.</p>
+    </section>
+
+    <section class="plate-set">
+        <figure class="plateitem">
+            <div class="plateitem__num">01</div>
+            <blockquote class="big">Aa</blockquote>
+            <figcaption>Each specimen below scales on its own view timeline. The clock is its position in the scrollport, nothing else.</figcaption>
+        </figure>
+        <figure class="plateitem">
+            <div class="plateitem__num">02</div>
+            <blockquote class="big">Bb</blockquote>
+            <figcaption>Same keyframes, different range. Character comes from the range, not the animation.</figcaption>
+        </figure>
+        <figure class="plateitem">
+            <div class="plateitem__num">03</div>
+            <blockquote class="big">Cc</blockquote>
+            <figcaption>Scrub the scrollbar backwards. Scroll-driven animation is a function of position, so it plays in reverse for free.</figcaption>
+        </figure>
+    </section>
+
+    <section class="closing">
+        <p class="colorize">
+            <span>The</span> <span>page</span> <span>was</span> <span>always</span>
+            <span>able</span> <span>to</span> <span>do</span> <span>this.</span>
+        </p>
+        <a class="plate plate--back" href="index.html">
+            <span class="plate__label">Back</span>
+            <span class="plate__title">Choreo</span>
+            <span class="plate__note">&larr; And again, in reverse</span>
+        </a>
+    </section>
+
+    <footer class="foot">
+        <div class="support">
+            <p class="kicker">Two documents</p>
+            <ul>
+                <li class="chk chk--vt">Cross-document view transitions</li>
+                <li class="chk chk--sda">Scroll-driven animations</li>
+            </ul>
+        </div>
+        <p class="colophon">
+            Choreo &middot; one stylesheet, two documents, zero scripts.<br>
+            <a href="../">experiments by Kevin</a>
+        </p>
+    </footer>
+</body>
+</html>

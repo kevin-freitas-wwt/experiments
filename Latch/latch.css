@@ -1,0 +1,890 @@
+/* Latch — interface state without JavaScript.
+   Every mechanism verified in headless Firefox and headless Chromium.
+   Nothing here is engine-exclusive except one clearly marked line in Fig. 5. */
+
+@property --sweep {
+    inherits: false;
+    initial-value: 20deg;
+    syntax: "<angle>";
+}
+
+@property --bleed {
+    inherits: false;
+    initial-value: 2px;
+    syntax: "<length>";
+}
+
+@property --warp {
+    inherits: false;
+    initial-value: 0;
+    syntax: "<number>";
+}
+
+:root {
+    --blue: light-dark( #14439c, #6f9bff );
+    --gap: 1.5rem;
+    --ink: light-dark( #17181b, #e9e6de );
+    --lead: light-dark( #b9b2a4, #33342f );
+    --paper: light-dark( #eeeae1, #101215 );
+    --plate: light-dark( #f7f5ef, #171a1e );
+    --red: light-dark( #c23a17, #ff7345 );
+    --soft: light-dark( #7d7869, #8d887a );
+    --step: 1;
+    --ui: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    color-scheme: light dark;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    -webkit-font-smoothing: antialiased;
+    background: var( --paper );
+    background-image:
+        linear-gradient( to right, color-mix( in oklab, var( --lead ) 45%, transparent ) 1px, transparent 1px ),
+        linear-gradient( to bottom, color-mix( in oklab, var( --lead ) 45%, transparent ) 1px, transparent 1px );
+    background-size: 6mm 6mm;
+    color: var( --ink );
+    font-family: var( --ui );
+    margin: 0;
+    padding: 0 0 4rem;
+}
+
+/* ---- the density latch: :has() writes a property, style queries read it ---- */
+
+body:has( #d-tight:checked ) {
+    --gap: 0.75rem;
+    --step: 0.88;
+}
+
+body:has( #d-tight:checked ) .rack {
+    --density: tight;
+}
+
+code {
+    background: color-mix( in oklab, var( --blue ) 12%, transparent );
+    color: var( --blue );
+    font-family: var( --mono );
+    font-size: 0.85em;
+    padding: 0.05em 0.28em;
+}
+
+em {
+    font-style: normal;
+    text-decoration: 1px underline var( --red );
+    text-underline-offset: 3px;
+}
+
+/* ---- floating density switch ---- */
+
+.controls {
+    position: fixed;
+    right: 1rem;
+    top: 1rem;
+    z-index: 20;
+}
+
+.setter {
+    background: var( --plate );
+    border: 1px solid var( --ink );
+    display: flex;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0.45rem 0.7rem 0.55rem;
+}
+
+.setter legend {
+    font-family: var( --mono );
+    font-size: 0.55rem;
+    letter-spacing: 0.16em;
+    padding: 0 0.3rem;
+    text-transform: uppercase;
+}
+
+.setter label {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    font-family: var( --mono );
+    font-size: 0.62rem;
+    gap: 0.3rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.setter input {
+    accent-color: var( --red );
+    margin: 0;
+}
+
+/* ---- title block, drawn like one ---- */
+
+.titleblock {
+    align-items: end;
+    border-bottom: 2px solid var( --ink );
+    display: grid;
+    gap: var( --gap );
+    grid-template-columns: 1fr;
+    margin: 0 var( --gap );
+    padding: 3.5rem 0 1rem;
+}
+
+.stamp {
+    color: var( --soft );
+    font-family: var( --mono );
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    margin: 0 0 0.8rem;
+    text-transform: uppercase;
+}
+
+.titleblock h1 {
+    font-size: calc( clamp( 3.2rem, 11vw, 8rem ) * var( --step ) );
+    font-weight: 700;
+    letter-spacing: -0.045em;
+    line-height: 0.86;
+    margin: 0;
+}
+
+.sub {
+    font-size: calc( 1.05rem * var( --step ) );
+    letter-spacing: 0.01em;
+    margin: 0.6rem 0 0;
+}
+
+.titleblock__spec {
+    border: 1px solid var( --ink );
+    display: grid;
+    font-family: var( --mono );
+    font-size: 0.62rem;
+    gap: 0;
+    grid-template-columns: auto 1fr;
+    margin: 0;
+    min-width: 15rem;
+}
+
+.titleblock__spec dt {
+    border-bottom: 1px solid color-mix( in oklab, var( --ink ) 25%, transparent );
+    border-right: 1px solid color-mix( in oklab, var( --ink ) 25%, transparent );
+    color: var( --soft );
+    letter-spacing: 0.12em;
+    padding: 0.35rem 0.6rem;
+    text-transform: uppercase;
+}
+
+.titleblock__spec dd {
+    border-bottom: 1px solid color-mix( in oklab, var( --ink ) 25%, transparent );
+    letter-spacing: 0.06em;
+    margin: 0;
+    padding: 0.35rem 0.6rem;
+}
+
+.titleblock__spec dt:last-of-type,
+.titleblock__spec dd:last-of-type {
+    border-bottom: none;
+}
+
+@media ( min-width: 900px ) {
+    .titleblock {
+        grid-template-columns: 1fr auto;
+    }
+}
+
+/* ---- preamble ---- */
+
+.preamble {
+    border-bottom: 1px solid var( --ink );
+    margin: 0 var( --gap );
+    max-width: 60ch;
+    padding: 2rem 0;
+}
+
+.lede {
+    font-size: calc( 1.2rem * var( --step ) );
+    line-height: 1.5;
+    margin: 0 0 1rem;
+    text-wrap: pretty;
+}
+
+.preamble p:last-child {
+    color: var( --soft );
+    font-size: calc( 0.95rem * var( --step ) );
+    line-height: 1.65;
+    margin: 0;
+}
+
+/* ---- figure scaffolding ---- */
+
+.fig,
+.verdict {
+    border-bottom: 1px solid var( --ink );
+    margin: 0 var( --gap );
+    padding: 2.2rem 0 2.6rem;
+}
+
+.fig__rule {
+    align-items: baseline;
+    border-bottom: 1px solid var( --lead );
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+    margin-bottom: 1.6rem;
+    padding-bottom: 0.5rem;
+}
+
+.fig__rule span {
+    background: var( --ink );
+    color: var( --paper );
+    font-family: var( --mono );
+    font-size: 0.58rem;
+    letter-spacing: 0.16em;
+    padding: 0.2rem 0.45rem;
+    text-transform: uppercase;
+}
+
+.fig__rule b {
+    font-size: calc( 1.15rem * var( --step ) );
+    letter-spacing: -0.01em;
+}
+
+.fig__rule i {
+    color: var( --soft );
+    font-family: var( --mono );
+    font-size: 0.6rem;
+    font-style: normal;
+    letter-spacing: 0.04em;
+    margin-left: auto;
+}
+
+.fig__body {
+    display: grid;
+    gap: 2rem var( --gap );
+    grid-template-columns: 1fr;
+}
+
+.fig__note p {
+    font-size: calc( 0.95rem * var( --step ) );
+    line-height: 1.65;
+    margin: 0 0 0.9rem;
+    max-width: 54ch;
+    text-wrap: pretty;
+}
+
+.fig__note p:last-child {
+    margin-bottom: 0;
+}
+
+@media ( min-width: 940px ) {
+    .fig__body {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.plate {
+    align-content: start;
+    background: var( --plate );
+    border: 1px solid var( --ink );
+    display: grid;
+    gap: 1rem;
+    padding: 1.4rem;
+    position: relative;
+}
+
+.plate::before,
+.plate::after {
+    border: 1px solid var( --red );
+    content: "";
+    height: 7px;
+    position: absolute;
+    width: 7px;
+}
+
+.plate::before {
+    border-bottom: none;
+    border-right: none;
+    left: 5px;
+    top: 5px;
+}
+
+.plate::after {
+    border-left: none;
+    border-top: none;
+    bottom: 5px;
+    right: 5px;
+}
+
+.plate__cap {
+    color: var( --soft );
+    font-family: var( --mono );
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+/* ---- FIG 1 · the drawn unit and its anchored pins ---- */
+
+.unit {
+    aspect-ratio: 4 / 3;
+    background: var( --plate );
+    border: 1.5px solid var( --ink );
+    box-shadow: inset 0 0 0 4px var( --plate ), inset 0 0 0 5px color-mix( in oklab, var( --ink ) 35%, transparent );
+    display: grid;
+    gap: 0;
+    grid-template-rows: 0.6fr 1.6fr 0.8fr;
+    margin: 0 auto;
+    max-width: 25rem;
+    padding: 1.1rem;
+    position: relative;
+    width: 100%;
+}
+
+.unit__cap {
+    border: 1.5px solid var( --ink );
+    border-radius: 999px 999px 0 0;
+    margin: 0 22%;
+}
+
+.unit__grille {
+    align-content: center;
+    border: 1.5px solid var( --ink );
+    display: grid;
+    gap: 5px;
+    grid-template-columns: repeat( 4, 1fr );
+    padding: 0.7rem;
+}
+
+.unit__grille i {
+    background: color-mix( in oklab, var( --ink ) 16%, transparent );
+    border: 1px solid var( --ink );
+    display: block;
+    height: 0.7rem;
+}
+
+.unit__dial {
+    background: conic-gradient( from -90deg, var( --red ) 0 34%, transparent 34% );
+    border: 1.5px solid var( --ink );
+    border-radius: 50%;
+    height: 2.4rem;
+    justify-self: end;
+    margin: 0.5rem 0;
+    width: 2.4rem;
+}
+
+.unit__base {
+    align-self: end;
+    background: repeating-linear-gradient( 45deg, transparent 0 4px, color-mix( in oklab, var( --ink ) 40%, transparent ) 4px 5px );
+    border-top: 1.5px solid var( --ink );
+    height: 0.75rem;
+}
+
+.pin {
+    anchor-name: --pin;
+    aspect-ratio: 1;
+    background: var( --red );
+    border: none;
+    border-radius: 50%;
+    color: #fff;
+    cursor: pointer;
+    font-family: var( --mono );
+    font-size: 0.66rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+    position: absolute;
+    transition: box-shadow 160ms ease, transform 160ms ease;
+    width: 1.4rem;
+}
+
+.pin:hover,
+.pin:focus-visible {
+    box-shadow: 0 0 0 4px color-mix( in oklab, var( --red ) 28%, transparent );
+    transform: scale( 1.12 );
+}
+
+.pin--1 { anchor-name: --pin1; left: 12%; top: 8%; }
+.pin--2 { anchor-name: --pin2; right: 10%; top: 34%; }
+.pin--3 { anchor-name: --pin3; bottom: 26%; left: 30%; }
+.pin--4 { anchor-name: --pin4; bottom: 8%; right: 24%; }
+
+.call {
+    background: var( --plate );
+    border: 1.5px solid var( --ink );
+    color: var( --ink );
+    inset: auto;
+    margin: 0;
+    max-width: 20rem;
+    padding: 0.8rem 0.95rem;
+    align-self: anchor-center;
+    margin-inline: 0.6rem;
+    position: fixed;
+    position-area: inline-end;
+    position-try-fallbacks: flip-inline, block-end span-inline-end, block-start span-inline-end;
+    /* enter / exit, declared once, no script */
+    opacity: 0;
+    transition: display 220ms allow-discrete, opacity 220ms ease, transform 220ms cubic-bezier( 0.2, 0.7, 0.3, 1 );
+    transform: translateY( 4px );
+}
+
+.call:popover-open {
+    opacity: 1;
+    transform: none;
+}
+
+@starting-style {
+    .call:popover-open {
+        opacity: 0;
+        transform: translateY( 4px );
+    }
+}
+
+#c1 { position-anchor: --pin1; }
+#c2 { position-anchor: --pin2; }
+#c3 { position-anchor: --pin3; }
+#c4 { position-anchor: --pin4; }
+
+.call p {
+    font-size: 0.84rem;
+    line-height: 1.55;
+    margin: 0;
+}
+
+.call b {
+    color: var( --red );
+    font-family: var( --mono );
+}
+
+/* ---- FIG 2 · the rack, restyled by a style query ---- */
+
+.rack {
+    border: 1px solid var( --ink );
+    display: grid;
+}
+
+.slot {
+    align-items: center;
+    border-bottom: 1px solid color-mix( in oklab, var( --ink ) 30%, transparent );
+    display: grid;
+    gap: 0.9rem;
+    grid-template-columns: 2rem 1fr;
+    padding: 0.85rem 0.9rem;
+    transition: padding 260ms ease;
+}
+
+.slot:last-child {
+    border-bottom: none;
+}
+
+.slot span {
+    background: var( --ink );
+    color: var( --paper );
+    display: grid;
+    font-family: var( --mono );
+    font-size: 0.66rem;
+    height: 1.5rem;
+    place-items: center;
+    transition: height 260ms ease, width 260ms ease;
+    width: 1.5rem;
+}
+
+.slot p {
+    font-size: 0.95rem;
+    margin: 0;
+    transition: font-size 260ms ease, letter-spacing 260ms ease;
+}
+
+@container style( --density: tight ) {
+    .slot {
+        padding: 0.3rem 0.6rem;
+    }
+    .slot span {
+        height: 1.05rem;
+        width: 1.05rem;
+    }
+    .slot p {
+        font-size: 0.78rem;
+        letter-spacing: 0.02em;
+    }
+}
+
+/* ---- FIG 3 · registered properties actually interpolate ---- */
+
+.dials {
+    display: grid;
+    gap: 0.8rem;
+    grid-template-columns: repeat( 3, 1fr );
+}
+
+.dial {
+    align-items: end;
+    aspect-ratio: 1;
+    border: 1.5px solid var( --ink );
+    display: flex;
+    justify-content: center;
+    padding-bottom: 0.5rem;
+}
+
+.dial span {
+    background: var( --plate );
+    font-family: var( --mono );
+    font-size: 0.56rem;
+    letter-spacing: 0.12em;
+    padding: 0 0.25rem;
+    text-transform: uppercase;
+}
+
+.dial--sweep {
+    background: conic-gradient( from -90deg, var( --blue ) 0 var( --sweep ), transparent var( --sweep ) );
+    border-radius: 50%;
+    transition: --sweep 700ms cubic-bezier( 0.3, 0.8, 0.2, 1 );
+}
+
+.dial--sweep:hover,
+.dial--sweep:focus-visible {
+    --sweep: 320deg;
+}
+
+.dial--bleed {
+    box-shadow: inset 0 0 0 var( --bleed ) var( --red );
+    transition: --bleed 500ms ease;
+}
+
+.dial--bleed:hover,
+.dial--bleed:focus-visible {
+    --bleed: 22px;
+}
+
+.dial--warp {
+    background: repeating-linear-gradient(
+        calc( 12deg + var( --warp ) * 60deg ),
+        transparent 0 6px,
+        color-mix( in oklab, var( --blue ) 55%, transparent ) 6px calc( 7px + var( --warp ) * 5px )
+    );
+    transition: --warp 800ms linear( 0, 0.4 30%, 0.85 60%, 1 );
+}
+
+.dial--warp:hover,
+.dial--warp:focus-visible {
+    --warp: 1;
+}
+
+.dial:focus-visible {
+    outline: 2px solid var( --red );
+    outline-offset: 2px;
+}
+
+/* ---- FIG 4 · @scope with a lower boundary ---- */
+
+.card {
+    border: 1px solid var( --ink );
+    padding: 1rem;
+}
+
+.card__slot {
+    border: 1px dashed var( --red );
+    margin: 0.8rem 0;
+    padding: 0.8rem;
+}
+
+@scope ( .card ) to ( .card__slot ) {
+    p {
+        color: var( --blue );
+        font-size: 0.92rem;
+        line-height: 1.55;
+        margin: 0 0 0.6rem;
+    }
+
+    p:last-child {
+        margin-bottom: 0;
+    }
+}
+
+.card__slot p {
+    font-size: 0.92rem;
+    line-height: 1.55;
+    margin: 0;
+}
+
+/* ---- FIG 5 · discrete transitions, exclusive details ---- */
+
+.drawerwrap button,
+.tabs a {
+    background: none;
+    border: 1px solid var( --ink );
+    color: var( --ink );
+    cursor: pointer;
+    display: inline-block;
+    font-family: var( --mono );
+    font-size: 0.64rem;
+    letter-spacing: 0.14em;
+    padding: 0.55rem 0.85rem;
+    text-decoration: none;
+    text-transform: uppercase;
+    transition: background 160ms ease, color 160ms ease;
+}
+
+.drawerwrap button:hover,
+.tabs a:hover {
+    background: var( --ink );
+    color: var( --paper );
+}
+
+.tray {
+    background: var( --plate );
+    border: 1.5px solid var( --ink );
+    color: var( --ink );
+    inset: auto;
+    left: 50%;
+    margin: 0;
+    max-width: 27rem;
+    opacity: 0;
+    padding: 1.1rem 1.2rem;
+    position: fixed;
+    top: 50%;
+    transition: display 300ms allow-discrete, opacity 300ms ease, transform 300ms cubic-bezier( 0.2, 0.8, 0.2, 1 );
+    transform: translate( -50%, -46% ) scale( 0.96 );
+    width: calc( 100% - 2rem );
+}
+
+/* Blink also animates the top layer itself; Gecko skips this line and still transitions. */
+@supports ( overlay: auto ) {
+    .tray,
+    .call {
+        transition-property: display, overlay, opacity, transform;
+    }
+}
+
+.tray:popover-open {
+    opacity: 1;
+    transform: translate( -50%, -50% ) scale( 1 );
+}
+
+@starting-style {
+    .tray:popover-open {
+        opacity: 0;
+        transform: translate( -50%, -46% ) scale( 0.96 );
+    }
+}
+
+.tray::backdrop {
+    backdrop-filter: blur( 2px );
+    background: color-mix( in oklab, var( --paper ) 55%, transparent );
+}
+
+.tray p {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin: 0 0 0.8rem;
+}
+
+.tray p:last-child {
+    margin-bottom: 0;
+}
+
+details {
+    border-top: 1px solid var( --lead );
+    padding: 0.6rem 0 0.2rem;
+}
+
+summary {
+    cursor: pointer;
+    font-family: var( --mono );
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+details p {
+    color: var( --soft );
+    font-size: 0.88rem;
+    line-height: 1.6;
+    margin: 0.6rem 0 0.4rem;
+}
+
+/* ---- FIG 6 · :target as the state machine ---- */
+
+.tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.panels {
+    border: 1px solid var( --ink );
+    padding: 1rem;
+}
+
+.panel {
+    display: none;
+}
+
+.panel:target,
+.panels:not( :has( .panel:target ) ) .panel:first-child {
+    display: block;
+}
+
+.panel h3 {
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    margin: 0 0 0.4rem;
+}
+
+.panel p {
+    color: var( --soft );
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* the tab styles itself current by asking whether its panel is targeted */
+.plate:has( #p-one:target ) .tabs a[ href="#p-one" ],
+.plate:has( #p-two:target ) .tabs a[ href="#p-two" ],
+.plate:has( #p-three:target ) .tabs a[ href="#p-three" ],
+.plate:not( :has( .panel:target ) ) .tabs a:first-child {
+    background: var( --red );
+    border-color: var( --red );
+    color: #fff;
+}
+
+/* ---- verdict ---- */
+
+.verdict__grid {
+    display: grid;
+    gap: 1.6rem var( --gap );
+    grid-template-columns: 1fr;
+}
+
+@media ( min-width: 800px ) {
+    .verdict__grid {
+        grid-template-columns: repeat( 3, 1fr );
+    }
+}
+
+.col-label {
+    border-bottom: 1px solid var( --lead );
+    color: var( --soft );
+    font-family: var( --mono );
+    font-size: 0.58rem;
+    letter-spacing: 0.16em;
+    margin: 0 0 0.7rem;
+    padding-bottom: 0.4rem;
+    text-transform: uppercase;
+}
+
+.chk {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.chk li {
+    font-size: 0.86rem;
+    line-height: 1.75;
+}
+
+.chk--yes li::before {
+    color: var( --blue );
+    content: "✓ ";
+}
+
+.chk--no li::before {
+    color: var( --red );
+    content: "✕ ";
+}
+
+/* live probes: the engine grades itself */
+
+.probe {
+    color: var( --soft );
+}
+
+.probe::before {
+    color: var( --red );
+    content: "✕ ";
+}
+
+@supports ( anchor-name: --a ) {
+    .probe--anchor { color: var( --ink ); }
+    .probe--anchor::before { color: var( --blue ); content: "✓ "; }
+}
+
+@supports ( transition-behavior: allow-discrete ) {
+    .probe--discrete { color: var( --ink ); }
+    .probe--discrete::before { color: var( --blue ); content: "✓ "; }
+}
+
+@supports ( color: light-dark( red, blue ) ) {
+    .probe--lightdark { color: var( --ink ); }
+    .probe--lightdark::before { color: var( --blue ); content: "✓ "; }
+}
+
+@supports ( animation-timeline: view() ) {
+    .probe--sda { color: var( --ink ); }
+    .probe--sda::before { color: var( --blue ); content: "✓ "; }
+}
+
+/* the @scope row is lit by an actual @scope rule */
+@scope ( .verdict ) {
+    .probe--scope {
+        color: var( --ink );
+    }
+
+    .probe--scope::before {
+        color: var( --blue );
+        content: "✓ ";
+    }
+}
+
+/* and the style-query row by an actual style query */
+.verdict {
+    --probe: on;
+}
+
+@container style( --probe: on ) {
+    .probe--style { color: var( --ink ); }
+    .probe--style::before { color: var( --blue ); content: "✓ "; }
+}
+
+.probe__note {
+    color: var( --soft );
+    font-size: 0.76rem;
+    line-height: 1.55;
+    margin: 0.8rem 0 0;
+}
+
+.verdict__close {
+    border-top: 1px solid var( --lead );
+    font-size: calc( 1rem * var( --step ) );
+    line-height: 1.6;
+    margin: 1.8rem 0 0;
+    max-width: 64ch;
+    padding-top: 1.2rem;
+    text-wrap: pretty;
+}
+
+/* ---- colophon ---- */
+
+.colophon {
+    color: var( --soft );
+    font-family: var( --mono );
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    margin: 2rem var( --gap ) 0;
+    text-transform: uppercase;
+}
+
+.colophon p {
+    margin: 0 0 0.4rem;
+}
+
+.colophon a {
+    color: var( --red );
+}
+
+@media ( prefers-reduced-motion: reduce ) {
+    * {
+        transition-duration: 1ms !important;
+    }
+}

@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en" data-state="idle">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roomtone — An Interface That Listens to the Room</title>
+    <meta name="description" content="A reading surface that reshapes itself to the sound of the room it's in. Silence lets it bloom, typing strips it to essentials, a nearby voice blurs anything private. All audio analysis stays on device.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="experiments by Kevin">
+    <meta property="og:title" content="Roomtone — An Interface That Listens to the Room">
+    <meta property="og:description" content="A reading surface that reshapes itself to the sound of the room it's in. Silence lets it bloom, typing strips it to essentials, a nearby voice blurs anything private. All audio analysis stays on device.">
+    <meta property="og:url" content="https://kevin-freitas-wwt.github.io/experiments/Roomtone/">
+    <meta property="og:image" content="https://kevin-freitas-wwt.github.io/experiments/Roomtone/thumb.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Roomtone — An Interface That Listens to the Room">
+    <meta name="twitter:description" content="A reading surface that reshapes itself to the sound of the room it's in. All audio analysis stays on device.">
+    <meta name="twitter:image" content="https://kevin-freitas-wwt.github.io/experiments/Roomtone/thumb.png">
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <style>
+        :root {
+            --accent: #a8481f;
+            --bg: #f4f1e9;
+            --card: #fbf9f4;
+            --ease: cubic-bezier( 0.22, 0.61, 0.36, 1 );
+            --gap: 2.4rem;
+            --ink: #1a1916;
+            --measure: 34rem;
+            --mute: #8a8477;
+            --rule: #ddd7c8;
+            --scale: 1;
+            --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+            --slow: 900ms;
+            --track: 0em;
+            --veil: 0;
+            --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+        }
+        @media ( prefers-color-scheme: dark ) {
+            :root {
+                --accent: #e0805a;
+                --bg: #14140f;
+                --card: #1c1c16;
+                --ink: #ece7db;
+                --mute: #7d776a;
+                --rule: #2c2c24;
+            }
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            background: var( --bg );
+            color: var( --ink );
+            font-family: var( --serif );
+            margin: 0;
+            min-height: 100vh;
+            transition: background var( --slow ) var( --ease ), color var( --slow ) var( --ease );
+        }
+        #field {
+            height: 100vh;
+            inset: 0;
+            opacity: 0.5;
+            pointer-events: none;
+            position: fixed;
+            width: 100vw;
+            z-index: 0;
+        }
+        main {
+            margin: 0 auto;
+            max-width: var( --measure );
+            padding: clamp( 3rem, 12vh, 9rem ) 1.5rem 8rem;
+            position: relative;
+            transition: max-width var( --slow ) var( --ease );
+            z-index: 1;
+        }
+        .eyebrow {
+            color: var( --mute );
+            font-family: var( --mono );
+            font-size: 0.66rem;
+            letter-spacing: 0.24em;
+            margin: 0 0 1.6rem;
+            text-transform: uppercase;
+        }
+        h1 {
+            font-size: calc( 2.6rem * var( --scale ) );
+            font-weight: 400;
+            letter-spacing: calc( -0.02em + var( --track ) );
+            line-height: 1.08;
+            margin: 0 0 1.2rem;
+            transition: font-size var( --slow ) var( --ease ), letter-spacing var( --slow ) var( --ease );
+        }
+        h2 {
+            font-size: calc( 1.05rem * var( --scale ) );
+            font-weight: 400;
+            letter-spacing: 0.02em;
+            margin: var( --gap ) 0 0.6rem;
+            transition: font-size var( --slow ) var( --ease ), margin var( --slow ) var( --ease );
+        }
+        h2::before {
+            color: var( --accent );
+            content: "§ ";
+        }
+        p {
+            font-size: calc( 1.02rem * var( --scale ) );
+            line-height: 1.72;
+            margin: 0 0 1.1rem;
+            transition: font-size var( --slow ) var( --ease ), line-height var( --slow ) var( --ease );
+        }
+        .lede {
+            color: var( --mute );
+            font-size: calc( 1.22rem * var( --scale ) );
+            line-height: 1.6;
+            margin-bottom: var( --gap );
+        }
+        .aside {
+            border-left: 2px solid var( --rule );
+            color: var( --mute );
+            font-size: calc( 0.9rem * var( --scale ) );
+            margin: var( --gap ) 0;
+            opacity: calc( 1 - var( --veil ) );
+            padding-left: 1.2rem;
+            transition: opacity var( --slow ) var( --ease );
+        }
+        .private {
+            background: color-mix( in oklab, var( --accent ) 10%, transparent );
+            border-radius: 2px;
+            filter: blur( calc( var( --veil ) * 5px ) );
+            padding: 0 0.15em;
+            transition: filter var( --slow ) var( --ease );
+        }
+        .private::after {
+            color: var( --accent );
+            content: "";
+            font-family: var( --mono );
+            font-size: 0.6rem;
+            letter-spacing: 0.1em;
+            opacity: var( --veil );
+            transition: opacity var( --slow ) var( --ease );
+            vertical-align: super;
+        }
+        [data-state="guard"] .private::after {
+            content: " HELD";
+        }
+        figure.states {
+            border-top: 1px solid var( --rule );
+            margin: var( --gap ) 0 0;
+            padding-top: 1rem;
+        }
+        .states dl {
+            display: grid;
+            gap: 0.1rem 1.2rem;
+            grid-template-columns: 6.5rem 1fr;
+            margin: 0;
+        }
+        .states dl > div {
+            display: contents;
+        }
+        .states dt {
+            color: var( --mute );
+            font-family: var( --mono );
+            font-size: 0.66rem;
+            letter-spacing: 0.16em;
+            padding-top: 0.42rem;
+            text-transform: uppercase;
+        }
+        .states dd {
+            font-size: 0.92rem;
+            line-height: 1.55;
+            margin: 0 0 0.5rem;
+        }
+        .states .on dt,
+        .states .on dd {
+            color: var( --accent );
+        }
+        /* the instrument */
+        .rig {
+            backdrop-filter: blur( 8px );
+            background: color-mix( in oklab, var( --card ) 88%, transparent );
+            border: 1px solid var( --rule );
+            border-radius: 3px;
+            bottom: 1rem;
+            font-family: var( --mono );
+            left: 1rem;
+            padding: 0.85rem 0.95rem 0.8rem;
+            position: fixed;
+            width: 16.5rem;
+            z-index: 3;
+        }
+        .rig header {
+            align-items: baseline;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.6rem;
+        }
+        .rig h3 {
+            color: var( --mute );
+            font-size: 0.6rem;
+            font-weight: 400;
+            letter-spacing: 0.2em;
+            margin: 0;
+            text-transform: uppercase;
+        }
+        .now {
+            color: var( --accent );
+            font-size: 0.72rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+        .meter {
+            align-items: center;
+            display: grid;
+            gap: 0.5rem;
+            grid-template-columns: 3.6rem 1fr 2.1rem;
+            margin-bottom: 0.24rem;
+        }
+        .meter span {
+            color: var( --mute );
+            font-size: 0.58rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+        .meter b {
+            color: var( --ink );
+            font-size: 0.58rem;
+            font-weight: 400;
+            text-align: right;
+        }
+        .bar {
+            background: var( --rule );
+            height: 3px;
+            overflow: hidden;
+        }
+        .bar i {
+            background: var( --accent );
+            display: block;
+            height: 100%;
+            transform-origin: left;
+            transition: transform 90ms linear;
+        }
+        #spec {
+            display: block;
+            height: 30px;
+            margin-top: 0.55rem;
+            width: 100%;
+        }
+        .rig footer {
+            border-top: 1px solid var( --rule );
+            color: var( --mute );
+            display: flex;
+            font-size: 0.55rem;
+            justify-content: space-between;
+            letter-spacing: 0.08em;
+            margin-top: 0.6rem;
+            padding-top: 0.5rem;
+            text-transform: uppercase;
+        }
+        /* gate */
+        .gate {
+            align-items: center;
+            background: var( --bg );
+            display: flex;
+            inset: 0;
+            justify-content: center;
+            position: fixed;
+            transition: opacity 700ms var( --ease ), visibility 700ms;
+            z-index: 10;
+        }
+        .gate[hidden] {
+            display: flex;
+            opacity: 0;
+            pointer-events: none;
+            visibility: hidden;
+        }
+        .gate > div {
+            max-width: 27rem;
+            padding: 2rem;
+        }
+        .gate h2 {
+            font-size: 1.9rem;
+            margin: 0 0 0.9rem;
+        }
+        .gate h2::before {
+            content: none;
+        }
+        .gate p {
+            color: var( --mute );
+            font-size: 0.95rem;
+        }
+        .acts {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            margin-top: 1.6rem;
+        }
+        button {
+            background: none;
+            border: 1px solid var( --ink );
+            color: var( --ink );
+            cursor: pointer;
+            font-family: var( --mono );
+            font-size: 0.68rem;
+            letter-spacing: 0.16em;
+            padding: 0.72rem 1.05rem;
+            text-transform: uppercase;
+            transition: background 200ms var( --ease ), color 200ms var( --ease );
+        }
+        button:hover {
+            background: var( --ink );
+            color: var( --bg );
+        }
+        button.ghost {
+            border-color: var( --rule );
+            color: var( --mute );
+        }
+        button.ghost:hover {
+            background: none;
+            border-color: var( --ink );
+            color: var( --ink );
+        }
+        .fine {
+            color: var( --mute );
+            font-family: var( --mono );
+            font-size: 0.58rem;
+            letter-spacing: 0.1em;
+            margin-top: 1.4rem;
+            text-transform: uppercase;
+        }
+        @media ( max-width: 720px ) {
+            .rig {
+                left: 0.5rem;
+                right: 0.5rem;
+                width: auto;
+            }
+        }
+        @media ( prefers-reduced-motion: reduce ) {
+            * {
+                transition-duration: 1ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="field" aria-hidden="true"></canvas>
+
+    <main>
+        <p class="eyebrow">Roomtone · an interface that listens</p>
+        <h1>This page is reading the room.</h1>
+        <p class="lede">Not your clicks. Not your scroll. The air. Sit in silence and it opens up. Start typing and it gets out of the way. Let a voice come near and it quietly covers what's private.</p>
+
+        <p>Almost every interface treats input as something you aim at it: a cursor, a keystroke, a tap. That leaves out nearly everything true about the moment you're in. Whether you're alone. Whether someone just walked up behind you. Whether the room is loud enough that small type has become useless.</p>
+
+        <p>A microphone answers all three, and it can answer them without a single byte leaving the machine. Everything below is computed from an <code>AnalyserNode</code> in this tab and thrown away frame by frame. There is no network code on this page at all.</p>
+
+        <h2>What it hears</h2>
+        <figure class="states">
+            <dl>
+                <div id="row-bloom"><dt>Bloom</dt><dd>Quiet room. Type breathes out, margins widen, asides come back.</dd></div>
+                <div id="row-focus"><dt>Focus</dt><dd>Keyboard clatter. Sharp transients, high spectral centroid. Decoration retreats.</dd></div>
+                <div id="row-guard"><dt>Guard</dt><dd>Speech nearby: energy at 300&ndash;3000&nbsp;Hz modulating around 4&nbsp;Hz. Private lines blur.</dd></div>
+                <div id="row-drift"><dt>Drift</dt><dd>Music. Broadband and steady. The field behind the text warms and slows.</dd></div>
+                <div id="row-shelter"><dt>Shelter</dt><dd>Loud, unstructured room. Type scales up for reading at a glance.</dd></div>
+            </dl>
+        </figure>
+
+        <h2>The private bit</h2>
+        <p>Here is a line worth hiding: <span class="private">the offer came in at $184,000 and Dana hasn't been told yet</span>. When the classifier decides a voice is in the room, that span blurs and marks itself held. Turn away, keep quiet, and it comes back.</p>
+
+        <p>This is the honest version of a pattern that usually gets built badly. Presence detection normally means a camera, a cloud model, and a privacy policy nobody reads. Sound is coarser, which is exactly why it's safer: it can tell that <em>a</em> voice is present without ever needing to know whose.</p>
+
+        <h2>Where it's wrong</h2>
+        <p>Often. A fan reads as music. A loud typist reads as speech. That's the interesting part rather than the flaw &mdash; ambient input can't be correct, so the design has to make being wrong cheap. Every response here is reversible, slow enough to feel like weather, and never destructive. Nothing is submitted, saved, or sent because the room got loud.</p>
+
+        <p class="aside">The slowness is deliberate. Every transition runs near 900&nbsp;ms with a long tail, and the classifier holds a state for at least a second and a half before it will hand over. A reactive interface that reacts instantly to a coughing fit is a strobe light, not a tool.</p>
+
+        <h2>Try it</h2>
+        <p>Go silent for five seconds. Then type. Then talk to someone, or to yourself. Then put music on. The instrument in the corner shows the five features the classifier actually looks at, so you can watch it make up its mind and catch it being wrong.</p>
+    </main>
+
+    <aside class="rig" id="rig" hidden>
+        <header>
+            <h3>Roomtone</h3>
+            <div class="now" id="stateName">idle</div>
+        </header>
+        <div class="meter"><span>Level</span><div class="bar"><i id="m-rms"></i></div><b id="v-rms">0</b></div>
+        <div class="meter"><span>Centroid</span><div class="bar"><i id="m-cen"></i></div><b id="v-cen">0</b></div>
+        <div class="meter"><span>Flux</span><div class="bar"><i id="m-flux"></i></div><b id="v-flux">0</b></div>
+        <div class="meter"><span>Crossings</span><div class="bar"><i id="m-zcr"></i></div><b id="v-zcr">0</b></div>
+        <div class="meter"><span>4&nbsp;Hz mod</span><div class="bar"><i id="m-mod"></i></div><b id="v-mod">0</b></div>
+        <canvas id="spec" aria-hidden="true"></canvas>
+        <footer><span id="src">on device</span><span id="held">held 0.0s</span></footer>
+    </aside>
+
+    <div class="gate" id="gate">
+        <div>
+            <h2>Roomtone needs to hear the room.</h2>
+            <p>The microphone stream is analysed in this tab and discarded every frame. Nothing is recorded, stored, or transmitted &mdash; this page contains no network code. Or skip the mic and watch a simulated room instead.</p>
+            <div class="acts">
+                <button id="listen">Listen to the room</button>
+                <button class="ghost" id="sim">Simulate instead</button>
+            </div>
+            <p class="fine">Headphones recommended · Chrome, Safari, Firefox</p>
+        </div>
+    </div>
+
+    <script>
+    ( function() {
+        "use strict";
+
+        const root = document.documentElement;
+        const el = function( id ) {
+            return document.getElementById( id );
+        };
+        const bars = {
+            cen: [ el( "m-cen" ), el( "v-cen" ) ],
+            flux: [ el( "m-flux" ), el( "v-flux" ) ],
+            mod: [ el( "m-mod" ), el( "v-mod" ) ],
+            rms: [ el( "m-rms" ), el( "v-rms" ) ],
+            zcr: [ el( "m-zcr" ), el( "v-zcr" ) ]
+        };
+        const rows = {
+            bloom: el( "row-bloom" ),
+            drift: el( "row-drift" ),
+            focus: el( "row-focus" ),
+            guard: el( "row-guard" ),
+            shelter: el( "row-shelter" )
+        };
+        const LOOK = {
+            bloom: { gap: "3.4rem", measure: "38rem", scale: 1.06, track: "0.006em", veil: 0 },
+            drift: { gap: "2.6rem", measure: "34rem", scale: 1, track: "0.01em", veil: 0 },
+            focus: { gap: "1.7rem", measure: "30rem", scale: 0.94, track: "0em", veil: 0.55 },
+            guard: { gap: "2.2rem", measure: "32rem", scale: 0.97, track: "0em", veil: 1 },
+            idle: { gap: "2.4rem", measure: "34rem", scale: 1, track: "0em", veil: 0 },
+            shelter: { gap: "2.6rem", measure: "36rem", scale: 1.18, track: "0.012em", veil: 0.3 }
+        };
+
+        const fieldCv = el( "field" );
+        const fieldCx = fieldCv.getContext( "2d" );
+        const specCv = el( "spec" );
+        const specCx = specCv.getContext( "2d" );
+
+        let analyser = null;
+        let freq = null;
+        let time = null;
+        let prevSpec = null;
+        let rate = 48000;
+        let state = "idle";
+        let stateSince = performance.now();
+        let candidate = null;
+        let candidateSince = 0;
+        let sim = null;
+        const env = new Array( 90 ).fill( 0 );
+        const smooth = { cen: 0, flux: 0, mod: 0, rms: 0, zcr: 0 };
+        const wash = [];
+
+        function fit() {
+            const d = Math.min( 2, window.devicePixelRatio || 1 );
+            fieldCv.width = window.innerWidth * d;
+            fieldCv.height = window.innerHeight * d;
+            fieldCx.setTransform( d, 0, 0, d, 0, 0 );
+            const r = specCv.getBoundingClientRect();
+            specCv.width = r.width * d;
+            specCv.height = r.height * d;
+            specCx.setTransform( d, 0, 0, d, 0, 0 );
+        }
+        window.addEventListener( "resize", fit );
+
+        function ink() {
+            return getComputedStyle( root ).getPropertyValue( "--accent" ).trim();
+        }
+
+        function features() {
+            if ( sim ) {
+                return sim();
+            }
+            analyser.getByteFrequencyData( freq );
+            analyser.getFloatTimeDomainData( time );
+
+            let sum = 0;
+            for ( let i = 0; i < time.length; i++ ) {
+                sum += time[ i ] * time[ i ];
+            }
+            const rms = Math.sqrt( sum / time.length );
+
+            let cross = 0;
+            for ( let i = 1; i < time.length; i++ ) {
+                if ( ( time[ i - 1 ] < 0 ) !== ( time[ i ] < 0 ) ) {
+                    cross++;
+                }
+            }
+            const zcr = cross / time.length;
+
+            let mag = 0, weighted = 0, flux = 0, voiceBand = 0, highBand = 0;
+            const hzPerBin = rate / 2 / freq.length;
+            for ( let i = 0; i < freq.length; i++ ) {
+                const v = freq[ i ] / 255;
+                mag += v;
+                weighted += v * i;
+                if ( prevSpec ) {
+                    const d = v - prevSpec[ i ];
+                    if ( d > 0 ) {
+                        flux += d;
+                    }
+                }
+                const hz = i * hzPerBin;
+                if ( hz > 280 && hz < 3200 ) {
+                    voiceBand += v;
+                }
+                if ( hz > 3800 ) {
+                    highBand += v;
+                }
+                if ( prevSpec ) {
+                    prevSpec[ i ] = v;
+                }
+            }
+            if ( !prevSpec ) {
+                prevSpec = Array.from( freq, function( v ) {
+                    return v / 255;
+                } );
+            }
+            const cen = mag > 0.0001 ? ( weighted / mag ) / freq.length : 0;
+
+            env.push( rms );
+            env.shift();
+            const mean = env.reduce( function( a, b ) {
+                return a + b;
+            }, 0 ) / env.length;
+            let mod = 0;
+            const lag = 8;
+            for ( let i = lag; i < env.length; i++ ) {
+                mod += Math.abs( ( env[ i ] - mean ) - ( env[ i - lag ] - mean ) );
+            }
+            mod = mean > 0.0004 ? Math.min( 1, ( mod / env.length ) / ( mean * 1.6 ) ) : 0;
+
+            return {
+                cen: cen,
+                flux: Math.min( 1, flux / 14 ),
+                high: highBand / freq.length,
+                mod: mod,
+                rms: rms,
+                spec: freq,
+                voice: voiceBand / freq.length,
+                zcr: zcr
+            };
+        }
+
+        function classify( f ) {
+            if ( f.rms < 0.008 ) {
+                return "bloom";
+            }
+            if ( f.rms > 0.16 && f.flux < 0.45 && f.cen < 0.3 ) {
+                return "shelter";
+            }
+            const speech = f.voice * 4 + f.mod * 1.6 - f.high * 3;
+            const keys = f.flux * 1.6 + f.cen * 1.5 + f.zcr * 2.2 - f.voice * 2;
+            const tune = f.voice * 1.4 + ( 1 - f.flux ) * 1.1 - f.mod * 1.3;
+            const best = Math.max( speech, keys, tune );
+            if ( best < 0.42 ) {
+                return "bloom";
+            }
+            if ( best === keys ) {
+                return "focus";
+            }
+            if ( best === speech ) {
+                return "guard";
+            }
+            return "drift";
+        }
+
+        function settle( next, now ) {
+            if ( next === state ) {
+                candidate = null;
+                return;
+            }
+            if ( next !== candidate ) {
+                candidate = next;
+                candidateSince = now;
+                return;
+            }
+            const dwell = next === "guard" ? 420 : 900;
+            if ( now - candidateSince < dwell || now - stateSince < 1500 ) {
+                return;
+            }
+            state = next;
+            stateSince = now;
+            candidate = null;
+            root.dataset.state = state;
+            el( "stateName" ).textContent = state;
+            Object.keys( rows ).forEach( function( k ) {
+                rows[ k ].classList.toggle( "on", k === state );
+            } );
+            const look = LOOK[ state ];
+            root.style.setProperty( "--gap", look.gap );
+            root.style.setProperty( "--measure", look.measure );
+            root.style.setProperty( "--scale", look.scale );
+            root.style.setProperty( "--track", look.track );
+            root.style.setProperty( "--veil", look.veil );
+        }
+
+        function meters( f ) {
+            const vals = { cen: f.cen, flux: f.flux, mod: f.mod, rms: Math.min( 1, f.rms * 7 ), zcr: Math.min( 1, f.zcr * 6 ) };
+            Object.keys( bars ).forEach( function( k ) {
+                smooth[ k ] += ( vals[ k ] - smooth[ k ] ) * 0.2;
+                bars[ k ][ 0 ].style.transform = "scaleX(" + smooth[ k ].toFixed( 3 ) + ")";
+                bars[ k ][ 1 ].textContent = smooth[ k ].toFixed( 2 );
+            } );
+            el( "held" ).textContent = "held " + ( ( performance.now() - stateSince ) / 1000 ).toFixed( 1 ) + "s";
+        }
+
+        function paintSpec( f ) {
+            const w = specCv.clientWidth, h = specCv.clientHeight;
+            specCx.clearRect( 0, 0, w, h );
+            specCx.fillStyle = ink();
+            const bins = 56;
+            const step = Math.floor( f.spec.length * 0.55 / bins );
+            for ( let i = 0; i < bins; i++ ) {
+                let v = 0;
+                for ( let j = 0; j < step; j++ ) {
+                    v = Math.max( v, f.spec[ i * step + j ] / 255 );
+                }
+                const bh = Math.max( 1, v * h );
+                specCx.globalAlpha = 0.25 + v * 0.75;
+                specCx.fillRect( i * ( w / bins ), h - bh, w / bins - 1, bh );
+            }
+            specCx.globalAlpha = 1;
+        }
+
+        function paintField( f, now ) {
+            const w = window.innerWidth, h = window.innerHeight;
+            fieldCx.clearRect( 0, 0, w, h );
+            if ( wash.length === 0 ) {
+                for ( let i = 0; i < 5; i++ ) {
+                    wash.push( { off: Math.random() * 1000, sp: 0.00006 + i * 0.00004 } );
+                }
+            }
+            const amp = state === "drift" ? 1 : state === "focus" ? 0.18 : 0.5;
+            const c = ink();
+            fieldCx.strokeStyle = c;
+            wash.forEach( function( b, i ) {
+                fieldCx.globalAlpha = 0.05 + f.rms * 0.28;
+                fieldCx.lineWidth = 1;
+                fieldCx.beginPath();
+                for ( let x = 0; x <= w; x += 12 ) {
+                    const t = now * b.sp + b.off;
+                    const y = h * ( 0.52 + i * 0.045 ) +
+                        Math.sin( x * 0.004 + t ) * 40 * amp +
+                        Math.sin( x * 0.011 - t * 1.7 ) * 16 * amp * ( 0.4 + f.flux );
+                    if ( x === 0 ) {
+                        fieldCx.moveTo( x, y );
+                    } else {
+                        fieldCx.lineTo( x, y );
+                    }
+                }
+                fieldCx.stroke();
+            } );
+            fieldCx.globalAlpha = 1;
+        }
+
+        function loop( now ) {
+            const f = features();
+            settle( classify( f ), now );
+            meters( f );
+            paintSpec( f );
+            paintField( f, now );
+            requestAnimationFrame( loop );
+        }
+
+        function begin() {
+            el( "gate" ).hidden = true;
+            el( "rig" ).hidden = false;
+            fit();
+            root.dataset.state = "bloom";
+            requestAnimationFrame( loop );
+        }
+
+        el( "listen" ).addEventListener( "click", async function() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia( {
+                    audio: { autoGainControl: false, echoCancellation: false, noiseSuppression: false }
+                } );
+                const ctx = new ( window.AudioContext || window.webkitAudioContext )();
+                rate = ctx.sampleRate;
+                analyser = ctx.createAnalyser();
+                analyser.fftSize = 2048;
+                analyser.smoothingTimeConstant = 0.55;
+                ctx.createMediaStreamSource( stream ).connect( analyser );
+                freq = new Uint8Array( analyser.frequencyBinCount );
+                time = new Float32Array( analyser.fftSize );
+                el( "src" ).textContent = Math.round( rate / 1000 ) + "kHz · on device";
+                begin();
+            } catch ( err ) {
+                el( "src" ).textContent = "mic denied";
+                startSim();
+            }
+        } );
+
+        function startSim() {
+            const spec = new Uint8Array( 512 );
+            const script = [ "bloom", "focus", "guard", "drift", "shelter" ];
+            let leg = 0, legStart = performance.now();
+            el( "src" ).textContent = "simulated room";
+            sim = function() {
+                const now = performance.now();
+                if ( now - legStart > 7000 ) {
+                    legStart = now;
+                    leg = ( leg + 1 ) % script.length;
+                }
+                const kind = script[ leg ];
+                const t = now / 1000;
+                const shape = {
+                    bloom: { cen: 0.06, flux: 0.02, high: 0.01, mod: 0.02, rms: 0.003, voice: 0.03, zcr: 0.02 },
+                    drift: { cen: 0.28, flux: 0.2, high: 0.06, mod: 0.1, rms: 0.07, voice: 0.3, zcr: 0.1 },
+                    focus: { cen: 0.62, flux: 0.8, high: 0.2, mod: 0.5, rms: 0.05, voice: 0.05, zcr: 0.28 },
+                    guard: { cen: 0.24, flux: 0.42, high: 0.03, mod: 0.72, rms: 0.06, voice: 0.42, zcr: 0.09 },
+                    shelter: { cen: 0.16, flux: 0.3, high: 0.05, mod: 0.3, rms: 0.22, voice: 0.2, zcr: 0.12 }
+                }[ kind ];
+                const wob = 0.85 + Math.sin( t * ( kind === "guard" ? 25 : 5 ) ) * 0.15;
+                for ( let i = 0; i < spec.length; i++ ) {
+                    const p = i / spec.length;
+                    const near = Math.exp( -Math.pow( ( p - shape.cen ) / 0.16, 2 ) );
+                    spec[ i ] = Math.min( 255, near * 250 * wob * ( 0.5 + shape.rms * 6 ) * ( 0.7 + Math.random() * 0.6 ) );
+                }
+                return {
+                    cen: shape.cen, flux: shape.flux * wob, high: shape.high, mod: shape.mod * wob,
+                    rms: shape.rms * wob, spec: spec, voice: shape.voice, zcr: shape.zcr
+                };
+            };
+            begin();
+        }
+
+        el( "sim" ).addEventListener( "click", startSim );
+
+        if ( new URLSearchParams( location.search ).has( "demo" ) ) {
+            startSim();
+        }
+    } )();
+    </script>
+</body>
+</html>

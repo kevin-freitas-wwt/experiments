@@ -7,6 +7,10 @@ locally, or visit the live site at
 
 ## Projects
 
+- **[Latch](https://kevin-freitas-wwt.github.io/experiments/Latch/)** — six working UI mechanisms with zero script tags: anchored callouts, `:has()` state, typed properties, scoped styles, discrete transitions, routed panels. Every one verified in headless Firefox *and* Chromium
+- **[Panes](https://kevin-freitas-wwt.github.io/experiments/Panes/)** — one aquarium spread across every browser window on your desktop; fish live in real screen coordinates, so dragging a window pushes the water
+- **[Roomtone](https://kevin-freitas-wwt.github.io/experiments/Roomtone/)** — a reading surface that reshapes itself to the sound of the room; silence lets it bloom, typing strips it back, a nearby voice blurs anything private
+- **[Choreo](https://kevin-freitas-wwt.github.io/experiments/Choreo/)** — Swiss editorial page choreographed entirely in CSS: scroll timelines, anchored footnotes, cross-document view transitions, zero script tags
 - **[Airgap](https://kevin-freitas-wwt.github.io/experiments/Airgap/)** — on-device text rewriter using Chrome's built-in Gemini Nano, with a live monitor proving zero network requests
 - **[Pop o'Clock](https://kevin-freitas-wwt.github.io/experiments/Pop%20o'Clock/)** — clock with audible pop ticks
 - **[Pic Shop](https://kevin-freitas-wwt.github.io/experiments/Pic%20Shop/)** — image editor

@@ -1,0 +1,148 @@
+/* Choreo — page two. Still no JavaScript. */
+
+.back {
+    color: var( --ink );
+    text-decoration: none;
+}
+
+.back:hover {
+    color: var( --accent );
+}
+
+.slabhero {
+    aspect-ratio: 16 / 7;
+    background: var( --ink );
+    color: var( --paper );
+    display: grid;
+    margin: var( --grid );
+    padding: 1.4rem;
+    view-transition-name: plate;
+}
+
+.slabhero__label {
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+}
+
+.slabhero__title {
+    align-self: center;
+    font-size: clamp( 2.4rem, 9vw, 7rem );
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    margin: 0;
+    view-transition-name: plate-title;
+}
+
+.slabhero__note {
+    align-self: end;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    opacity: 0.7;
+}
+
+.note {
+    border-bottom: 1px solid var( --edge );
+    display: grid;
+    gap: 1.2rem;
+    padding: clamp( 3rem, 8vh, 6rem ) var( --grid );
+}
+
+.note .lede {
+    max-width: 54ch;
+}
+
+@keyframes plateswell {
+    from {
+        letter-spacing: 0.1em;
+        opacity: 0.1;
+        transform: scale( 0.62 );
+    }
+    to {
+        letter-spacing: -0.06em;
+        opacity: 1;
+        transform: scale( 1 );
+    }
+}
+
+.plate-set {
+    border-bottom: 1px solid var( --edge );
+}
+
+.plateitem {
+    align-items: center;
+    border-bottom: 1px solid var( --edge );
+    display: grid;
+    gap: 0.6rem var( --grid );
+    grid-template-columns: 1fr;
+    margin: 0;
+    padding: clamp( 3rem, 12vh, 9rem ) var( --grid );
+}
+
+.plateitem:last-child {
+    border-bottom: none;
+}
+
+.plateitem__num {
+    color: var( --accent );
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+}
+
+.big {
+    animation: plateswell linear both;
+    animation-timeline: view();
+    font-size: clamp( 5rem, 22vw, 16rem );
+    font-weight: 700;
+    line-height: 0.82;
+    margin: 0;
+}
+
+.plateitem:nth-child( 1 ) .big { animation-range: entry 0% cover 45%; }
+.plateitem:nth-child( 2 ) .big { animation-range: entry 25% cover 60%; color: var( --accent ); }
+.plateitem:nth-child( 3 ) .big { animation-range: entry 10% exit 40%; }
+
+.plateitem figcaption {
+    color: var( --soft );
+    font-size: 0.82rem;
+    line-height: 1.55;
+    max-width: 40ch;
+}
+
+@media ( min-width: 900px ) {
+    .plateitem {
+        grid-template-columns: 4rem 1fr 22rem;
+    }
+}
+
+.closing {
+    display: grid;
+    gap: 2.5rem;
+    padding: clamp( 4rem, 12vh, 9rem ) var( --grid ) 3rem;
+}
+
+.plate--back {
+    aspect-ratio: 16 / 5;
+    margin-top: 0;
+    view-transition-name: plate-return;
+}
+
+@supports not ( animation-timeline: view() ) {
+    .big {
+        animation: none;
+        letter-spacing: -0.06em;
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@media ( prefers-reduced-motion: reduce ) {
+    .big {
+        animation: none;
+        opacity: 1;
+        transform: none;
+    }
+}

@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Latch — Interface State Without JavaScript</title>
+    <meta name="description" content="Six working mechanisms — anchored callouts, latching state, typed custom properties, scoped styles, discrete transitions and routed panels — built with zero script tags and verified running identically in Firefox and Chrome.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="experiments by Kevin">
+    <meta property="og:title" content="Latch — Interface State Without JavaScript">
+    <meta property="og:description" content="Six working mechanisms — anchored callouts, latching state, typed custom properties, scoped styles, discrete transitions and routed panels — built with zero script tags and verified running identically in Firefox and Chrome.">
+    <meta property="og:url" content="https://kevin-freitas-wwt.github.io/experiments/Latch/">
+    <meta property="og:image" content="https://kevin-freitas-wwt.github.io/experiments/Latch/thumb.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Latch — Interface State Without JavaScript">
+    <meta name="twitter:description" content="Six working mechanisms, zero script tags, identical in Firefox and Chrome.">
+    <meta name="twitter:image" content="https://kevin-freitas-wwt.github.io/experiments/Latch/thumb.png">
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <link rel="stylesheet" href="latch.css">
+</head>
+<body>
+    <!-- density latch: read by :has(), applied as a custom property, queried by @container style() -->
+    <div class="controls" id="deck">
+        <fieldset class="setter">
+            <legend>Sheet density</legend>
+            <label><input type="radio" name="density" id="d-open" checked><span>Open</span></label>
+            <label><input type="radio" name="density" id="d-tight"><span>Tight</span></label>
+        </fieldset>
+    </div>
+
+    <header class="titleblock">
+        <div class="titleblock__main">
+            <p class="stamp">Sheet 1 of 1 &nbsp;·&nbsp; Rev. A</p>
+            <h1>Latch</h1>
+            <p class="sub">Interface state without JavaScript</p>
+        </div>
+        <dl class="titleblock__spec">
+            <dt>Script tags</dt><dd>0</dd>
+            <dt>Dependencies</dt><dd>None</dd>
+            <dt>Engines</dt><dd>Gecko &amp; Blink</dd>
+            <dt>Drawn</dt><dd>2026</dd>
+        </dl>
+    </header>
+
+    <section class="preamble">
+        <p class="lede">Scroll-driven animation is the loud half of modern CSS and it only runs in one engine. The quiet half &mdash; the half that replaces the JavaScript you actually still write &mdash; shipped everywhere and nobody made a poster about it.</p>
+        <p>Every mechanism on this sheet was verified in headless Firefox and headless Chromium before it was drawn. Six of them. No script tag, no library, no build step, and no feature that one engine has and the other doesn't.</p>
+    </section>
+
+    <!-- FIG 1 -->
+    <section class="fig">
+        <div class="fig__rule"><span>Fig. 1</span><b>Anchored callouts</b><i>anchor-name · position-anchor · position-area · position-try-fallbacks</i></div>
+        <div class="fig__body">
+            <div class="plate">
+                <div class="unit">
+                    <div class="unit__cap"></div>
+                    <div class="unit__grille">
+                        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                    </div>
+                    <div class="unit__dial"></div>
+                    <div class="unit__base"></div>
+                    <button class="pin pin--1" popovertarget="c1" aria-label="Callout 1">1</button>
+                    <button class="pin pin--2" popovertarget="c2" aria-label="Callout 2">2</button>
+                    <button class="pin pin--3" popovertarget="c3" aria-label="Callout 3">3</button>
+                    <button class="pin pin--4" popovertarget="c4" aria-label="Callout 4">4</button>
+                </div>
+                <p class="plate__cap">Tap a callout. Then resize the window narrow and tap again.</p>
+            </div>
+            <div class="fig__note">
+                <p>A callout has always been a measurement problem. You read a rectangle in script, write pixels into a style attribute, then re&#8209;read it on resize, on scroll, on zoom, and on every layout shift you forgot about.</p>
+                <p>Anchor positioning replaces the measurement with a relationship. Each pin declares an <code>anchor-name</code>. Each note declares <code>position-anchor</code> and a <code>position-area</code>, and lists fallbacks for when the preferred side has no room. The browser resolves it at layout time, which is the only time the answer is ever correct.</p>
+                <p>The toggling is <code>popovertarget</code>. Focus, dismissal, escape, and the top layer are the browser's job now.</p>
+            </div>
+        </div>
+    </section>
+
+    <div class="call" id="c1" popover><p><b>1</b> &mdash; Preferred side is <code>inline-end</code>. Squeeze the viewport and it flips, because <code>position-try-fallbacks</code> was told what to do next.</p></div>
+    <div class="call" id="c2" popover><p><b>2</b> &mdash; Same stylesheet rule as every other note here. Only the anchor name differs.</p></div>
+    <div class="call" id="c3" popover><p><b>3</b> &mdash; The note lives in the top layer, outside this section's stacking context, and still tracks its pin.</p></div>
+    <div class="call" id="c4" popover><p><b>4</b> &mdash; Enter and exit are animated by <code>@starting-style</code> and <code>transition-behavior: allow-discrete</code>. See Fig. 5.</p></div>
+
+    <!-- FIG 2 -->
+    <section class="fig">
+        <div class="fig__rule"><span>Fig. 2</span><b>Latching state</b><i>:has() · custom property · @container style()</i></div>
+        <div class="fig__body">
+            <div class="plate plate--stack">
+                <div class="rack">
+                    <div class="slot"><span>A</span><p>Row one</p></div>
+                    <div class="slot"><span>B</span><p>Row two</p></div>
+                    <div class="slot"><span>C</span><p>Row three</p></div>
+                    <div class="slot"><span>D</span><p>Row four</p></div>
+                </div>
+                <p class="plate__cap">Flip the density switch at the top of the sheet.</p>
+            </div>
+            <div class="fig__note">
+                <p>This is the pattern that kills the most script. A radio input is checked. An ancestor notices with <code>:has()</code> and sets a custom property. Everything downstream reads that property through a <em>style</em> container query and restyles itself.</p>
+                <p>No class toggling, no state variable, no event handler, and no component that has to be told twice. The switch at the top of this sheet is retyping the rack above and the whole document's spacing at the same time, and the two know nothing about each other.</p>
+                <p>The radio is also the accessibility story for free: it is a real form control, it is keyboard operable, and it announces itself.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- FIG 3 -->
+    <section class="fig">
+        <div class="fig__rule"><span>Fig. 3</span><b>Typed properties</b><i>@property · registered syntax · interpolation</i></div>
+        <div class="fig__body">
+            <div class="plate">
+                <div class="dials">
+                    <div class="dial dial--sweep"><span>sweep</span></div>
+                    <div class="dial dial--bleed"><span>bleed</span></div>
+                    <div class="dial dial--warp"><span>warp</span></div>
+                </div>
+                <p class="plate__cap">Hover, or tab to each dial.</p>
+            </div>
+            <div class="fig__note">
+                <p>An unregistered custom property is a string, and strings cannot be interpolated. That single fact is why animating a gradient, an angle, or a shadow spread used to mean a requestAnimationFrame loop writing values into inline styles.</p>
+                <p><code>@property</code> gives the property a <code>syntax</code>, so the engine knows an <code>&lt;angle&gt;</code> from a <code>&lt;length&gt;</code> and can tween it on the compositor. Three declarations replace three animation libraries.</p>
+                <p>Registered properties also get an <code>initial-value</code> and an inheritance rule, which means they finally fail predictably instead of resolving to the empty string.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- FIG 4 -->
+    <section class="fig">
+        <div class="fig__rule"><span>Fig. 4</span><b>Scoped styles</b><i>@scope · proximity · donut boundary</i></div>
+        <div class="fig__body">
+            <div class="plate">
+                <div class="card">
+                    <p>Inside the card. This paragraph is blue.</p>
+                    <div class="card__slot">
+                        <p>Inside the slot, which is the lower boundary. This paragraph is <em>not</em> blue, and no reset was written to stop it.</p>
+                    </div>
+                    <p>Back outside the slot, still inside the card. Blue again.</p>
+                </div>
+                <p class="plate__cap">One rule, one boundary, no naming convention.</p>
+            </div>
+            <div class="fig__note">
+                <p>Thirty years of CSS architecture &mdash; BEM, CSS Modules, styled components, utility classes &mdash; exists to answer one question: where does this rule stop applying?</p>
+                <p><code>@scope ( .card ) to ( .card__slot )</code> answers it in the language itself. The rule applies from the root down and switches off at the boundary, and proximity beats specificity inside the scope, so nesting no longer needs escalating selector weight.</p>
+                <p>This is the least demoed and most consequential feature on the sheet. It does not animate, so nobody posts about it.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- FIG 5 -->
+    <section class="fig">
+        <div class="fig__rule"><span>Fig. 5</span><b>Discrete transitions</b><i>@starting-style · transition-behavior · display</i></div>
+        <div class="fig__body">
+            <div class="plate">
+                <div class="drawerwrap">
+                    <button popovertarget="tray">Open tray</button>
+                    <div class="tray" id="tray" popover>
+                        <p><b>Animated both ways.</b> The old problem: an element going to <code>display: none</code> had nothing to transition, so exit animations needed a script to delay the removal.</p>
+                        <p><code>transition-behavior: allow-discrete</code> lets <code>display</code> and <code>overlay</code> flip at the far end of the transition instead of the near end. <code>@starting-style</code> supplies the from&#8209;state for an element that was not previously rendered.</p>
+                        <p>Press escape. That is also the browser.</p>
+                    </div>
+                </div>
+                <details name="mech">
+                    <summary>Exclusive accordion, no script</summary>
+                    <p>Two <code>&lt;details&gt;</code> sharing a <code>name</code> behave as a radio group. Opening one closes the other.</p>
+                </details>
+                <details name="mech">
+                    <summary>And the second panel</summary>
+                    <p>This is the accordion component that has been rewritten in every framework, every year, since 2010.</p>
+                </details>
+            </div>
+            <div class="fig__note">
+                <p>Enter and exit animation for elements that come and go was the last honest reason to reach for a script on a static page. It is gone.</p>
+                <p>Both engines ship <code>@starting-style</code> and <code>allow-discrete</code>. Blink additionally animates <code>overlay</code>, which keeps a closing popover in the top layer while it fades; Gecko ignores that line and the transition still runs. That is what a real progressive enhancement looks like &mdash; one extra declaration, no branch.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- FIG 6 -->
+    <section class="fig">
+        <div class="fig__rule"><span>Fig. 6</span><b>Routed panels</b><i>:target · fragment as state</i></div>
+        <div class="fig__body">
+            <div class="plate">
+                <nav class="tabs">
+                    <a href="#p-one">One</a>
+                    <a href="#p-two">Two</a>
+                    <a href="#p-three">Three</a>
+                </nav>
+                <div class="panels">
+                    <article class="panel" id="p-one"><h3>Panel one</h3><p>The URL is the state. Reload the page and you are still here.</p></article>
+                    <article class="panel" id="p-two"><h3>Panel two</h3><p>The back button works, because navigation is doing the work rather than being intercepted.</p></article>
+                    <article class="panel" id="p-three"><h3>Panel three</h3><p>Deep-linkable, shareable, and bookmarkable without a router.</p></article>
+                </div>
+                <p class="plate__cap">Click the tabs, then press back.</p>
+            </div>
+            <div class="fig__note">
+                <p><code>:target</code> is twenty years old and still the cheapest state machine on the web. The fragment is a string the browser already persists, syncs to history, and exposes to the address bar.</p>
+                <p>Paired with <code>:has()</code> the panels can style their own tab as current without any duplicated markup. The single-page-app version of this control ships about forty kilobytes.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="verdict">
+        <div class="fig__rule"><span>Note</span><b>What is actually missing</b><i>measured, not assumed</i></div>
+        <div class="verdict__grid">
+            <div>
+                <p class="col-label">Ships in both engines</p>
+                <ul class="chk chk--yes">
+                    <li>Anchor positioning, in full</li>
+                    <li>Popover and <code>:popover-open</code></li>
+                    <li><code>@starting-style</code>, <code>allow-discrete</code></li>
+                    <li><code>@property</code>, <code>@scope</code></li>
+                    <li>Style container queries, <code>:has()</code></li>
+                    <li><code>light-dark()</code>, <code>shape()</code>, <code>linear()</code></li>
+                </ul>
+            </div>
+            <div>
+                <p class="col-label">Blink only, today</p>
+                <ul class="chk chk--no">
+                    <li>Scroll-driven animations, entirely</li>
+                    <li><code>scroll-state</code> container queries</li>
+                    <li>Cross-document view transitions</li>
+                    <li><code>::scroll-button</code>, <code>scroll-marker-group</code></li>
+                    <li><code>interpolate-size</code>, <code>calc-size()</code></li>
+                    <li><code>sibling-index()</code>, <code>corner-shape</code></li>
+                </ul>
+            </div>
+            <div>
+                <p class="col-label">This browser, live</p>
+                <ul class="chk">
+                    <li class="probe probe--anchor">Anchor positioning</li>
+                    <li class="probe probe--scope"><code>@scope</code></li>
+                    <li class="probe probe--style">Style queries</li>
+                    <li class="probe probe--discrete"><code>allow-discrete</code></li>
+                    <li class="probe probe--lightdark"><code>light-dark()</code></li>
+                    <li class="probe probe--sda">Scroll-driven animation</li>
+                </ul>
+                <p class="probe__note">Each row grades itself with the mechanism it names &mdash; the <code>@scope</code> row is lit by an actual <code>@scope</code> rule, the style-query row by an actual style query.</p>
+            </div>
+        </div>
+        <p class="verdict__close">The interesting divide is not Chrome against Firefox. It is that the features which make a nice video shipped in one engine, and the features which delete your code shipped in both. Only one of those got the attention.</p>
+    </section>
+
+    <footer class="colophon">
+        <p>Latch &middot; zero script tags &middot; drawn for Gecko and Blink</p>
+        <p><a href="../">experiments by Kevin</a> &nbsp;·&nbsp; <a href="../Choreo/">See also: Choreo, which is Blink&#8209;only on purpose</a></p>
+    </footer>
+</body>
+</html>
