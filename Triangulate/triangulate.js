@@ -261,13 +261,15 @@
 
     let heading = null, pitch = null;
 
-    /* Rays are cast along the rear camera axis (device -z), not the top edge,
-       so both heading paths resolve the azimuth of -z in the earth frame. */
+    /* Rays are cast along the rear camera axis (device -z), not the top edge
+       or screen normal, so both heading paths resolve the camera's azimuth. */
     function onOrient( e ) {
-        if ( e.webkitCompassHeading != null && e.beta != null && e.gamma != null ) {
-            /* webkitCompassHeading tracks the device top edge (+y); shift it by
-               the alpha-invariant angle between +y's and -z's azimuths */
-            heading = norm360( e.webkitCompassHeading + cameraYawOffset( e.beta, e.gamma ) );
+        if ( e.webkitCompassHeading != null ) {
+            /* iOS tilt-compensates webkitCompassHeading around gravity, so with
+               the phone raised for sighting it already tracks the rear camera's
+               azimuth continuously — including past vertical. Projecting the
+               top edge and offsetting flips the ray out the screen; don't. */
+            heading = norm360( e.webkitCompassHeading );
         } else if ( e.absolute && e.alpha != null ) {
             heading = compassHeading( e.alpha, e.beta, e.gamma );
         }
@@ -283,14 +285,6 @@
         const vy = -Math.sin( z ) * Math.sin( y ) + Math.cos( z ) * Math.sin( x ) * Math.cos( y );
         let h = Math.atan2( vx, vy ) / D2R;
         return h < 0 ? h + 360 : h;
-    }
-
-    /* Azimuth delta between rear camera (-z) and top edge (+y), independent of alpha */
-    function cameraYawOffset( beta, gamma ) {
-        const b = beta * D2R, g = gamma * D2R;
-        const azCam = Math.atan2( -Math.sin( g ), Math.sin( b ) * Math.cos( g ) );
-        const azTop = Math.atan2( 0, Math.cos( b ) );
-        return ( azCam - azTop ) / D2R;
     }
 
     /* Elevation of the rear camera axis; +up, accounts for roll */
