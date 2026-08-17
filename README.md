@@ -7,6 +7,7 @@ locally, or visit the live site at
 
 ## Projects
 
+- **[Fix](https://kevin-freitas-wwt.github.io/experiments/Fix/)** — crowd triangulation: sight a target through your phone's camera and each shot casts a compass-bearing ray on a map; rays from different spots least-squares into a lat/lon/altitude fix with an error radius. Hand-plot mode for desktop, photos stored locally per ray
 - **[Ucomms](https://kevin-freitas-wwt.github.io/experiments/Ucomms/)** — text messenger that transmits over sound: audible, near-ultrasonic, or fully silent bands. FSK modem in pure Web Audio with live word-by-word receive, delivery acks with resend, a waterfall spectrogram, and an optional 6-digit cipher; offline-capable PWA
 - **[Latch](https://kevin-freitas-wwt.github.io/experiments/Latch/)** — six working UI mechanisms with zero script tags: anchored callouts, `:has()` state, typed properties, scoped styles, discrete transitions, routed panels. Every one verified in headless Firefox *and* Chromium
 - **[Panes](https://kevin-freitas-wwt.github.io/experiments/Panes/)** — one aquarium spread across every browser window on your desktop; fish live in real screen coordinates, so dragging a window pushes the water
