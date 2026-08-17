@@ -146,7 +146,7 @@
     function estIcon( color ) {
         return L.divIcon( {
             className: "est-marker",
-            html: `<svg viewBox="0 0 26 26" width="26" height="26"><circle cx="13" cy="13" r="8" fill="none" stroke="${ color }" stroke-width="1.5"/><circle cx="13" cy="13" r="2" fill="${ color }"/><path d="M13 0v6M13 20v6M0 13h6M20 13h26" stroke="${ color }" stroke-width="1.5"/></svg>`,
+            html: `<svg viewBox="0 0 26 26" width="26" height="26"><circle cx="13" cy="13" r="8" fill="none" stroke="${ color }" stroke-width="1.5"/><circle cx="13" cy="13" r="2" fill="${ color }"/><path d="M13 0v6M13 20v6M0 13h6M20 13h6" stroke="${ color }" stroke-width="1.5"/></svg>`,
             iconAnchor: [ 13, 13 ],
             iconSize: [ 26, 26 ]
         } );
@@ -305,16 +305,19 @@
 
     $( "sightBtn" ).addEventListener( "click", async () => {
         if ( !await startOrientation() ) { toast( "Compass permission denied — can't cast rays" ); return; }
-        openPicker();
+        openPicker( openCamera );
     } );
 
-    function openPicker() {
+    let pickCb = null;
+
+    function openPicker( cb ) {
+        pickCb = cb;
         const listEl = $( "pickList" );
         listEl.innerHTML = "";
         items.forEach( ( item ) => {
             const b = document.createElement( "button" );
             b.innerHTML = `<span class="target-dot" style="background:${ itemColor( item ) }"></span>${ esc( item.name ) }`;
-            b.addEventListener( "click", () => { closePicker(); openCamera( item ); } );
+            b.addEventListener( "click", () => { closePicker(); pickCb( item ); } );
             listEl.appendChild( b );
         } );
         $( "pickName" ).value = "";
@@ -334,7 +337,7 @@
         items.push( item );
         persist();
         closePicker();
-        openCamera( item );
+        pickCb( item );
     } );
 
     async function openCamera( item ) {
@@ -452,7 +455,7 @@
             const hdg = bearing( plot.origin, e.latlng );
             const origin = plot.origin;
             endPlot();
-            pickForPlot( ( itemId ) => addRay( itemId, { alt: null, heading: hdg, lat: origin.lat, lon: origin.lng, pitch: null } ) );
+            openPicker( ( item ) => addRay( item.id, { alt: null, heading: hdg, lat: origin.lat, lon: origin.lng, pitch: null } ) );
         }
     } );
 
@@ -465,29 +468,6 @@
         const dx = ( b.lng - a.lng ) * 111320 * Math.cos( a.lat * D2R );
         let h = Math.atan2( dx, dy ) / D2R;
         return h < 0 ? h + 360 : h;
-    }
-
-    function pickForPlot( done ) {
-        openPicker();
-        const listEl = $( "pickList" );
-        listEl.querySelectorAll( "button" ).forEach( ( b, i ) => {
-            const clone = b.cloneNode( true );
-            clone.addEventListener( "click", () => { closePicker(); done( items[ i ].id ); } );
-            b.replaceWith( clone );
-        } );
-        const form = $( "pickForm" );
-        const clone = form.cloneNode( true );
-        clone.addEventListener( "submit", ( e ) => {
-            e.preventDefault();
-            const name = clone.querySelector( "input" ).value.trim();
-            if ( !name ) return;
-            const item = { id: uid(), name: name, createdAt: Date.now() };
-            items.push( item );
-            persist();
-            closePicker();
-            done( item.id );
-        } );
-        form.replaceWith( clone );
     }
 
     /* ---------- demo ---------- */
