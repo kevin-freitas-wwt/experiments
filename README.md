@@ -7,6 +7,7 @@ locally, or visit the live site at
 
 ## Projects
 
+- **[Ucomms](https://kevin-freitas-wwt.github.io/experiments/Ucomms/)** — text messenger that transmits over sound: audible, near-ultrasonic, or fully silent bands. FSK modem in pure Web Audio with live word-by-word receive, delivery acks with resend, a waterfall spectrogram, and an optional 6-digit cipher; offline-capable PWA
 - **[Latch](https://kevin-freitas-wwt.github.io/experiments/Latch/)** — six working UI mechanisms with zero script tags: anchored callouts, `:has()` state, typed properties, scoped styles, discrete transitions, routed panels. Every one verified in headless Firefox *and* Chromium
 - **[Panes](https://kevin-freitas-wwt.github.io/experiments/Panes/)** — one aquarium spread across every browser window on your desktop; fish live in real screen coordinates, so dragging a window pushes the water
 - **[Roomtone](https://kevin-freitas-wwt.github.io/experiments/Roomtone/)** — a reading surface that reshapes itself to the sound of the room; silence lets it bloom, typing strips it back, a nearby voice blurs anything private
