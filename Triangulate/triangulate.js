@@ -7,17 +7,17 @@
 
     /* ---------- store ---------- */
 
-    let items = JSON.parse( localStorage.getItem( "fix.items" ) || "[]" );
-    let rays = JSON.parse( localStorage.getItem( "fix.rays" ) || "[]" );
+    let items = JSON.parse( localStorage.getItem( "triangulate.items" ) || "[]" );
+    let rays = JSON.parse( localStorage.getItem( "triangulate.rays" ) || "[]" );
 
     function persist() {
-        localStorage.setItem( "fix.items", JSON.stringify( items ) );
-        localStorage.setItem( "fix.rays", JSON.stringify( rays ) );
+        localStorage.setItem( "triangulate.items", JSON.stringify( items ) );
+        localStorage.setItem( "triangulate.rays", JSON.stringify( rays ) );
     }
 
     let idb = null;
     const idbReady = new Promise( ( resolve ) => {
-        const req = indexedDB.open( "fix-photos", 1 );
+        const req = indexedDB.open( "triangulate-photos", 1 );
         req.onupgradeneeded = () => req.result.createObjectStore( "photos" );
         req.onsuccess = () => { idb = req.result; resolve(); };
         req.onerror = () => resolve();
