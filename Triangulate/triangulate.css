@@ -301,8 +301,9 @@ body {
     color: var( --ink );
     flex: 1;
     font: inherit;
-    font-size: 0.85rem;
-    padding: 0.55rem 0.7rem;
+    /* 16px minimum stops iOS Safari auto-zooming the camera UI on focus */
+    font-size: 16px;
+    padding: 0.45rem 0.7rem;
 }
 
 .sheet-new input:focus {
