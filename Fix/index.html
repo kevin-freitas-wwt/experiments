@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Fix — crowd triangulation</title>
+    <meta name="description" content="Sight a target through your phone's camera and cast a bearing ray on the map. Enough rays from enough angles pin down its position and altitude.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="experiments by Kevin">
+    <meta property="og:title" content="Fix — crowd triangulation">
+    <meta property="og:description" content="Sight a target through your phone's camera and cast a bearing ray on the map. Enough rays from enough angles pin down its position and altitude.">
+    <meta property="og:url" content="https://kevin-freitas-wwt.github.io/experiments/Fix/">
+    <meta property="og:image" content="https://kevin-freitas-wwt.github.io/experiments/Fix/thumb.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Fix — crowd triangulation">
+    <meta name="twitter:description" content="Cast bearing rays from your phone's camera and compass. Crossing rays fix a target's position and altitude.">
+    <meta name="twitter:image" content="https://kevin-freitas-wwt.github.io/experiments/Fix/thumb.png">
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="fix.css">
+</head>
+<body>
+    <header class="bar">
+        <h1>FIX</h1>
+        <span class="bar-sub">crowd triangulation</span>
+        <span class="bar-status" id="gpsStatus">GPS —</span>
+    </header>
+
+    <main class="layout">
+        <div id="map"></div>
+
+        <aside class="panel" id="panel">
+            <div class="panel-head">
+                <span>TARGETS</span>
+                <button class="btn-plot" id="plotBtn" title="Plot a ray by hand on the map">+ PLOT RAY</button>
+            </div>
+            <div class="panel-list" id="targetList"></div>
+            <div class="panel-empty" id="emptyState">
+                <p>No targets yet.</p>
+                <p>On a phone, tap <b>SIGHT</b> and photograph something through the reticle. Each shot casts a bearing ray. Two or more rays from different spots produce a fix.</p>
+                <p>On desktop, use <b>+ PLOT RAY</b>: click the map for the observer, click again for the bearing.</p>
+                <p><a href="#" id="demoLink">Load demo rays</a></p>
+            </div>
+        </aside>
+    </main>
+
+    <button class="fab" id="sightBtn" hidden>
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="currentColor" stroke-width="1.6"/></svg>
+        SIGHT
+    </button>
+
+    <div class="sheet-veil" id="pickVeil" hidden>
+        <div class="sheet" role="dialog" aria-label="Choose target">
+            <div class="sheet-head">SIGHT WHICH TARGET?</div>
+            <div class="sheet-options" id="pickList"></div>
+            <form class="sheet-new" id="pickForm">
+                <input type="text" id="pickName" placeholder="New target name" maxlength="40" autocomplete="off">
+                <button type="submit">NEW</button>
+            </form>
+            <button class="sheet-cancel" id="pickCancel">CANCEL</button>
+        </div>
+    </div>
+
+    <div class="cam" id="cam" hidden>
+        <video id="camVideo" autoplay playsinline muted></video>
+        <div class="cam-hud">
+            <p class="cam-hint">PLACE THE TARGET IN THE CIRCLE</p>
+            <div class="cam-reticle" aria-hidden="true"></div>
+            <div class="cam-readout">
+                <span id="roHeading">HDG ---°</span>
+                <span id="roPitch">PITCH --°</span>
+                <span id="roAcc">±-- M</span>
+            </div>
+            <div class="cam-zoom" id="zoomRow"></div>
+            <div class="cam-controls">
+                <button class="cam-close" id="camClose" aria-label="Close camera">✕</button>
+                <button class="cam-shutter" id="shutter" aria-label="Capture ray"></button>
+                <span class="cam-target" id="camTarget"></span>
+            </div>
+        </div>
+        <div class="cam-flash" id="camFlash"></div>
+    </div>
+
+    <div class="toast" id="toast" hidden></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="fix.js"></script>
+</body>
+</html>
