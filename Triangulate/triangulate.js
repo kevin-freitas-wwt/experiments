@@ -260,9 +260,12 @@
     /* ---------- orientation ---------- */
 
     let heading = null, pitch = null;
+    let rawA = null, rawB = null, rawG = null;
+    let rayReversed = localStorage.getItem( "triReverseRay" ) === "1";
 
     /* Rays are cast along the rear camera axis (device -z), not the top edge
-       or screen normal, so both heading paths resolve the camera's azimuth. */
+       or screen normal, so both heading paths resolve the camera's azimuth.
+       The REV Z toggle flips the ray 180° for devices that report otherwise. */
     function onOrient( e ) {
         if ( e.webkitCompassHeading != null ) {
             /* iOS tilt-compensates webkitCompassHeading around gravity, so with
@@ -274,8 +277,25 @@
             heading = compassHeading( e.alpha, e.beta, e.gamma );
         }
         if ( e.beta != null && e.gamma != null ) pitch = cameraPitch( e.beta, e.gamma );
-        $( "roHeading" ).textContent = heading != null ? `HDG ${ String( Math.round( heading ) ).padStart( 3, "0" ) }°` : "HDG ---°";
-        $( "roPitch" ).textContent = pitch != null ? `PITCH ${ pitch >= 0 ? "+" : "" }${ Math.round( pitch ) }°` : "PITCH --°";
+        if ( e.alpha != null ) { rawA = e.alpha; rawB = e.beta || 0; rawG = e.gamma || 0; }
+        updateReadout();
+        drawGizmo();
+    }
+
+    function rayHeading() {
+        if ( heading == null ) return null;
+        return rayReversed ? norm360( heading + 180 ) : heading;
+    }
+
+    function rayPitch() {
+        if ( pitch == null ) return null;
+        return rayReversed ? -pitch : pitch;
+    }
+
+    function updateReadout() {
+        const h = rayHeading(), p = rayPitch();
+        $( "roHeading" ).textContent = h != null ? `HDG ${ String( Math.round( h ) ).padStart( 3, "0" ) }°` : "HDG ---°";
+        $( "roPitch" ).textContent = p != null ? `PITCH ${ p >= 0 ? "+" : "" }${ Math.round( p ) }°` : "PITCH --°";
     }
 
     /* Azimuth of the rear camera (-z) from absolute alpha/beta/gamma */
@@ -296,6 +316,86 @@
     function norm360( h ) {
         return ( ( h % 360 ) + 360 ) % 360;
     }
+
+    /* ---------- axis gizmo ---------- */
+
+    const gizmo = $( "axisGizmo" );
+    const gtx = gizmo.getContext( "2d" );
+    gtx.scale( 2, 2 );
+
+    /* Device x/y/z axes in the earth frame [E, N, Up] — columns of RZ(a)RX(b)RY(g) */
+    function deviceAxesWorld() {
+        const a = rawA * D2R, b = rawB * D2R, g = rawG * D2R;
+        const ca = Math.cos( a ), sa = Math.sin( a ), cb = Math.cos( b );
+        const sb = Math.sin( b ), cg = Math.cos( g ), sg = Math.sin( g );
+        return {
+            x: [ ca * cg - sa * sb * sg, sa * cg + ca * sb * sg, -cb * sg ],
+            y: [ -sa * cb, ca * cb, sb ],
+            z: [ ca * sg + sa * sb * cg, sa * sg - ca * sb * cg, cb * cg ]
+        };
+    }
+
+    function yawTo( v, d ) {
+        const c = Math.cos( d ), s = Math.sin( d );
+        return [ v[ 0 ] * c + v[ 1 ] * s, v[ 1 ] * c - v[ 0 ] * s, v[ 2 ] ];
+    }
+
+    /* Fixed world viewpoint: East right, North up-left, Up up */
+    function gproj( v, len ) {
+        return [
+            42 + len * ( v[ 0 ] * 0.94 - v[ 1 ] * 0.34 ),
+            42 - len * ( v[ 2 ] * 0.80 + v[ 1 ] * 0.42 + v[ 0 ] * 0.10 )
+        ];
+    }
+
+    function garrow( v, len, color, width, label ) {
+        const [ px, py ] = gproj( v, len );
+        gtx.beginPath();
+        gtx.lineWidth = width;
+        gtx.strokeStyle = color;
+        gtx.moveTo( 42, 42 );
+        gtx.lineTo( px, py );
+        gtx.stroke();
+        gtx.beginPath();
+        gtx.fillStyle = color;
+        gtx.arc( px, py, width + 0.5, 0, Math.PI * 2 );
+        gtx.fill();
+        if ( label ) {
+            gtx.fillStyle = color;
+            gtx.font = "600 8px system-ui, sans-serif";
+            gtx.fillText( label, px + ( px >= 42 ? 3 : -9 ), py + ( py >= 42 ? 8 : -4 ) );
+        }
+    }
+
+    function drawGizmo() {
+        if ( $( "cam" ).hidden || rawA == null ) return;
+        gtx.clearRect( 0, 0, 84, 84 );
+        garrow( [ 0, 1, 0 ], 34, "rgba( 255, 255, 255, 0.35 )", 1, "N" );
+        garrow( [ 1, 0, 0 ], 34, "rgba( 255, 255, 255, 0.35 )", 1, "E" );
+        const axes = deviceAxesWorld();
+        /* Yaw the relative axes so the camera azimuth matches the absolute heading */
+        let d = 0;
+        if ( heading != null ) {
+            const camAz = Math.atan2( -axes.z[ 0 ], -axes.z[ 1 ] );
+            d = heading * D2R - camAz;
+        }
+        const x = yawTo( axes.x, d ), y = yawTo( axes.y, d ), z = yawTo( axes.z, d );
+        const ray = rayReversed ? z : [ -z[ 0 ], -z[ 1 ], -z[ 2 ] ];
+        garrow( x, 26, "#ff5f56", 1.5, "x" );
+        garrow( y, 26, "#4bd07e", 1.5, "y" );
+        garrow( ray, 32, "#ffb000", 2.5, "Z" );
+    }
+
+    $( "axisFlip" ).setAttribute( "aria-pressed", String( rayReversed ) );
+
+    $( "axisFlip" ).addEventListener( "click", () => {
+        rayReversed = !rayReversed;
+        localStorage.setItem( "triReverseRay", rayReversed ? "1" : "0" );
+        $( "axisFlip" ).setAttribute( "aria-pressed", String( rayReversed ) );
+        updateReadout();
+        drawGizmo();
+        toast( rayReversed ? "Ray reversed — casting out the screen side" : "Ray normal — casting out the camera side" );
+    } );
 
     function clamp( v, lo, hi ) {
         return Math.min( Math.max( v, lo ), hi );
@@ -425,11 +525,11 @@
         addRay( activeItem.id, {
             acc: pos.coords.accuracy,
             alt: pos.coords.altitude,
-            heading: heading,
+            heading: rayHeading(),
             lat: pos.coords.latitude,
             lon: pos.coords.longitude,
             photo: key,
-            pitch: pitch
+            pitch: rayPitch()
         } );
         const n = rays.filter( ( r ) => r.itemId === activeItem.id ).length;
         toast( n < 2 ? "Ray cast — move somewhere else and sight again" : `Ray cast — ${ n } rays on ${ activeItem.name }` );
