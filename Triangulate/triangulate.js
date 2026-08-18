@@ -260,7 +260,6 @@
     /* ---------- orientation ---------- */
 
     let heading = null, pitch = null;
-    let rawA = null, rawB = null, rawG = null;
     let rayReversed = localStorage.getItem( "triReverseRay" ) === "1";
 
     /* Rays are cast along the rear camera axis (device -z), not the top edge
@@ -277,9 +276,7 @@
             heading = compassHeading( e.alpha, e.beta, e.gamma );
         }
         if ( e.beta != null && e.gamma != null ) pitch = cameraPitch( e.beta, e.gamma );
-        if ( e.alpha != null ) { rawA = e.alpha; rawB = e.beta || 0; rawG = e.gamma || 0; }
         updateReadout();
-        drawGizmo();
     }
 
     function rayHeading() {
@@ -294,7 +291,7 @@
 
     function updateReadout() {
         const h = rayHeading(), p = rayPitch();
-        $( "roHeading" ).textContent = h != null ? `HDG ${ String( Math.round( h ) ).padStart( 3, "0" ) }°` : "HDG ---°";
+        $( "roHeading" ).textContent = h != null ? `${ String( Math.round( h ) ).padStart( 3, "0" ) }°` : "---°";
         $( "roPitch" ).textContent = p != null ? `PITCH ${ p >= 0 ? "+" : "" }${ Math.round( p ) }°` : "PITCH --°";
     }
 
@@ -317,75 +314,6 @@
         return ( ( h % 360 ) + 360 ) % 360;
     }
 
-    /* ---------- axis gizmo ---------- */
-
-    const gizmo = $( "axisGizmo" );
-    const gtx = gizmo.getContext( "2d" );
-    gtx.scale( 2, 2 );
-
-    /* Device x/y/z axes in the earth frame [E, N, Up] — columns of RZ(a)RX(b)RY(g) */
-    function deviceAxesWorld() {
-        const a = rawA * D2R, b = rawB * D2R, g = rawG * D2R;
-        const ca = Math.cos( a ), sa = Math.sin( a ), cb = Math.cos( b );
-        const sb = Math.sin( b ), cg = Math.cos( g ), sg = Math.sin( g );
-        return {
-            x: [ ca * cg - sa * sb * sg, sa * cg + ca * sb * sg, -cb * sg ],
-            y: [ -sa * cb, ca * cb, sb ],
-            z: [ ca * sg + sa * sb * cg, sa * sg - ca * sb * cg, cb * cg ]
-        };
-    }
-
-    function yawTo( v, d ) {
-        const c = Math.cos( d ), s = Math.sin( d );
-        return [ v[ 0 ] * c + v[ 1 ] * s, v[ 1 ] * c - v[ 0 ] * s, v[ 2 ] ];
-    }
-
-    /* Fixed world viewpoint: East right, North up-left, Up up */
-    function gproj( v, len ) {
-        return [
-            42 + len * ( v[ 0 ] * 0.94 - v[ 1 ] * 0.34 ),
-            42 - len * ( v[ 2 ] * 0.80 + v[ 1 ] * 0.42 + v[ 0 ] * 0.10 )
-        ];
-    }
-
-    function garrow( v, len, color, width, label ) {
-        const [ px, py ] = gproj( v, len );
-        gtx.beginPath();
-        gtx.lineWidth = width;
-        gtx.strokeStyle = color;
-        gtx.moveTo( 42, 42 );
-        gtx.lineTo( px, py );
-        gtx.stroke();
-        gtx.beginPath();
-        gtx.fillStyle = color;
-        gtx.arc( px, py, width + 0.5, 0, Math.PI * 2 );
-        gtx.fill();
-        if ( label ) {
-            gtx.fillStyle = color;
-            gtx.font = "600 8px system-ui, sans-serif";
-            gtx.fillText( label, px + ( px >= 42 ? 3 : -9 ), py + ( py >= 42 ? 8 : -4 ) );
-        }
-    }
-
-    function drawGizmo() {
-        if ( $( "cam" ).hidden || rawA == null ) return;
-        gtx.clearRect( 0, 0, 84, 84 );
-        garrow( [ 0, 1, 0 ], 34, "rgba( 255, 255, 255, 0.35 )", 1, "N" );
-        garrow( [ 1, 0, 0 ], 34, "rgba( 255, 255, 255, 0.35 )", 1, "E" );
-        const axes = deviceAxesWorld();
-        /* Yaw the relative axes so the camera azimuth matches the absolute heading */
-        let d = 0;
-        if ( heading != null ) {
-            const camAz = Math.atan2( -axes.z[ 0 ], -axes.z[ 1 ] );
-            d = heading * D2R - camAz;
-        }
-        const x = yawTo( axes.x, d ), y = yawTo( axes.y, d ), z = yawTo( axes.z, d );
-        const ray = rayReversed ? z : [ -z[ 0 ], -z[ 1 ], -z[ 2 ] ];
-        garrow( x, 26, "#ff5f56", 1.5, "x" );
-        garrow( y, 26, "#4bd07e", 1.5, "y" );
-        garrow( ray, 32, "#ffb000", 2.5, "Z" );
-    }
-
     $( "axisFlip" ).setAttribute( "aria-pressed", String( rayReversed ) );
 
     $( "axisFlip" ).addEventListener( "click", () => {
@@ -393,8 +321,7 @@
         localStorage.setItem( "triReverseRay", rayReversed ? "1" : "0" );
         $( "axisFlip" ).setAttribute( "aria-pressed", String( rayReversed ) );
         updateReadout();
-        drawGizmo();
-        toast( rayReversed ? "Ray reversed — casting out the screen side" : "Ray normal — casting out the camera side" );
+        toast( rayReversed ? "Ray reversed — casting out the screen side" : "Ray normal — casting out the back of the phone" );
     } );
 
     function clamp( v, lo, hi ) {
@@ -415,17 +342,16 @@
         return true;
     }
 
-    /* ---------- camera ---------- */
+    /* ---------- sight screen (compass + GPS, no camera) ---------- */
 
-    const video = $( "camVideo" );
-    let stream = null, track = null, digitalZoom = 1, activeItem = null;
+    let activeItem = null;
 
-    const canSight = !!( navigator.mediaDevices && navigator.mediaDevices.getUserMedia && typeof DeviceOrientationEvent !== "undefined" );
+    const canSight = typeof DeviceOrientationEvent !== "undefined";
     if ( canSight ) $( "sightBtn" ).hidden = false;
 
     $( "sightBtn" ).addEventListener( "click", async () => {
         if ( !await startOrientation() ) { toast( "Compass permission denied — can't cast rays" ); return; }
-        openPicker( openCamera );
+        openPicker( openSight );
     } );
 
     let pickCb = null;
@@ -460,58 +386,18 @@
         pickCb( item );
     } );
 
-    async function openCamera( item ) {
+    function openSight( item ) {
         activeItem = item;
         $( "camTarget" ).textContent = item.name;
-        try {
-            stream = await navigator.mediaDevices.getUserMedia( {
-                video: { facingMode: { ideal: "environment" }, height: { ideal: 1080 }, width: { ideal: 1920 } }
-            } );
-        } catch {
-            toast( "Camera unavailable — use + PLOT RAY instead" );
-            return;
-        }
-        video.srcObject = stream;
-        track = stream.getVideoTracks()[ 0 ];
-        digitalZoom = 1;
-        video.style.transform = "";
-        buildZoomRow();
+        updateReadout();
         $( "cam" ).hidden = false;
-        render();
     }
 
-    function buildZoomRow() {
-        const row = $( "zoomRow" );
-        row.innerHTML = "";
-        const caps = track.getCapabilities ? track.getCapabilities() : {};
-        const hw = caps.zoom && caps.zoom.max > caps.zoom.min;
-        const min = hw ? caps.zoom.min : 1;
-        const max = hw ? caps.zoom.max : 4;
-        const stops = [ ...new Set( [ min, 1, 2, Math.min( 3, max ), max ].filter( ( z ) => z >= min && z <= max ) ) ].sort( ( a, b ) => a - b );
-        stops.forEach( ( z ) => {
-            const b = document.createElement( "button" );
-            b.textContent = z + "×";
-            b.addEventListener( "click", () => {
-                row.querySelectorAll( "button" ).forEach( ( x ) => x.classList.remove( "on" ) );
-                b.classList.add( "on" );
-                if ( hw ) track.applyConstraints( { advanced: [ { zoom: z } ] } );
-                else {
-                    digitalZoom = z;
-                    video.style.transform = `scale( ${ z } )`;
-                }
-            } );
-            if ( z === 1 || ( z === min && min > 1 ) ) b.classList.add( "on" );
-            row.appendChild( b );
-        } );
-    }
-
-    function closeCamera() {
-        if ( stream ) stream.getTracks().forEach( ( t ) => t.stop() );
-        stream = null;
+    function closeSight() {
         $( "cam" ).hidden = true;
     }
 
-    $( "camClose" ).addEventListener( "click", closeCamera );
+    $( "camClose" ).addEventListener( "click", closeSight );
 
     $( "shutter" ).addEventListener( "click", () => {
         if ( !pos ) { toast( "No GPS fix yet — hold on" ); return; }
@@ -520,32 +406,17 @@
         flash.classList.remove( "go" );
         void flash.offsetWidth;
         flash.classList.add( "go" );
-        const key = uid();
-        capturePhoto( key );
         addRay( activeItem.id, {
             acc: pos.coords.accuracy,
             alt: pos.coords.altitude,
             heading: rayHeading(),
             lat: pos.coords.latitude,
             lon: pos.coords.longitude,
-            photo: key,
             pitch: rayPitch()
         } );
         const n = rays.filter( ( r ) => r.itemId === activeItem.id ).length;
         toast( n < 2 ? "Ray cast — move somewhere else and sight again" : `Ray cast — ${ n } rays on ${ activeItem.name }` );
     } );
-
-    function capturePhoto( key ) {
-        const w = video.videoWidth, h = video.videoHeight;
-        if ( !w ) return;
-        const scale = Math.min( 1, 900 / w );
-        const c = document.createElement( "canvas" );
-        c.width = Math.round( w * scale / digitalZoom );
-        c.height = Math.round( h * scale / digitalZoom );
-        const sx = ( w - w / digitalZoom ) / 2, sy = ( h - h / digitalZoom ) / 2;
-        c.getContext( "2d" ).drawImage( video, sx, sy, w / digitalZoom, h / digitalZoom, 0, 0, c.width, c.height );
-        c.toBlob( ( blob ) => blob && idbReady.then( () => photoPut( key, blob ) ), "image/jpeg", 0.72 );
-    }
 
     /* ---------- hand plotting ---------- */
 

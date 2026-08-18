@@ -62,20 +62,15 @@
     </div>
 
     <div class="cam" id="cam" hidden>
-        <video id="camVideo" autoplay playsinline muted></video>
         <div class="cam-hud">
-            <p class="cam-hint">PLACE THE TARGET IN THE CIRCLE</p>
-            <div class="cam-reticle" aria-hidden="true"></div>
+            <p class="cam-hint">LINE UP THE TARGET WITH THE LINE, THEN CAPTURE</p>
+            <div class="cam-line" aria-hidden="true"></div>
+            <div class="cam-heading" id="roHeading">---°</div>
             <div class="cam-readout">
-                <span id="roHeading">HDG ---°</span>
                 <span id="roPitch">PITCH --°</span>
                 <span id="roAcc">±-- M</span>
             </div>
-            <div class="cam-zoom" id="zoomRow"></div>
-            <div class="cam-axes">
-                <canvas id="axisGizmo" width="168" height="168"></canvas>
-                <button id="axisFlip" aria-pressed="false" title="Reverse ray direction">REV Z</button>
-            </div>
+            <button class="cam-flip" id="axisFlip" aria-pressed="false" title="Reverse ray direction">REV Z</button>
             <div class="cam-controls">
                 <button class="cam-close" id="camClose" aria-label="Close camera">✕</button>
                 <button class="cam-shutter" id="shutter" aria-label="Capture ray"></button>
