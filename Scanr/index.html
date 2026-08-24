@@ -395,7 +395,8 @@
         rec: false,
         len: 0,
         has: false,
-        drift: 0
+        drift: 0,
+        frame: 0
     };
 
     function isVertical() {
@@ -472,52 +473,86 @@
         ctx.drawImage( copy, 0, 0 );
     }
 
+    var RATE = { 1: 1, 10: 8, 100: 80 },
+        tmp = document.createElement( 'canvas' ),
+        tg = tmp.getContext( '2d' );
+
+    function feather( v, over, band ) {
+        var g = v ? tg.createLinearGradient( 0, 0, over, 0 ) :
+                    tg.createLinearGradient( 0, 0, 0, over );
+        g.addColorStop( 0, 'rgba(0,0,0,1)' );
+        g.addColorStop( 1, 'rgba(0,0,0,0)' );
+        tg.globalCompositeOperation = 'destination-out';
+        tg.fillStyle = g;
+        if ( v ) tg.fillRect( 0, 0, over, band );
+        else tg.fillRect( 0, 0, band, over );
+    }
+
     function capture() {
         if ( !st.rec ) return;
+        requestAnimationFrame( capture );
+        if ( st.frame++ % RATE[ st.slice ] ) return;
         var vw = video.videoWidth,
             vh = video.videoHeight,
             v = isVertical(),
+            over = st.slice > 1 && st.len ? st.slice / 5 : 0,
+            dest = st.slice + over,
             cw, ch, cx, cy, scale, srcSize, srcPos, shift;
-        if ( vw && vh ) {
-            cw = vw / st.zoom;
-            ch = vh / st.zoom;
-            cx = ( vw - cw ) / 2;
-            cy = ( vh - ch ) / 2;
-            scale = BAND / ( v ? ch : cw );
-            srcSize = Math.max( 1, st.slice / scale );
-            shift = st.stab ? st.drift : 0;
-            if ( v ) {
-                srcPos = Math.min( Math.max( cx + cw / 2 - srcSize / 2 + shift, cx ), cx + cw - srcSize );
-                if ( st.len + st.slice > scan.width ) {
-                    if ( scan.width >= MAX_LEN ) return stop();
-                    grow();
-                }
-                ctx.drawImage( video, srcPos, cy, srcSize, ch, st.len, 0, st.slice, BAND );
-                preview.scrollLeft = st.len * 128 / BAND - preview.clientWidth;
+        if ( !vw || !vh ) return;
+        cw = vw / st.zoom;
+        ch = vh / st.zoom;
+        cx = ( vw - cw ) / 2;
+        cy = ( vh - ch ) / 2;
+        scale = BAND / ( v ? ch : cw );
+        srcSize = Math.max( 1, dest / scale );
+        shift = st.stab ? st.drift : 0;
+        if ( v ) {
+            srcPos = Math.min( Math.max( cx + cw / 2 - srcSize / 2 + shift, cx ), cx + cw - srcSize );
+            if ( st.len + st.slice > scan.width ) {
+                if ( scan.width >= MAX_LEN ) return stop();
+                grow();
+            }
+            if ( over ) {
+                tmp.width = dest;
+                tmp.height = BAND;
+                tg.drawImage( video, srcPos, cy, srcSize, ch, 0, 0, dest, BAND );
+                feather( true, over, BAND );
+                ctx.drawImage( tmp, st.len - over, 0 );
             } else {
-                srcPos = Math.min( Math.max( cy + ch / 2 - srcSize / 2 + shift, cy ), cy + ch - srcSize );
-                if ( st.len + st.slice > scan.height ) {
-                    if ( scan.height >= MAX_LEN ) return stop();
-                    grow();
-                }
+                ctx.drawImage( video, srcPos, cy, srcSize, ch, st.len, 0, st.slice, BAND );
+            }
+            preview.scrollLeft = st.len * 128 / BAND - preview.clientWidth;
+        } else {
+            srcPos = Math.min( Math.max( cy + ch / 2 - srcSize / 2 + shift, cy ), cy + ch - srcSize );
+            if ( st.len + st.slice > scan.height ) {
+                if ( scan.height >= MAX_LEN ) return stop();
+                grow();
+            }
+            if ( over ) {
+                tmp.width = BAND;
+                tmp.height = dest;
+                tg.drawImage( video, cx, srcPos, cw, srcSize, 0, 0, BAND, dest );
+                feather( false, over, BAND );
+                ctx.drawImage( tmp, 0, st.len - over );
+            } else {
                 ctx.drawImage( video, cx, srcPos, cw, srcSize, 0, st.len, BAND, st.slice );
-                preview.scrollTop = st.len * 128 / BAND - preview.clientHeight;
             }
-            st.len += st.slice;
-            if ( !st.has ) {
-                st.has = true;
-                scan.hidden = false;
-                emptyMsg.hidden = true;
-                document.body.classList.add( 'has-scan' );
-            }
-            meta( 'REC' );
+            preview.scrollTop = st.len * 128 / BAND - preview.clientHeight;
         }
-        requestAnimationFrame( capture );
+        st.len += st.slice;
+        if ( !st.has ) {
+            st.has = true;
+            scan.hidden = false;
+            emptyMsg.hidden = true;
+            document.body.classList.add( 'has-scan' );
+        }
+        meta( 'REC' );
     }
 
     function start() {
         st.rec = true;
         st.drift = 0;
+        st.frame = 0;
         resetScan();
         st.has = false;
         document.body.classList.add( 'rec' );
