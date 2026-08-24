@@ -105,6 +105,41 @@
     body.stab .stab-badge {
         opacity: 1;
     }
+    .meter {
+        background: rgba( 0, 0, 0, .35 );
+        border: 1px solid var( --hairline );
+        border-radius: 2px;
+        bottom: 14px;
+        height: 4px;
+        left: 50%;
+        opacity: 0;
+        position: absolute;
+        transform: translateX( -50% );
+        transition: opacity .2s;
+        width: 44%;
+        z-index: 2;
+    }
+    body.rec.motion .meter {
+        opacity: 1;
+    }
+    .meter-fill {
+        background: var( --accent );
+        border-radius: 2px;
+        height: 100%;
+        transition: width .1s linear;
+        width: 0;
+    }
+    .meter-fill.over {
+        background: var( --rec );
+    }
+    .meter-mark {
+        background: var( --ink );
+        bottom: -3px;
+        left: 66.7%;
+        position: absolute;
+        top: -3px;
+        width: 1px;
+    }
     .panel {
         background: var( --panel );
         border-top: 1px solid var( --hairline );
@@ -377,6 +412,10 @@
         <span class="brand">SCANR</span>
         <span class="stab-badge">STAB</span>
         <div class="slice-line v" id="sliceLine"></div>
+        <div class="meter">
+            <div class="meter-fill" id="meterFill"></div>
+            <div class="meter-mark"></div>
+        </div>
     </div>
     <div class="panel">
         <div class="row">
@@ -452,7 +491,10 @@
         len: 0,
         has: false,
         drift: 0,
-        frame: 0
+        sweep: 0,
+        acc: 0,
+        speed: 0,
+        motion: false
     };
 
     function isVertical() {
@@ -529,9 +571,9 @@
         ctx.drawImage( copy, 0, 0 );
     }
 
-    var RATE = { 1: 1, 10: 8, 100: 80 },
-        tmp = document.createElement( 'canvas' ),
-        tg = tmp.getContext( '2d' );
+    var tmp = document.createElement( 'canvas' ),
+        tg = tmp.getContext( '2d' ),
+        meterFill = document.getElementById( 'meterFill' );
 
     function feather( v, over, band ) {
         var g = v ? tg.createLinearGradient( 0, 0, over, 0 ) :
@@ -544,27 +586,55 @@
         else tg.fillRect( 0, 0, band, over );
     }
 
-    function capture() {
+    function updateMeter() {
+        var r = Math.min( st.speed / st.slice, 1.5 );
+        meterFill.style.width = ( r / 1.5 * 100 ) + '%';
+        meterFill.classList.toggle( 'over', st.speed > st.slice );
+    }
+
+    function nextFrame() {
         if ( !st.rec ) return;
-        requestAnimationFrame( capture );
-        if ( st.frame++ % RATE[ st.slice ] ) return;
+        if ( video.requestVideoFrameCallback ) video.requestVideoFrameCallback( capture );
+        else requestAnimationFrame( capture );
+    }
+
+    function capture() {
+        nextFrame();
         var vw = video.videoWidth,
             vh = video.videoHeight,
             v = isVertical(),
-            over = st.slice > 1 && st.len ? st.slice / 5 : 0,
-            dest = st.slice + over,
-            cw, ch, cx, cy, scale, srcSize, srcPos, shift;
-        if ( !vw || !vh ) return;
+            angle = st.sweep,
+            w, over, dest, destPx, cw, ch, cx, cy, scale, srcSize, srcPos, shift;
+        st.sweep = 0;
+        if ( !st.rec || !vw || !vh ) return;
         cw = vw / st.zoom;
         ch = vh / st.zoom;
         cx = ( vw - cw ) / 2;
         cy = ( vh - ch ) / 2;
         scale = BAND / ( v ? ch : cw );
+        if ( st.motion ) {
+            destPx = Math.abs( Math.tan( angle ) ) * vw * scale;
+            st.speed = st.speed * 0.7 + destPx * 0.3;
+            updateMeter();
+            st.acc += destPx;
+            w = Math.floor( st.acc );
+            if ( w < 1 ) return;
+            if ( w > st.slice ) {
+                w = st.slice;
+                st.acc = 0;
+            } else {
+                st.acc -= w;
+            }
+        } else {
+            w = st.slice;
+        }
+        over = st.len && w >= 8 ? w / 5 : 0;
+        dest = w + over;
         srcSize = Math.max( 1, dest / scale );
         shift = st.stab ? st.drift : 0;
         if ( v ) {
             srcPos = Math.min( Math.max( cx + cw / 2 - srcSize / 2 + shift, cx ), cx + cw - srcSize );
-            if ( st.len + st.slice > scan.width ) {
+            if ( st.len + w > scan.width ) {
                 if ( scan.width >= MAX_LEN ) return stop();
                 grow();
             }
@@ -575,12 +645,12 @@
                 feather( true, over, BAND );
                 ctx.drawImage( tmp, st.len - over, 0 );
             } else {
-                ctx.drawImage( video, srcPos, cy, srcSize, ch, st.len, 0, st.slice, BAND );
+                ctx.drawImage( video, srcPos, cy, srcSize, ch, st.len, 0, w, BAND );
             }
             preview.scrollLeft = st.len * 128 / BAND - preview.clientWidth;
         } else {
             srcPos = Math.min( Math.max( cy + ch / 2 - srcSize / 2 + shift, cy ), cy + ch - srcSize );
-            if ( st.len + st.slice > scan.height ) {
+            if ( st.len + w > scan.height ) {
                 if ( scan.height >= MAX_LEN ) return stop();
                 grow();
             }
@@ -591,11 +661,11 @@
                 feather( false, over, BAND );
                 ctx.drawImage( tmp, 0, st.len - over );
             } else {
-                ctx.drawImage( video, cx, srcPos, cw, srcSize, 0, st.len, BAND, st.slice );
+                ctx.drawImage( video, cx, srcPos, cw, srcSize, 0, st.len, BAND, w );
             }
             preview.scrollTop = st.len * 128 / BAND - preview.clientHeight;
         }
-        st.len += st.slice;
+        st.len += w;
         if ( !st.has ) {
             st.has = true;
             scan.hidden = false;
@@ -608,17 +678,22 @@
     function start() {
         st.rec = true;
         st.drift = 0;
-        st.frame = 0;
+        st.sweep = 0;
+        st.acc = 0;
+        st.speed = 0;
         resetScan();
         st.has = false;
         document.body.classList.add( 'rec' );
+        requestMotion( attachMotion );
+        lockCamera();
         meta( 'REC' );
-        requestAnimationFrame( capture );
+        nextFrame();
     }
 
     function stop() {
         st.rec = false;
         document.body.classList.remove( 'rec' );
+        unlockCamera();
         if ( st.has && st.len ) {
             crop();
             document.body.classList.add( 'has-scan' );
@@ -752,36 +827,93 @@
     viewer.addEventListener( 'pointerup', vzEnd );
     viewer.addEventListener( 'pointercancel', vzEnd );
 
-    var lastMotion = 0;
+    var lastMotion = 0,
+        motionAttached = false;
 
     function onMotion( e ) {
         var now = performance.now(),
             dt = lastMotion ? ( now - lastMotion ) / 1000 : 0,
             r = e.rotationRate,
-            rate;
+            rad;
         lastMotion = now;
-        if ( !r || !dt ) return;
-        rate = isVertical() ? ( r.gamma || 0 ) : ( r.beta || 0 );
-        st.drift += Math.tan( rate * Math.PI / 180 * dt ) * video.videoWidth;
+        if ( !r || r.gamma === null || !dt ) return;
+        if ( !st.motion ) {
+            st.motion = true;
+            document.body.classList.add( 'motion' );
+        }
+        rad = ( isVertical() ? r.gamma : r.beta ) * Math.PI / 180 * dt;
+        st.sweep += rad;
+        st.drift += Math.tan( rad ) * video.videoWidth;
         st.drift *= 0.92;
     }
 
-    function enableStab() {
+    function attachMotion() {
+        if ( motionAttached ) return;
+        motionAttached = true;
+        window.addEventListener( 'devicemotion', onMotion );
+    }
+
+    function requestMotion( fn ) {
         if ( typeof DeviceMotionEvent !== 'undefined' &&
              typeof DeviceMotionEvent.requestPermission === 'function' ) {
             DeviceMotionEvent.requestPermission().then( function( res ) {
-                if ( res === 'granted' ) attachStab();
+                if ( res === 'granted' ) fn();
             } ).catch( function() {} );
         } else {
-            attachStab();
+            fn();
         }
     }
 
-    function attachStab() {
-        st.stab = true;
-        document.body.classList.add( 'stab' );
-        document.getElementById( 'stab' ).classList.add( 'on' );
-        window.addEventListener( 'devicemotion', onMotion );
+    function enableStab() {
+        requestMotion( function() {
+            attachMotion();
+            st.stab = true;
+            document.body.classList.add( 'stab' );
+            document.getElementById( 'stab' ).classList.add( 'on' );
+        } );
+    }
+
+    var locked = [];
+
+    function camTrack() {
+        var s = video.srcObject;
+        return s && s.getVideoTracks ? s.getVideoTracks()[ 0 ] : null;
+    }
+
+    function lockCamera() {
+        var t = camTrack(),
+            adv = [],
+            caps, cur;
+        locked = [];
+        if ( !t || !t.getCapabilities ) return;
+        caps = t.getCapabilities();
+        cur = t.getSettings();
+        if ( ( caps.exposureMode || [] ).indexOf( 'manual' ) > -1 && cur.exposureTime ) {
+            adv.push( { exposureMode: 'manual', exposureTime: cur.exposureTime } );
+            locked.push( 'exposureMode' );
+        }
+        if ( ( caps.whiteBalanceMode || [] ).indexOf( 'manual' ) > -1 && cur.colorTemperature ) {
+            adv.push( { whiteBalanceMode: 'manual', colorTemperature: cur.colorTemperature } );
+            locked.push( 'whiteBalanceMode' );
+        }
+        if ( ( caps.focusMode || [] ).indexOf( 'manual' ) > -1 && cur.focusDistance ) {
+            adv.push( { focusMode: 'manual', focusDistance: cur.focusDistance } );
+            locked.push( 'focusMode' );
+        }
+        if ( adv.length ) t.applyConstraints( { advanced: adv } ).catch( function() { locked = []; } );
+    }
+
+    function unlockCamera() {
+        var t = camTrack(),
+            adv = [];
+        if ( !t || !locked.length ) return;
+        locked.forEach( function( k ) {
+            var o = {};
+            o[ k ] = 'continuous';
+            adv.push( o );
+        } );
+        locked = [];
+        t.applyConstraints( { advanced: adv } ).catch( function() {} );
     }
 
     function seg( id, attr, fn ) {
@@ -818,7 +950,6 @@
             st.drift = 0;
             document.body.classList.remove( 'stab' );
             this.classList.remove( 'on' );
-            window.removeEventListener( 'devicemotion', onMotion );
         } else {
             enableStab();
         }
