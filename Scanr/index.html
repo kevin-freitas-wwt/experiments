@@ -105,6 +105,11 @@
     body.stab .stab-badge {
         opacity: 1;
     }
+    body.mode-img #stab,
+    body.mode-img #stabLabel {
+        opacity: .35;
+        pointer-events: none;
+    }
     .meter {
         background: rgba( 0, 0, 0, .35 );
         border: 1px solid var( --hairline );
@@ -422,6 +427,10 @@
             <label>ZOOM</label>
             <input type="range" id="zoom" min="1" max="5" step="0.1" value="1">
             <span class="readout" id="zoomOut">1.0&times;</span>
+            <div class="seg" id="modeSeg">
+                <button data-mode="gyro" class="on">GYRO</button>
+                <button data-mode="img">IMG</button>
+            </div>
         </div>
         <div class="row">
             <label>DIR</label>
@@ -445,7 +454,7 @@
                 <button data-slice="100">100</button>
             </div>
             <div class="spacer"></div>
-            <label>STAB</label>
+            <label id="stabLabel">STAB</label>
             <button class="switch" id="stab" aria-label="stabilize"></button>
         </div>
     </div>
@@ -494,7 +503,9 @@
         sweep: 0,
         acc: 0,
         speed: 0,
-        motion: false
+        motion: false,
+        mode: 'gyro',
+        jitter: 0
     };
 
     function isVertical() {
@@ -586,10 +597,63 @@
         else tg.fillRect( 0, 0, band, over );
     }
 
+    var AW = 128,
+        AH = 96,
+        alignC = document.createElement( 'canvas' ),
+        alignG = null,
+        prevGray = null;
+
+    alignC.width = AW;
+    alignC.height = AH;
+    alignG = alignC.getContext( '2d', { willReadFrequently: true } );
+
+    function sad( a, b, mx, my ) {
+        var s = 0,
+            x, y, r, rp;
+        for ( y = 20; y < AH - 20; y += 2 ) {
+            r = y * AW;
+            rp = ( y - my ) * AW - mx;
+            for ( x = 24; x < AW - 24; x += 2 ) s += Math.abs( a[ r + x ] - b[ rp + x ] );
+        }
+        return s;
+    }
+
+    function measureFlow( cx, cy, cw, ch, v ) {
+        alignG.drawImage( video, cx, cy, cw, ch, 0, 0, AW, AH );
+        var d = alignG.getImageData( 0, 0, AW, AH ).data,
+            g = new Float32Array( AW * AH ),
+            R = v ? 20 : 16,
+            best = Infinity,
+            bm = 0,
+            bc = 0,
+            i, j, m, c, s, s0, s1, s2, sub, prev;
+        for ( i = 0, j = 0; j < g.length; i += 4, j++ ) g[ j ] = d[ i ] + 2 * d[ i + 1 ] + d[ i + 2 ];
+        prev = prevGray;
+        prevGray = g;
+        if ( !prev ) return null;
+        for ( m = -R; m <= R; m++ ) {
+            for ( c = -3; c <= 3; c++ ) {
+                s = v ? sad( g, prev, m, c ) : sad( g, prev, c, m );
+                if ( s < best ) {
+                    best = s;
+                    bm = m;
+                    bc = c;
+                }
+            }
+        }
+        s0 = best;
+        s1 = Math.abs( bm ) < R ? ( v ? sad( g, prev, bm - 1, bc ) : sad( g, prev, bc, bm - 1 ) ) : s0;
+        s2 = Math.abs( bm ) < R ? ( v ? sad( g, prev, bm + 1, bc ) : sad( g, prev, bc, bm + 1 ) ) : s0;
+        if ( s0 * 8 < Math.min( s1, s2 ) ) sub = 0;
+        else sub = Math.max( s1, s2 ) > s0 ? 0.5 * ( s1 - s2 ) / ( Math.max( s1, s2 ) - s0 ) : 0;
+        return { main: bm + sub, cross: bc };
+    }
+
     function updateMeter() {
-        var r = Math.min( st.speed / st.slice, 1.5 );
+        var a = Math.abs( st.speed ),
+            r = Math.min( a / st.slice, 1.5 );
         meterFill.style.width = ( r / 1.5 * 100 ) + '%';
-        meterFill.classList.toggle( 'over', st.speed > st.slice );
+        meterFill.classList.toggle( 'over', a > st.slice );
     }
 
     function nextFrame() {
@@ -598,32 +662,50 @@
         else requestAnimationFrame( capture );
     }
 
-    function capture() {
+    var lastMedia = -1;
+
+    function capture( now, info ) {
         nextFrame();
         var vw = video.videoWidth,
             vh = video.videoHeight,
             v = isVertical(),
-            angle = st.sweep,
-            w, over, dest, destPx, cw, ch, cx, cy, scale, srcSize, srcPos, shift;
-        st.sweep = 0;
+            w, over, dest, destPx, angle, cw, ch, cx, cy, scale, srcSize, srcPos, shift,
+            mrg, chS, cwS, flow, jit;
         if ( !st.rec || !vw || !vh ) return;
+        if ( info && info.mediaTime === lastMedia ) return;
+        if ( info ) lastMedia = info.mediaTime;
+        angle = st.sweep;
+        st.sweep = 0;
         cw = vw / st.zoom;
         ch = vh / st.zoom;
         cx = ( vw - cw ) / 2;
         cy = ( vh - ch ) / 2;
-        scale = BAND / ( v ? ch : cw );
-        if ( st.motion ) {
-            destPx = Math.abs( Math.tan( angle ) ) * vw * scale;
+        mrg = st.mode === 'img' ? ( v ? ch : cw ) * 0.02 : 0;
+        chS = v ? ch - 2 * mrg : ch;
+        cwS = v ? cw : cw - 2 * mrg;
+        scale = BAND / ( v ? chS : cwS );
+        if ( st.mode === 'img' ) {
+            flow = measureFlow( cx, cy, cw, ch, v );
+            if ( !flow ) return;
+            document.body.classList.add( 'motion' );
+            destPx = flow.main * ( v ? cw / AW : ch / AH ) * scale;
+            st.jitter = ( st.jitter + flow.cross * ( v ? ch / AH : cw / AW ) ) * 0.9;
+        } else if ( st.motion ) {
+            destPx = Math.tan( angle ) * vw * scale;
+        } else {
+            destPx = null;
+        }
+        if ( destPx !== null ) {
             st.speed = st.speed * 0.7 + destPx * 0.3;
             updateMeter();
             st.acc += destPx;
-            w = Math.floor( st.acc );
+            w = Math.floor( Math.abs( st.acc ) );
             if ( w < 1 ) return;
             if ( w > st.slice ) {
                 w = st.slice;
                 st.acc = 0;
             } else {
-                st.acc -= w;
+                st.acc -= st.acc > 0 ? w : -w;
             }
         } else {
             w = st.slice;
@@ -631,7 +713,8 @@
         over = st.len && w >= 8 ? w / 5 : 0;
         dest = w + over;
         srcSize = Math.max( 1, dest / scale );
-        shift = st.stab ? st.drift : 0;
+        shift = st.stab && st.mode === 'gyro' ? st.drift : 0;
+        jit = Math.min( Math.max( st.jitter, -mrg ), mrg );
         if ( v ) {
             srcPos = Math.min( Math.max( cx + cw / 2 - srcSize / 2 + shift, cx ), cx + cw - srcSize );
             if ( st.len + w > scan.width ) {
@@ -641,11 +724,11 @@
             if ( over ) {
                 tmp.width = dest;
                 tmp.height = BAND;
-                tg.drawImage( video, srcPos, cy, srcSize, ch, 0, 0, dest, BAND );
+                tg.drawImage( video, srcPos, cy + mrg + jit, srcSize, chS, 0, 0, dest, BAND );
                 feather( true, over, BAND );
                 ctx.drawImage( tmp, st.len - over, 0 );
             } else {
-                ctx.drawImage( video, srcPos, cy, srcSize, ch, st.len, 0, w, BAND );
+                ctx.drawImage( video, srcPos, cy + mrg + jit, srcSize, chS, st.len, 0, w, BAND );
             }
             preview.scrollLeft = st.len * 128 / BAND - preview.clientWidth;
         } else {
@@ -657,11 +740,11 @@
             if ( over ) {
                 tmp.width = BAND;
                 tmp.height = dest;
-                tg.drawImage( video, cx, srcPos, cw, srcSize, 0, 0, BAND, dest );
+                tg.drawImage( video, cx + mrg + jit, srcPos, cwS, srcSize, 0, 0, BAND, dest );
                 feather( false, over, BAND );
                 ctx.drawImage( tmp, 0, st.len - over );
             } else {
-                ctx.drawImage( video, cx, srcPos, cw, srcSize, 0, st.len, BAND, w );
+                ctx.drawImage( video, cx + mrg + jit, srcPos, cwS, srcSize, 0, st.len, BAND, w );
             }
             preview.scrollTop = st.len * 128 / BAND - preview.clientHeight;
         }
@@ -681,10 +764,12 @@
         st.sweep = 0;
         st.acc = 0;
         st.speed = 0;
+        st.jitter = 0;
+        prevGray = null;
         resetScan();
         st.has = false;
         document.body.classList.add( 'rec' );
-        requestMotion( attachMotion );
+        if ( st.mode === 'gyro' ) requestMotion( attachMotion );
         lockCamera();
         meta( 'REC' );
         nextFrame();
@@ -937,6 +1022,15 @@
         sliceLine.className = 'slice-line ' + ( isVertical() ? 'v' : 'h' );
         resetScan();
         meta( 'READY' );
+    } );
+
+    seg( 'modeSeg', 'mode', function( m ) {
+        st.mode = m;
+        st.jitter = 0;
+        prevGray = null;
+        document.body.classList.toggle( 'mode-img', m === 'img' );
+        if ( !st.motion ) document.body.classList.remove( 'motion' );
+        if ( m === 'gyro' && st.rec ) requestMotion( attachMotion );
     } );
 
     seg( 'sliceSeg', 'slice', function( s ) {
