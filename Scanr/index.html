@@ -649,11 +649,29 @@
         return out;
     }
 
-    function savePng() {
-        var a = document.createElement( 'a' );
-        a.download = 'scanr-' + Date.now() + '.png';
-        a.href = exportCanvas().toDataURL( 'image/png' );
+    function downloadBlob( blob, name ) {
+        var a = document.createElement( 'a' ),
+            url = URL.createObjectURL( blob );
+        a.download = name;
+        a.href = url;
+        document.body.appendChild( a );
         a.click();
+        a.remove();
+        setTimeout( function() { URL.revokeObjectURL( url ); }, 10000 );
+    }
+
+    function savePng() {
+        var name = 'scanr-' + Date.now() + '.png';
+        exportCanvas().toBlob( function( blob ) {
+            var file = new File( [ blob ], name, { type: 'image/png' } );
+            if ( navigator.canShare && navigator.canShare( { files: [ file ] } ) ) {
+                navigator.share( { files: [ file ] } ).catch( function( err ) {
+                    if ( err.name !== 'AbortError' ) downloadBlob( blob, name );
+                } );
+            } else {
+                downloadBlob( blob, name );
+            }
+        }, 'image/png' );
     }
 
     var viewer = document.getElementById( 'viewer' ),
