@@ -656,15 +656,20 @@
         meterFill.classList.toggle( 'over', a > st.slice );
     }
 
-    function nextFrame() {
-        if ( !st.rec ) return;
-        if ( video.requestVideoFrameCallback ) video.requestVideoFrameCallback( capture );
-        else requestAnimationFrame( capture );
+    var vfcSeen = false,
+        vfcTick = false;
+
+    function onVFC() {
+        vfcSeen = true;
+        vfcTick = true;
+        if ( st.rec ) video.requestVideoFrameCallback( onVFC );
     }
 
-    var lastMedia = -1;
+    function nextFrame() {
+        if ( st.rec ) requestAnimationFrame( capture );
+    }
 
-    function capture( now, info ) {
+    function capture() {
         nextFrame();
         var vw = video.videoWidth,
             vh = video.videoHeight,
@@ -672,8 +677,8 @@
             w, over, dest, destPx, angle, cw, ch, cx, cy, scale, srcSize, srcPos, shift,
             mrg, chS, cwS, flow, jit;
         if ( !st.rec || !vw || !vh ) return;
-        if ( info && info.mediaTime === lastMedia ) return;
-        if ( info ) lastMedia = info.mediaTime;
+        if ( vfcSeen && !vfcTick ) return;
+        vfcTick = false;
         angle = st.sweep;
         st.sweep = 0;
         cw = vw / st.zoom;
@@ -769,9 +774,14 @@
         resetScan();
         st.has = false;
         document.body.classList.add( 'rec' );
-        if ( st.mode === 'gyro' ) requestMotion( attachMotion );
-        lockCamera();
+        try { if ( st.mode === 'gyro' ) requestMotion( attachMotion ); } catch ( e ) {}
+        try { lockCamera(); } catch ( e ) {}
         meta( 'REC' );
+        vfcSeen = false;
+        vfcTick = true;
+        if ( video.requestVideoFrameCallback ) {
+            try { video.requestVideoFrameCallback( onVFC ); } catch ( e ) {}
+        }
         nextFrame();
     }
 
