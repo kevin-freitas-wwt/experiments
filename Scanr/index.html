@@ -649,11 +649,14 @@
         return { main: bm + sub, cross: bc };
     }
 
+    var MAXW = 160;
+
     function updateMeter() {
-        var a = Math.abs( st.speed ),
-            r = Math.min( a / st.slice, 1.5 );
+        var lim = Math.floor( MAXW / st.slice ) * st.slice,
+            a = Math.abs( st.speed ),
+            r = Math.min( a / lim, 1.5 );
         meterFill.style.width = ( r / 1.5 * 100 ) + '%';
-        meterFill.classList.toggle( 'over', a > st.slice );
+        meterFill.classList.toggle( 'over', a > lim );
     }
 
     var vfcSeen = false,
@@ -704,14 +707,11 @@
             st.speed = st.speed * 0.7 + destPx * 0.3;
             updateMeter();
             st.acc += destPx;
-            w = Math.floor( Math.abs( st.acc ) );
-            if ( w < 1 ) return;
-            if ( w > st.slice ) {
-                w = st.slice;
-                st.acc = 0;
-            } else {
-                st.acc -= st.acc > 0 ? w : -w;
-            }
+            w = Math.floor( Math.abs( st.acc ) / st.slice ) * st.slice;
+            if ( !w ) return;
+            w = Math.min( w, Math.floor( MAXW / st.slice ) * st.slice );
+            st.acc -= st.acc > 0 ? w : -w;
+            st.acc = Math.min( Math.max( st.acc, -MAXW ), MAXW );
         } else {
             w = st.slice;
         }
