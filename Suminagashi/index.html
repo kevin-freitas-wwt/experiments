@@ -124,7 +124,7 @@
         <p id="fallbackDetail" style="font-size: 0.85em; opacity: 0.6;"></p>
     </div>
     <script type="module">
-        import { init, effect, pingPong, sampler, surface, target } from "../vendor/vgpu.js";
+        import { init, effect, frame, pingPong, sampler, surface, target } from "../vendor/vgpu.js";
 
         const ADVECT_WGSL = `
             struct Params { dt: f32, dissipation: f32, pad0: f32, pad1: f32 }
@@ -415,7 +415,7 @@
                 dyePP.swap();
 
                 display.set( { samp: linear, src: dyePP.read } );
-                display.draw( canvasSurface );
+                frame( gpu, ( f ) => f.pass( canvasSurface, display ) );
                 requestAnimationFrame( tick );
             }
             requestAnimationFrame( tick );

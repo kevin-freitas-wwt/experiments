@@ -172,7 +172,7 @@
         <p id="fallbackDetail" style="font-size: 0.85em; opacity: 0.6;"></p>
     </div>
     <script type="module">
-        import { init, effect, sampler, surface, target } from "../vendor/vgpu.js";
+        import { init, effect, frame, sampler, surface, target } from "../vendor/vgpu.js";
 
         const MARCH_WGSL = `
             struct Params {
@@ -415,7 +415,7 @@
                 } );
                 march.draw( frameT );
                 blit.set( { samp: linear, src: frameT } );
-                blit.draw( canvasSurface );
+                frame( gpu, ( f ) => f.pass( canvasSurface, blit ) );
 
                 document.getElementById( "rPower" ).textContent = state.power.toFixed( 2 );
                 document.getElementById( "rDist" ).textContent = state.dist.toFixed( 2 );
