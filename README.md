@@ -7,6 +7,7 @@ locally, or visit the live site at
 
 ## Projects
 
+- **[Vantage](https://kevin-freitas-wwt.github.io/experiments/Vantage/)** — client telemetry three ways in WebGPU: orbit a 250,000-point request cloud, watch traffic arc between 40 data centers on a globe with true limb occlusion, and read utilization as a 4,096-bar terrain. One synthetic dataset, single instanced draw calls, no build step
 - **[Triptych](https://kevin-freitas-wwt.github.io/experiments/Triptych/)** — three WebGPU studies in one canvas: a raymarched Mandelbulb observatory, suminagashi ink marbling on a real Navier–Stokes solver, and a Gray–Scott reaction-diffusion culture. One GPU context, three switchable worlds, each with its own design, no build step
 - **[Triangulate](https://kevin-freitas-wwt.github.io/experiments/Triangulate/)** — crowd triangulation: sight a target through your phone's camera and each shot casts a compass-bearing ray on a map; rays from different spots least-squares into a lat/lon/altitude fix with an error radius. Hand-plot mode for desktop, photos stored locally per ray
 - **[Ucomms](https://kevin-freitas-wwt.github.io/experiments/Ucomms/)** — text messenger that transmits over sound: audible, near-ultrasonic, or fully silent bands. FSK modem in pure Web Audio with live word-by-word receive, delivery acks with resend, a waterfall spectrogram, and an optional 6-digit cipher; offline-capable PWA
