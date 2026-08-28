@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suminagashi</title>
+    <meta name="description" content="Ink marbling on floating water — a Navier–Stokes fluid solver in WebGPU, combed with your pointer.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="experiments by Kevin">
+    <meta property="og:title" content="Suminagashi">
+    <meta property="og:description" content="Ink marbling on floating water — alternating drops of sumi ink and dispersant make rings, your pointer combs them into marble. A full Navier–Stokes solver in WebGPU via vgpu, no build step.">
+    <meta property="og:url" content="https://kevin-freitas-wwt.github.io/experiments/Suminagashi/">
+    <meta property="og:image" content="https://kevin-freitas-wwt.github.io/experiments/Suminagashi/thumb.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Suminagashi">
+    <meta name="twitter:description" content="Ink marbling on floating water — a Navier–Stokes fluid solver in WebGPU, combed with your pointer.">
+    <meta name="twitter:image" content="https://kevin-freitas-wwt.github.io/experiments/Suminagashi/thumb.png">
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ink: #16161f;
+            --paper: #f4eee2;
+            --vermilion: #c3402b;
+        }
+        * { box-sizing: border-box; }
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+        body {
+            background: var( --paper );
+            color: var( --ink );
+            font-family: "Cormorant Garamond", Georgia, serif;
+            font-size: 17px;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            height: 100%;
+            left: 0;
+            position: fixed;
+            top: 0;
+            touch-action: none;
+            width: 100%;
+        }
+        header {
+            left: 28px;
+            pointer-events: none;
+            position: fixed;
+            top: 24px;
+        }
+        header h1 {
+            font-size: 30px;
+            font-style: italic;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            margin: 0;
+        }
+        header p {
+            font-size: 15px;
+            margin: 2px 0 0;
+            opacity: 0.55;
+        }
+        .seal {
+            background: var( --vermilion );
+            bottom: 26px;
+            height: 34px;
+            position: fixed;
+            right: 28px;
+            width: 34px;
+        }
+        .panel {
+            bottom: 24px;
+            display: flex;
+            gap: 6px;
+            left: 28px;
+            position: fixed;
+        }
+        .panel button {
+            background: none;
+            border: 1px solid rgba( 22, 22, 31, 0.35 );
+            border-radius: 0;
+            color: var( --ink );
+            cursor: pointer;
+            font: inherit;
+            font-size: 15px;
+            padding: 5px 14px;
+        }
+        .panel button:hover { border-color: var( --ink ); }
+        .panel button[aria-pressed="true"] {
+            background: var( --ink );
+            color: var( --paper );
+        }
+        #fallback {
+            background: var( --paper );
+            display: grid;
+            height: 100%;
+            left: 0;
+            place-items: center;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 5;
+        }
+        #fallback p { max-width: 44ch; text-align: center; }
+    </style>
+</head>
+<body>
+    <canvas id="view"></canvas>
+    <header>
+        <h1>Suminagashi</h1>
+        <p>ink floating on still water &mdash; drag to comb the rings into marble</p>
+    </header>
+    <div class="panel" id="panel" hidden>
+        <button id="drops" aria-pressed="true">Dropping ink</button>
+        <button id="still">Still water</button>
+    </div>
+    <div class="seal" aria-hidden="true"></div>
+    <div id="fallback" hidden>
+        <p>This experiment needs WebGPU. Try a current Chrome, Edge, or Safari 26+.</p>
+    </div>
+    <script type="module">
+        import { init, effect, pingPong, sampler, surface, target } from "https://esm.sh/vgpu@0.3.1";
+
+        const ADVECT_WGSL = `
+            struct Params { dt: f32, dissipation: f32, pad0: f32, pad1: f32 }
+            @group(0) @binding(0) var vel: texture_2d<f32>;
+            @group(0) @binding(1) var src: texture_2d<f32>;
+            @group(0) @binding(2) var samp: sampler;
+            @group(0) @binding(3) var<uniform> params: Params;
+
+            @fragment fn fs_main( @location(0) uv: vec2f ) -> @location(0) vec4f {
+                let v = textureSampleLevel( vel, samp, uv, 0.0 ).xy;
+                let pos = uv - v * params.dt;
+                var value = textureSampleLevel( src, samp, pos, 0.0 );
+                return value * params.dissipation;
+            }
+        `;
+
+        const SPLAT_WGSL = `
+            struct Params {
+                point: vec2f,
+                value: vec2f,
+                radius: f32,
+                aspect: f32,
+                dye: f32,
+                radial: f32,
+            }
+            @group(0) @binding(0) var src: texture_2d<f32>;
+            @group(0) @binding(1) var samp: sampler;
+            @group(0) @binding(2) var<uniform> params: Params;
+
+            @fragment fn fs_main( @location(0) uv: vec2f ) -> @location(0) vec4f {
+                let base = textureSampleLevel( src, samp, uv, 0.0 );
+                var d = uv - params.point;
+                d.x *= params.aspect;
+                let g = exp( -dot( d, d ) / ( params.radius * params.radius ) );
+                if ( params.dye > 0.5 ) {
+                    let ink = clamp( base.x + params.value.x * g, 0.0, 1.6 );
+                    return vec4f( ink, 0.0, 0.0, 1.0 );
+                }
+                if ( params.radial > 0.5 ) {
+                    let dir = d / max( length( d ), 1e-4 );
+                    return vec4f( base.xy + dir * params.value.x * g, 0.0, 1.0 );
+                }
+                return vec4f( base.xy + params.value * g, 0.0, 1.0 );
+            }
+        `;
+
+        const DROP_WGSL = `
+            struct Params { point: vec2f, radius: f32, ink: f32, aspect: f32, pad0: f32 }
+            @group(0) @binding(0) var src: texture_2d<f32>;
+            @group(0) @binding(1) var samp: sampler;
+            @group(0) @binding(2) var<uniform> params: Params;
+
+            @fragment fn fs_main( @location(0) uv: vec2f ) -> @location(0) vec4f {
+                var d = uv - params.point;
+                d.x *= params.aspect;
+                let len = length( d );
+                if ( len < params.radius ) {
+                    return vec4f( params.ink, 0.0, 0.0, 1.0 );
+                }
+                let pulled = sqrt( len * len - params.radius * params.radius ) / len;
+                var srcUv = d * pulled;
+                srcUv.x /= params.aspect;
+                return textureSampleLevel( src, samp, params.point + srcUv, 0.0 );
+            }
+        `;
+
+        const DIV_WGSL = `
+            @group(0) @binding(0) var vel: texture_2d<f32>;
+
+            fn v( p: vec2i, size: vec2i ) -> vec2f {
+                let q = clamp( p, vec2i( 0 ), size - vec2i( 1 ) );
+                return textureLoad( vel, q, 0 ).xy;
+            }
+
+            @fragment fn fs_main( @location(0) uv: vec2f ) -> @location(0) vec4f {
+                let size = vec2i( textureDimensions( vel ) );
+                let p = vec2i( uv * vec2f( size ) );
+                let div = 0.5 * ( v( p + vec2i( 1, 0 ), size ).x - v( p + vec2i( -1, 0 ), size ).x
+                                + v( p + vec2i( 0, 1 ), size ).y - v( p + vec2i( 0, -1 ), size ).y );
+                return vec4f( div, 0.0, 0.0, 1.0 );
+            }
+        `;
+
+        const JACOBI_WGSL = `
+            @group(0) @binding(0) var prs: texture_2d<f32>;
+            @group(0) @binding(1) var div: texture_2d<f32>;
+
+            fn p( q: vec2i, size: vec2i ) -> f32 {
+                let r = clamp( q, vec2i( 0 ), size - vec2i( 1 ) );
+                return textureLoad( prs, r, 0 ).x;
+            }
+
+            @fragment fn fs_main( @location(0) uv: vec2f ) -> @location(0) vec4f {
+                let size = vec2i( textureDimensions( prs ) );
+                let q = vec2i( uv * vec2f( size ) );
+                let d = textureLoad( div, clamp( q, vec2i( 0 ), size - vec2i( 1 ) ), 0 ).x;
+                let next = ( p( q + vec2i( 1, 0 ), size ) + p( q + vec2i( -1, 0 ), size )
+                           + p( q + vec2i( 0, 1 ), size ) + p( q + vec2i( 0, -1 ), size ) - d ) * 0.25;
+                return vec4f( next, 0.0, 0.0, 1.0 );
+            }
+        `;
+
+        const GRADSUB_WGSL = `
+            @group(0) @binding(0) var prs: texture_2d<f32>;
+            @group(0) @binding(1) var vel: texture_2d<f32>;
+
+            fn p( q: vec2i, size: vec2i ) -> f32 {
+                let r = clamp( q, vec2i( 0 ), size - vec2i( 1 ) );
+                return textureLoad( prs, r, 0 ).x;
+            }
+
+            @fragment fn fs_main( @location(0) uv: vec2f ) -> @location(0) vec4f {
+                let size = vec2i( textureDimensions( prs ) );
+                let q = vec2i( uv * vec2f( size ) );
+                let grad = 0.5 * vec2f(
+                    p( q + vec2i( 1, 0 ), size ) - p( q + vec2i( -1, 0 ), size ),
+                    p( q + vec2i( 0, 1 ), size ) - p( q + vec2i( 0, -1 ), size ),
+                );
+                var v = textureLoad( vel, clamp( q, vec2i( 0 ), size - vec2i( 1 ) ), 0 ).xy - grad;
+                let border = smoothstep( 0.0, 0.03, uv.x ) * smoothstep( 0.0, 0.03, 1.0 - uv.x )
+                           * smoothstep( 0.0, 0.03, uv.y ) * smoothstep( 0.0, 0.03, 1.0 - uv.y );
+                return vec4f( v * border, 0.0, 1.0 );
+            }
+        `;
+
+        const DISPLAY_WGSL = `
+            @group(0) @binding(0) var src: texture_2d<f32>;
+            @group(0) @binding(1) var samp: sampler;
+
+            fn hash( p: vec2f ) -> f32 {
+                return fract( sin( dot( p, vec2f( 127.1, 311.7 ) ) ) * 43758.5453123 );
+            }
+
+            @fragment fn fs_main( @location(0) uv: vec2f, @builtin(position) frag: vec4f ) -> @location(0) vec4f {
+                let ink = clamp( textureSampleLevel( src, samp, uv, 0.0 ).x, 0.0, 1.0 );
+                let paper = vec3f( 0.957, 0.933, 0.886 );
+                let sumi = vec3f( 0.086, 0.086, 0.122 );
+                let grain = ( hash( floor( frag.xy * 0.5 ) ) - 0.5 ) * 0.03;
+                let fibre = ( hash( floor( frag.xy * vec2f( 0.13, 2.0 ) ) ) - 0.5 ) * 0.012;
+                var col = mix( paper, sumi, smoothstep( 0.02, 0.5, ink ) );
+                col += ( grain + fibre ) * ( 1.0 - ink * 0.8 );
+                let edge = 1.0 - 0.06 * pow( distance( uv, vec2f( 0.5 ) ) * 1.4, 2.0 );
+                return vec4f( col * edge, 1.0 );
+            }
+        `;
+
+        const state = {
+            aspect: 1,
+            down: false,
+            dropping: true,
+            lastPos: null,
+            pos: [ 0.5, 0.5 ],
+        };
+
+        async function main() {
+            if ( !navigator.gpu ) { showFallback(); return; }
+            let gpu;
+            try { gpu = await init(); } catch { showFallback(); return; }
+
+            const canvas = document.getElementById( "view" );
+            const canvasSurface = surface( gpu, canvas, { dpr: [ 1, 2 ] } );
+            const linear = sampler( gpu, { magFilter: "linear", minFilter: "linear" } );
+
+            const advect = effect( gpu, ADVECT_WGSL );
+            const splat = effect( gpu, SPLAT_WGSL );
+            const drop = effect( gpu, DROP_WGSL );
+            const divergence = effect( gpu, DIV_WGSL );
+            const jacobi = effect( gpu, JACOBI_WGSL );
+            const gradsub = effect( gpu, GRADSUB_WGSL );
+            const display = effect( gpu, DISPLAY_WGSL );
+
+            let velPP = null;
+            let dyePP = null;
+            let prsPP = null;
+            let divT = null;
+
+            function rebuild( w, h ) {
+                state.aspect = w / h;
+                const velScale = Math.min( 1, 420 / Math.max( w, h ) );
+                const dyeScale = Math.min( 1, 1200 / Math.max( w, h ) );
+                const vw = Math.max( 64, Math.round( w * velScale ) );
+                const vh = Math.max( 64, Math.round( h * velScale ) );
+                const dw = Math.max( 128, Math.round( w * dyeScale ) );
+                const dh = Math.max( 128, Math.round( h * dyeScale ) );
+                velPP = pingPong( gpu, vw, vh, { format: "rgba16float" } );
+                dyePP = pingPong( gpu, dw, dh, { format: "rgba16float" } );
+                prsPP = pingPong( gpu, vw, vh, { format: "rgba16float" } );
+                divT = target( gpu, { size: [ vw, vh ], format: "rgba16float" } );
+            }
+
+            rebuild( canvasSurface.size[ 0 ], canvasSurface.size[ 1 ] );
+            canvasSurface.onResize( ( { width, height } ) => rebuild( width, height ) );
+
+            canvas.addEventListener( "pointerdown", ( e ) => {
+                state.down = true;
+                state.lastPos = null;
+                trackPointer( e );
+            } );
+            canvas.addEventListener( "pointermove", trackPointer );
+            window.addEventListener( "pointerup", () => { state.down = false; state.lastPos = null; } );
+
+            function trackPointer( e ) {
+                const r = canvas.getBoundingClientRect();
+                state.pos = [ ( e.clientX - r.left ) / r.width, ( e.clientY - r.top ) / r.height ];
+            }
+
+            function splatTo( pp, point, value, radius, dye, radial ) {
+                splat.set( {
+                    params: { aspect: state.aspect, dye: dye, point: point, radial: radial, radius: radius, value: value },
+                    samp: linear,
+                    src: pp.read,
+                } );
+                splat.draw( pp.write );
+                pp.swap();
+            }
+
+            function dropRing( point, polarity ) {
+                drop.set( {
+                    params: { aspect: state.aspect, ink: polarity > 0 ? 1 : 0, pad0: 0, point: point, radius: 0.05 },
+                    samp: linear,
+                    src: dyePP.read,
+                } );
+                drop.draw( dyePP.write );
+                dyePP.swap();
+            }
+
+            wireUi();
+            document.getElementById( "panel" ).hidden = false;
+
+            const dt = 1 / 60;
+            let frameN = 0;
+            let dropCentre = [ 0.5, 0.48 ];
+            let polarity = 1;
+
+            function tick() {
+                frameN++;
+
+                if ( frameN === 1 ) {
+                    for ( let i = 0; i < 8; i++ ) {
+                        dropRing( dropCentre, i % 2 ? -1 : 1 );
+                    }
+                }
+                if ( state.dropping && frameN % 105 === 0 ) {
+                    dropCentre = [
+                        Math.min( 0.8, Math.max( 0.2, dropCentre[ 0 ] + ( Math.random() - 0.5 ) * 0.03 ) ),
+                        Math.min( 0.8, Math.max( 0.2, dropCentre[ 1 ] + ( Math.random() - 0.5 ) * 0.03 ) ),
+                    ];
+                    dropRing( dropCentre, polarity );
+                    polarity *= -1;
+                }
+
+                if ( state.down && state.lastPos ) {
+                    const dx = state.pos[ 0 ] - state.lastPos[ 0 ];
+                    const dy = state.pos[ 1 ] - state.lastPos[ 1 ];
+                    if ( Math.abs( dx ) + Math.abs( dy ) > 0 ) {
+                        splatTo( velPP, state.pos, [ dx * 28, dy * 28 ], 0.028, 0, 0 );
+                    }
+                }
+                state.lastPos = state.down ? [ ...state.pos ] : null;
+
+                advect.set( { params: { dissipation: 0.985, dt: dt, pad0: 0, pad1: 0 }, samp: linear, src: velPP.read, vel: velPP.read } );
+                advect.draw( velPP.write );
+                velPP.swap();
+
+                divergence.set( { vel: velPP.read } );
+                divergence.draw( divT );
+
+                for ( let i = 0; i < 20; i++ ) {
+                    jacobi.set( { div: divT, prs: prsPP.read } );
+                    jacobi.draw( prsPP.write );
+                    prsPP.swap();
+                }
+
+                gradsub.set( { prs: prsPP.read, vel: velPP.read } );
+                gradsub.draw( velPP.write );
+                velPP.swap();
+
+                advect.set( { params: { dissipation: 0.9999, dt: dt, pad0: 0, pad1: 0 }, samp: linear, src: dyePP.read, vel: velPP.read } );
+                advect.draw( dyePP.write );
+                dyePP.swap();
+
+                display.set( { samp: linear, src: dyePP.read } );
+                display.draw( canvasSurface );
+                requestAnimationFrame( tick );
+            }
+            requestAnimationFrame( tick );
+
+            function wireUi() {
+                const drops = document.getElementById( "drops" );
+                drops.addEventListener( "click", () => {
+                    state.dropping = !state.dropping;
+                    drops.setAttribute( "aria-pressed", state.dropping ? "true" : "false" );
+                    drops.textContent = state.dropping ? "Dropping ink" : "Ink paused";
+                } );
+                document.getElementById( "still" ).addEventListener( "click", () => {
+                    rebuild( canvasSurface.size[ 0 ], canvasSurface.size[ 1 ] );
+                } );
+            }
+        }
+
+        function showFallback() {
+            document.getElementById( "fallback" ).hidden = false;
+        }
+
+        main();
+    </script>
+</body>
+</html>
