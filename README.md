@@ -7,6 +7,9 @@ locally, or visit the live site at
 
 ## Projects
 
+- **[Bulb](https://kevin-freitas-wwt.github.io/experiments/Bulb/)** — raymarched Mandelbulb observatory: drag to orbit, scroll to approach, slide the power to morph the fractal. Orbit-trap coloring, adaptive resolution, WebGPU via vgpu with no build step
+- **[Suminagashi](https://kevin-freitas-wwt.github.io/experiments/Suminagashi/)** — ink marbling on floating water: alternating drops of sumi ink and dispersant make rings, your pointer combs them into marble. Aubry drop warps plus a full Navier–Stokes solver in WebGPU
+- **[Petri](https://kevin-freitas-wwt.github.io/experiments/Petri/)** — Gray–Scott reaction-diffusion under a dark-field microscope: five cultures from mitosis to coral, draw on the dish to seed new growth. WebGPU via vgpu with no build step
 - **[Triangulate](https://kevin-freitas-wwt.github.io/experiments/Triangulate/)** — crowd triangulation: sight a target through your phone's camera and each shot casts a compass-bearing ray on a map; rays from different spots least-squares into a lat/lon/altitude fix with an error radius. Hand-plot mode for desktop, photos stored locally per ray
 - **[Ucomms](https://kevin-freitas-wwt.github.io/experiments/Ucomms/)** — text messenger that transmits over sound: audible, near-ultrasonic, or fully silent bands. FSK modem in pure Web Audio with live word-by-word receive, delivery acks with resend, a waterfall spectrogram, and an optional 6-digit cipher; offline-capable PWA
 - **[Latch](https://kevin-freitas-wwt.github.io/experiments/Latch/)** — six working UI mechanisms with zero script tags: anchored callouts, `:has()` state, typed properties, scoped styles, discrete transitions, routed panels. Every one verified in headless Firefox *and* Chromium
