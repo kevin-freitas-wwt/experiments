@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Triptych</title>
+    <meta name="description" content="Three WebGPU studies in one canvas — a Mandelbulb observatory, ink marbling on water, and a reaction-diffusion culture.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="experiments by Kevin">
+    <meta property="og:title" content="Triptych">
+    <meta property="og:description" content="Three WebGPU studies in one canvas — raymarched Mandelbulb observatory, suminagashi ink marbling with a real fluid solver, and a Gray–Scott reaction-diffusion culture. One GPU context, three worlds, no build step.">
+    <meta property="og:url" content="https://kevin-freitas-wwt.github.io/experiments/Triptych/">
+    <meta property="og:image" content="https://kevin-freitas-wwt.github.io/experiments/Triptych/thumb.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Triptych">
+    <meta name="twitter:description" content="Three WebGPU studies in one canvas — Mandelbulb, ink marbling, reaction-diffusion.">
+    <meta name="twitter:image" content="https://kevin-freitas-wwt.github.io/experiments/Triptych/thumb.png">
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+        body {
+            overflow: hidden;
+        }
+        body[data-mode="bulb"] {
+            background: #04070c;
+            color: #9fc3cd;
+            font-family: "Space Mono", ui-monospace, monospace;
+            font-size: 12px;
+        }
+        body[data-mode="sumi"] {
+            background: #f4eee2;
+            color: #16161f;
+            font-family: "Cormorant Garamond", Georgia, serif;
+            font-size: 17px;
+        }
+        body[data-mode="petri"] {
+            background: #05070a;
+            color: #9aa4ab;
+            font-family: "IBM Plex Mono", ui-monospace, monospace;
+            font-size: 12px;
+        }
+        canvas {
+            display: block;
+            height: 100%;
+            left: 0;
+            position: fixed;
+            top: 0;
+            touch-action: none;
+            width: 100%;
+        }
+        body[data-mode="bulb"] canvas { cursor: grab; }
+        body[data-mode="bulb"] canvas:active { cursor: grabbing; }
+        body[data-mode="petri"] canvas { cursor: crosshair; }
+
+        header {
+            left: 26px;
+            pointer-events: none;
+            position: fixed;
+            top: 24px;
+        }
+        header h1 { margin: 0; }
+        header p { margin: 3px 0 0; opacity: 0.6; }
+        body[data-mode="bulb"] header h1 {
+            color: #d7ecf2;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.5em;
+            text-transform: uppercase;
+        }
+        body[data-mode="bulb"] header p { color: #53707c; letter-spacing: 0.06em; }
+        body[data-mode="sumi"] header h1 {
+            font-size: 30px;
+            font-style: italic;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+        }
+        body[data-mode="sumi"] header p { font-size: 15px; }
+        body[data-mode="petri"] header h1 {
+            color: #d6dde2;
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+        }
+        body[data-mode="petri"] header p { color: #5c656c; text-transform: lowercase; }
+
+        .switcher {
+            display: flex;
+            gap: 4px;
+            position: fixed;
+            right: 22px;
+            top: 22px;
+            z-index: 3;
+        }
+        .switcher button {
+            background: none;
+            border: 1px solid transparent;
+            color: inherit;
+            cursor: pointer;
+            font: inherit;
+            font-size: 12px;
+            letter-spacing: 0.1em;
+            opacity: 0.55;
+            padding: 5px 10px;
+            text-transform: uppercase;
+        }
+        .switcher button:hover { opacity: 0.9; }
+        .switcher button[aria-pressed="true"] {
+            border-color: currentColor;
+            opacity: 1;
+        }
+        body[data-mode="sumi"] .switcher button { font-size: 14px; }
+
+        .panel {
+            align-items: center;
+            display: flex;
+            gap: 14px;
+            position: fixed;
+            z-index: 2;
+        }
+        .panel[hidden] { display: none; }
+        .panel button {
+            background: none;
+            border: 1px solid transparent;
+            color: inherit;
+            cursor: pointer;
+            font: inherit;
+            padding: 4px 9px;
+        }
+
+        #petriPanel {
+            backdrop-filter: blur( 6px );
+            background: rgba( 5, 7, 10, 0.82 );
+            border: 1px solid rgba( 154, 164, 171, 0.25 );
+            bottom: 16px;
+            left: 50%;
+            padding: 10px 16px;
+            transform: translateX( -50% );
+        }
+        #petriPanel button {
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+        #petriPanel button:hover { border-color: rgba( 154, 164, 171, 0.25 ); }
+        #petriPanel button[aria-pressed="true"] {
+            border-color: #e8a33d;
+            color: #e8a33d;
+        }
+        #petriPanel .label {
+            color: #5c656c;
+            font-size: 10px;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+        }
+        #petriPanel .readout {
+            color: #5c656c;
+            font-size: 10px;
+        }
+        #petriPanel .readout b {
+            color: #e8a33d;
+            font-weight: 400;
+        }
+
+        #sumiPanel {
+            bottom: 24px;
+            left: 26px;
+        }
+        #sumiPanel button {
+            border-color: rgba( 22, 22, 31, 0.35 );
+            font-size: 15px;
+        }
+        #sumiPanel button:hover { border-color: #16161f; }
+        #sumiPanel button[aria-pressed="true"] {
+            background: #16161f;
+            color: #f4eee2;
+        }
+        .seal {
+            background: #c3402b;
+            bottom: 26px;
+            height: 34px;
+            position: fixed;
+            right: 22px;
+            width: 34px;
+        }
+        body:not([data-mode="sumi"]) .seal { display: none; }
+
+        #bulbPanel {
+            bottom: 24px;
+            right: 22px;
+        }
+        #bulbPanel label {
+            color: #53707c;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+        }
+        #bulbPanel input[type="range"] {
+            accent-color: #7fd4e8;
+            width: 130px;
+        }
+        #bulbPanel button {
+            border-color: rgba( 127, 212, 232, 0.28 );
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+        #bulbPanel button[aria-pressed="true"] {
+            border-color: #7fd4e8;
+            color: #7fd4e8;
+        }
+        .readouts {
+            bottom: 24px;
+            left: 26px;
+            letter-spacing: 0.1em;
+            pointer-events: none;
+            position: fixed;
+        }
+        body:not([data-mode="bulb"]) .readouts { display: none; }
+        .readouts div { margin-top: 3px; }
+        .readouts span {
+            color: #53707c;
+            display: inline-block;
+            width: 7ch;
+        }
+        .readouts b {
+            color: #7fd4e8;
+            font-weight: 400;
+        }
+        .corner {
+            border-color: rgba( 127, 212, 232, 0.28 );
+            border-style: solid;
+            border-width: 0;
+            height: 18px;
+            pointer-events: none;
+            position: fixed;
+            width: 18px;
+        }
+        body:not([data-mode="bulb"]) .corner { display: none; }
+        .corner.tl { border-left-width: 1px; border-top-width: 1px; left: 14px; top: 14px; }
+        .corner.bl { border-bottom-width: 1px; border-left-width: 1px; bottom: 14px; left: 14px; }
+        .corner.br { border-bottom-width: 1px; border-right-width: 1px; bottom: 14px; right: 14px; }
+
+        #fallback[hidden] { display: none; }
+        #fallback {
+            background: inherit;
+            display: grid;
+            height: 100%;
+            left: 0;
+            place-items: center;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 5;
+        }
+        #fallback .notice {
+            backdrop-filter: blur( 4px );
+            background: rgba( 8, 10, 14, 0.75 );
+            color: #cfd8dd;
+            padding: 22px 28px;
+        }
+        #fallback p { max-width: 44ch; text-align: center; }
+        #fallback.preview {
+            background-blend-mode: multiply;
+            background-image: url( "thumb.png" );
+            background-position: center;
+            background-size: cover;
+        }
+        @media ( max-width: 760px ) {
+            #petriPanel { flex-wrap: wrap; gap: 8px; justify-content: center; max-width: calc( 100% - 20px ); }
+            .readouts { display: none; }
+        }
+    </style>
+</head>
+<body data-mode="bulb">
+    <canvas id="view"></canvas>
+    <div class="corner tl"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+    <header>
+        <h1 id="hTitle">Bulb</h1>
+        <p id="hSub">mandelbulb observatory &mdash; drag to orbit &middot; scroll to approach</p>
+    </header>
+    <div class="switcher" id="switcher">
+        <button data-mode="bulb" aria-pressed="true">Bulb</button>
+        <button data-mode="sumi" aria-pressed="false">Suminagashi</button>
+        <button data-mode="petri" aria-pressed="false">Petri</button>
+    </div>
+
+    <div class="panel" id="bulbPanel">
+        <label for="power">Power</label>
+        <input id="power" type="range" min="2" max="12" step="0.01" value="8">
+        <button id="morph" aria-pressed="false">Morph</button>
+    </div>
+    <div class="readouts">
+        <div><span>POWER</span> <b id="rPower">8.00</b></div>
+        <div><span>RANGE</span> <b id="rDist">2.60</b></div>
+        <div><span>AZ/EL</span> <b id="rAng">&mdash;</b></div>
+        <div><span>FPS</span> <b id="rFps">&mdash;</b></div>
+    </div>
+
+    <div class="panel" id="sumiPanel" hidden>
+        <button id="drops" aria-pressed="true">Dropping ink</button>
+        <button id="still">Still water</button>
+    </div>
+    <div class="seal" aria-hidden="true"></div>
+
+    <div class="panel" id="petriPanel" hidden>
+        <span class="label">Culture</span>
+        <span id="presets">
+            <button data-f="0.0367" data-k="0.0649">Mitosis</button>
+            <button data-f="0.0545" data-k="0.0620" aria-pressed="true">Coral</button>
+            <button data-f="0.0780" data-k="0.0610">Worms</button>
+            <button data-f="0.0300" data-k="0.0620">Solitons</button>
+            <button data-f="0.0260" data-k="0.0510">Maze</button>
+        </span>
+        <button id="reseed">Reseed</button>
+        <button id="pause">Pause</button>
+        <span class="readout">F <b id="rF">0.0545</b> K <b id="rK">0.0620</b></span>
+    </div>
+
+    <div id="fallback" hidden>
+        <div class="notice">
+            <p>This experiment needs WebGPU. Try a current Chrome, Edge, Firefox, or Safari.</p>
+            <p id="fallbackDetail" style="font-size: 0.85em; opacity: 0.6;"></p>
+        </div>
+    </div>
+    <script type="module">
+        import { init, effect, frame, pingPong, sampler, surface, target } from "../vendor/vgpu.js?v=7";
+
+        const P_SEED_WGSL = `
+            struct Params { seed: f32, pad0: f32, pad1: f32, pad2: f32 }
+            @group(0) @binding(0) var<uniform> params: Params;
+
+            fn hash( p: vec2f ) -> f32 {
+                let h = dot( p, vec2f( 127.1, 311.7 ) ) + params.seed * 17.13;
+                return fract( sin( h ) * 43758.5453123 );
+            }
+
+            @fragment fn fs_main( @location(0) uv: vec2f ) -> @location(0) vec4f {
+                let cell = floor( uv * 96.0 );
+                let speck = step( 0.985, hash( cell ) );
+                let centre = 1.0 - step( 0.02, distance( uv, vec2f( 0.5 ) ) );
+                let b = max( speck, centre );
+                return vec4f( 1.0, b, 0.0, 1.0 );
+            }
+        `;
+
+        const P_SIM_WGSL = `
+            struct Params {
+                feed: f32,
+                kill: f32,
+                brush: f32,
+                mouseDown: f32,
+                mouse: vec2f,
+                dt: f32,
+                pad0: f32,
+            }
+            @group(0) @binding(0) var src: texture_2d<f32>;
+            @group(0) @binding(1) var<uniform> params: Params;
+
+            fn cell( p: vec2i, size: vec2i ) -> vec2f {
+                let q = clamp( p, vec2i( 0 ), size - vec2i( 1 ) );
+                return textureLoad( src, q, 0 ).rg;
+            }
+
+            @fragment fn fs_main( @location(0) uv: vec2f ) -> @location(0) vec4f {
+                let size = vec2i( textureDimensions( src ) );
+                let p = vec2i( uv * vec2f( size ) );
+                let c = cell( p, size );
+                var lap = -c;
+                lap += 0.2 * cell( p + vec2i( 1, 0 ), size );
+                lap += 0.2 * cell( p + vec2i( -1, 0 ), size );
+                lap += 0.2 * cell( p + vec2i( 0, 1 ), size );
+                lap += 0.2 * cell( p + vec2i( 0, -1 ), size );
+                lap += 0.05 * cell( p + vec2i( 1, 1 ), size );
+                lap += 0.05 * cell( p + vec2i( -1, 1 ), size );
+                lap += 0.05 * cell( p + vec2i( 1, -1 ), size );
+                lap += 0.05 * cell( p + vec2i( -1, -1 ), size );
+                let abb = c.x * c.y * c.y;
+                var a = c.x + ( lap.x - abb + params.feed * ( 1.0 - c.x ) ) * params.dt;
+                var b = c.y + ( 0.5 * lap.y + abb - ( params.kill + params.feed ) * c.y ) * params.dt;
+                if ( params.mouseDown > 0.5 ) {
+                    let d = distance( vec2f( p ), params.mouse );
+                    if ( d < params.brush ) { b = max( b, 0.9 ); }
+                }
+                return vec4f( clamp( a, 0.0, 1.0 ), clamp( b, 0.0, 1.0 ), 0.0, 1.0 );
+            }
+        `;
+
+        const P_DISPLAY_WGSL = `
+            @group(0) @binding(0) var src: texture_2d<f32>;
+            @group(0) @binding(1) var samp: sampler;
+
+            @fragment fn fs_main( @location(0) uv: vec2f ) -> @location(0) vec4f {
+                let texel = 1.0 / vec2f( textureDimensions( src ) );
+                let b = textureSampleLevel( src, samp, uv, 0.0 ).g;
+                let bx = textureSampleLevel( src, samp, uv + vec2f( texel.x, 0.0 ), 0.0 ).g
+                       - textureSampleLevel( src, samp, uv - vec2f( texel.x, 0.0 ), 0.0 ).g;
+                let by = textureSampleLevel( src, samp, uv + vec2f( 0.0, texel.y ), 0.0 ).g
+                       - textureSampleLevel( src, samp, uv - vec2f( 0.0, texel.y ), 0.0 ).g;
+                let edge = clamp( length( vec2f( bx, by ) ) * 6.0, 0.0, 1.0 );
+                let body = smoothstep( 0.12, 0.42, b );
+                let membrane = vec3f( 0.91, 0.64, 0.24 ) * edge;
+                let cytoplasm = vec3f( 0.72, 0.86, 0.90 ) * body * 0.85;
+                let glow = vec3f( 0.10, 0.16, 0.19 ) * smoothstep( 0.02, 0.2, b );
+                var col = glow + cytoplasm + membrane;
+                let vignette = 1.0 - 0.55 * pow( distance( uv, vec2f( 0.5 ) ) * 1.35, 2.2 );
+                col *= max( vignette, 0.0 );
+                return vec4f( col, 1.0 );
+            }
+        `;
+
+        const S_ADVECT_WGSL = `
+            struct Params { dt: f32, dissipation: f32, pad0: f32, pad1: f32 }
+            @group(0) @binding(0) var vel: texture_2d<f32>;
+            @group(0) @binding(1) var src: texture_2d<f32>;
+            @group(0) @binding(2) var samp: sampler;
+            @group(0) @binding(3) var<uniform> params: Params;
+
+            @fragment fn fs_main( @location(0) uv: vec2f ) -> @location(0) vec4f {
+                let v = textureSampleLevel( vel, samp, uv, 0.0 ).xy;
+                let pos = uv - v * params.dt;
+                var value = textureSampleLevel( src, samp, pos, 0.0 );
+                return value * params.dissipation;
+            }
+        `;
+
+        const S_SPLAT_WGSL = `
+            struct Params {
+                point: vec2f,
+                value: vec2f,
+                radius: f32,
+                aspect: f32,
+                dye: f32,
+                radial: f32,
+            }
+            @group(0) @binding(0) var src: texture_2d<f32>;
+            @group(0) @binding(1) var samp: sampler;
+            @group(0) @binding(2) var<uniform> params: Params;
+
+            @fragment fn fs_main( @location(0) uv: vec2f ) -> @location(0) vec4f {
+                let base = textureSampleLevel( src, samp, uv, 0.0 );
+                var d = uv - params.point;
+                d.x *= params.aspect;
+                let g = exp( -dot( d, d ) / ( params.radius * params.radius ) );
+                if ( params.dye > 0.5 ) {
+                    let ink = clamp( base.x + params.value.x * g, 0.0, 1.6 );
+                    return vec4f( ink, 0.0, 0.0, 1.0 );
+                }
+                if ( params.radial > 0.5 ) {
+                    let dir = d / max( length( d ), 1e-4 );
+                    return vec4f( base.xy + dir * params.value.x * g, 0.0, 1.0 );
+                }
+                return vec4f( base.xy + params.value * g, 0.0, 1.0 );
+            }
+        `;
+
+        const S_DROP_WGSL = `
+            struct Params { point: vec2f, radius: f32, ink: f32, aspect: f32, pad0: f32 }
+            @group(0) @binding(0) var src: texture_2d<f32>;
+            @group(0) @binding(1) var samp: sampler;
+            @group(0) @binding(2) var<uniform> params: Params;
+
+            @fragment fn fs_main( @location(0) uv: vec2f ) -> @location(0) vec4f {
+                var d = uv - params.point;
+                d.x *= params.aspect;
+                let len = length( d );
+                if ( len < params.radius ) {
+                    return vec4f( params.ink, 0.0, 0.0, 1.0 );
+                }
+                let pulled = sqrt( len * len - params.radius * params.radius ) / len;
+                var srcUv = d * pulled;
+                srcUv.x /= params.aspect;
+                return textureSampleLevel( src, samp, params.point + srcUv, 0.0 );
+            }
+        `;
+
+        const S_DIV_WGSL = `
+            @group(0) @binding(0) var vel: texture_2d<f32>;
+
+            fn v( p: vec2i, size: vec2i ) -> vec2f {
+                let q = clamp( p, vec2i( 0 ), size - vec2i( 1 ) );
+                return textureLoad( vel, q, 0 ).xy;
+            }
+
+            @fragment fn fs_main( @location(0) uv: vec2f ) -> @location(0) vec4f {
+                let size = vec2i( textureDimensions( vel ) );
+                let p = vec2i( uv * vec2f( size ) );
+                let div = 0.5 * ( v( p + vec2i( 1, 0 ), size ).x - v( p + vec2i( -1, 0 ), size ).x
+                                + v( p + vec2i( 0, 1 ), size ).y - v( p + vec2i( 0, -1 ), size ).y );
+                return vec4f( div, 0.0, 0.0, 1.0 );
+            }
+        `;
+
+        const S_JACOBI_WGSL = `
+            @group(0) @binding(0) var prs: texture_2d<f32>;
+            @group(0) @binding(1) var div: texture_2d<f32>;
+
+            fn p( q: vec2i, size: vec2i ) -> f32 {
+                let r = clamp( q, vec2i( 0 ), size - vec2i( 1 ) );
+                return textureLoad( prs, r, 0 ).x;
+            }
+
+            @fragment fn fs_main( @location(0) uv: vec2f ) -> @location(0) vec4f {
+                let size = vec2i( textureDimensions( prs ) );
+                let q = vec2i( uv * vec2f( size ) );
+                let d = textureLoad( div, clamp( q, vec2i( 0 ), size - vec2i( 1 ) ), 0 ).x;
+                let next = ( p( q + vec2i( 1, 0 ), size ) + p( q + vec2i( -1, 0 ), size )
+                           + p( q + vec2i( 0, 1 ), size ) + p( q + vec2i( 0, -1 ), size ) - d ) * 0.25;
+                return vec4f( next, 0.0, 0.0, 1.0 );
+            }
+        `;
+
+        const S_GRADSUB_WGSL = `
+            @group(0) @binding(0) var prs: texture_2d<f32>;
+            @group(0) @binding(1) var vel: texture_2d<f32>;
+
+            fn p( q: vec2i, size: vec2i ) -> f32 {
+                let r = clamp( q, vec2i( 0 ), size - vec2i( 1 ) );
+                return textureLoad( prs, r, 0 ).x;
+            }
+
+            @fragment fn fs_main( @location(0) uv: vec2f ) -> @location(0) vec4f {
+                let size = vec2i( textureDimensions( prs ) );
+                let q = vec2i( uv * vec2f( size ) );
+                let grad = 0.5 * vec2f(
+                    p( q + vec2i( 1, 0 ), size ) - p( q + vec2i( -1, 0 ), size ),
+                    p( q + vec2i( 0, 1 ), size ) - p( q + vec2i( 0, -1 ), size ),
+                );
+                var v = textureLoad( vel, clamp( q, vec2i( 0 ), size - vec2i( 1 ) ), 0 ).xy - grad;
+                let border = smoothstep( 0.0, 0.03, uv.x ) * smoothstep( 0.0, 0.03, 1.0 - uv.x )
+                           * smoothstep( 0.0, 0.03, uv.y ) * smoothstep( 0.0, 0.03, 1.0 - uv.y );
+                return vec4f( v * border, 0.0, 1.0 );
+            }
+        `;
+
+        const S_DISPLAY_WGSL = `
+            @group(0) @binding(0) var src: texture_2d<f32>;
+            @group(0) @binding(1) var samp: sampler;
+
+            fn hash( p: vec2f ) -> f32 {
+                return fract( sin( dot( p, vec2f( 127.1, 311.7 ) ) ) * 43758.5453123 );
+            }
+
+            @fragment fn fs_main( @location(0) uv: vec2f, @builtin(position) frag: vec4f ) -> @location(0) vec4f {
+                let ink = clamp( textureSampleLevel( src, samp, uv, 0.0 ).x, 0.0, 1.0 );
+                let paper = vec3f( 0.957, 0.933, 0.886 );
+                let sumi = vec3f( 0.086, 0.086, 0.122 );
+                let grain = ( hash( floor( frag.xy * 0.5 ) ) - 0.5 ) * 0.03;
+                let fibre = ( hash( floor( frag.xy * vec2f( 0.13, 2.0 ) ) ) - 0.5 ) * 0.012;
+                var col = mix( paper, sumi, smoothstep( 0.02, 0.5, ink ) );
+                col += ( grain + fibre ) * ( 1.0 - ink * 0.8 );
+                let edge = 1.0 - 0.06 * pow( distance( uv, vec2f( 0.5 ) ) * 1.4, 2.0 );
+                return vec4f( col * edge, 1.0 );
+            }
+        `;
+
+        const B_MARCH_WGSL = `
+            struct Params {
+                theta: f32,
+                phi: f32,
+                dist: f32,
+                power: f32,
+                aspect: f32,
+                time: f32,
+                pad0: f32,
+                pad1: f32,
+            }
+            @group(0) @binding(0) var<uniform> params: Params;
+
+            const MAX_STEPS = 110;
+            const BAILOUT = 2.0;
+            const ITER = 11;
+
+            fn bulbDE( pos: vec3f, trap: ptr<function, f32> ) -> f32 {
+                var z = pos;
+                var dr = 1.0;
+                var r = 0.0;
+                for ( var i = 0; i < ITER; i++ ) {
+                    r = length( z );
+                    if ( r > BAILOUT ) { break; }
+                    let theta = acos( clamp( z.z / max( r, 1e-6 ), -1.0, 1.0 ) ) * params.power;
+                    let phi = atan2( z.y, z.x ) * params.power;
+                    dr = pow( r, params.power - 1.0 ) * params.power * dr + 1.0;
+                    let zr = pow( r, params.power );
+                    z = zr * vec3f( sin( theta ) * cos( phi ), sin( phi ) * sin( theta ), cos( theta ) ) + pos;
+                    *trap = min( *trap, length( z ) );
+                }
+                return 0.5 * log( max( r, 1e-6 ) ) * r / dr;
+            }
+
+            fn deOnly( pos: vec3f ) -> f32 {
+                var t = 1e9;
+                return bulbDE( pos, &t );
+            }
+
+            fn hash( p: vec2f ) -> f32 {
+                return fract( sin( dot( p, vec2f( 127.1, 311.7 ) ) ) * 43758.5453123 );
+            }
+
+            fn stars( rd: vec3f ) -> vec3f {
+                let g = rd.xy / max( abs( rd.z ), 0.2 ) * 42.0 + vec2f( rd.z * 7.0, 0.0 );
+                let cell = floor( g );
+                let h = hash( cell );
+                let sparkle = step( 0.992, h ) * pow( fract( h * 91.7 ), 2.0 );
+                let d = length( fract( g ) - 0.5 );
+                return vec3f( 0.55, 0.78, 0.86 ) * sparkle * smoothstep( 0.35, 0.05, d ) * 0.8;
+            }
+
+            @fragment fn fs_main( @location(0) uv: vec2f ) -> @location(0) vec4f {
+                var p = uv * 2.0 - 1.0;
+                p.x *= params.aspect;
+                p.y = -p.y;
+
+                let cs = cos( params.theta );
+                let sn = sin( params.theta );
+                let ce = cos( params.phi );
+                let se = sin( params.phi );
+                let ro = params.dist * vec3f( cs * ce, se, sn * ce );
+                let fwd = normalize( -ro );
+                let right = normalize( cross( fwd, vec3f( 0.0, 1.0, 0.0 ) ) );
+                let up = cross( right, fwd );
+                let rd = normalize( fwd * 1.6 + right * p.x + up * p.y );
+
+                var t = max( params.dist - 1.6, 0.0 );
+                var trap = 1e9;
+                var hit = false;
+                var steps = 0;
+                for ( var i = 0; i < MAX_STEPS; i++ ) {
+                    steps = i;
+                    let pos = ro + rd * t;
+                    var localTrap = 1e9;
+                    let d = bulbDE( pos, &localTrap );
+                    if ( d < 0.0008 * t ) {
+                        trap = localTrap;
+                        hit = true;
+                        break;
+                    }
+                    t += d * 0.9;
+                    if ( t > params.dist + 4.0 ) { break; }
+                }
+
+                if ( !hit ) {
+                    let horizon = vec3f( 0.016, 0.027, 0.047 ) * ( 1.0 - 0.5 * abs( rd.y ) );
+                    return vec4f( horizon + stars( rd ), 1.0 );
+                }
+
+                let pos = ro + rd * t;
+                let e = max( 0.0004 * t, 0.0002 );
+                let n = normalize( vec3f(
+                    deOnly( pos + vec3f( e, 0.0, 0.0 ) ) - deOnly( pos - vec3f( e, 0.0, 0.0 ) ),
+                    deOnly( pos + vec3f( 0.0, e, 0.0 ) ) - deOnly( pos - vec3f( 0.0, e, 0.0 ) ),
+                    deOnly( pos + vec3f( 0.0, 0.0, e ) ) - deOnly( pos - vec3f( 0.0, 0.0, e ) ),
+                ) );
+
+                let ao = 1.0 - f32( steps ) / f32( MAX_STEPS );
+                let lightDir = normalize( vec3f( 0.6, 0.7, -0.3 ) );
+                let diff = max( dot( n, lightDir ), 0.0 );
+                let rim = pow( 1.0 - max( dot( n, -rd ), 0.0 ), 3.0 );
+                let trapT = clamp( trap * 0.85, 0.0, 1.0 );
+
+                let base = mix( vec3f( 0.10, 0.34, 0.42 ), vec3f( 0.56, 0.64, 0.68 ), trapT );
+                var col = base * ( 0.18 + 0.85 * diff ) * ( 0.35 + 0.65 * ao * ao );
+                col += vec3f( 0.50, 0.83, 0.94 ) * rim * 0.55 * ao;
+                col += vec3f( 0.07, 0.45, 0.55 ) * pow( 1.0 - trapT, 3.0 ) * ao * 0.8;
+
+                let fog = 1.0 - exp( -0.35 * max( t - params.dist + 1.4, 0.0 ) );
+                col = mix( col, vec3f( 0.016, 0.027, 0.047 ), clamp( fog, 0.0, 1.0 ) );
+                col = pow( col, vec3f( 0.85 ) );
+                return vec4f( col, 1.0 );
+            }
+        `;
+
+        const B_BLIT_WGSL = `
+            @group(0) @binding(0) var src: texture_2d<f32>;
+            @group(0) @binding(1) var samp: sampler;
+
+            fn hash( p: vec2f ) -> f32 {
+                return fract( sin( dot( p, vec2f( 127.1, 311.7 ) ) ) * 43758.5453123 );
+            }
+
+            @fragment fn fs_main( @location(0) uv: vec2f, @builtin(position) frag: vec4f ) -> @location(0) vec4f {
+                var col = textureSampleLevel( src, samp, uv, 0.0 ).rgb;
+                col += ( hash( frag.xy ) - 0.5 ) * 0.012;
+                let vig = 1.0 - 0.32 * pow( distance( uv, vec2f( 0.5 ) ) * 1.3, 2.4 );
+                return vec4f( col * vig, 1.0 );
+            }
+        `;
+
+        const BUILD = "Triptych build 1 (2026-08-28)";
+        console.log( BUILD );
+        let booted = false;
+        window.addEventListener( "error", ( e ) => {
+            if ( !booted ) { showFallback( "Uncaught: " + e.message + " [" + BUILD + "]" ); }
+        } );
+        window.addEventListener( "unhandledrejection", ( e ) => {
+            if ( !booted ) { showFallback( "Unhandled rejection: " + ( e.reason && e.reason.message || e.reason ) + " [" + BUILD + "]" ); }
+        } );
+
+        const HEADERS = {
+            bulb: [ "Bulb", "mandelbulb observatory — drag to orbit · scroll to approach" ],
+            petri: [ "Petri", "gray–scott reaction-diffusion — draw on the culture to seed growth" ],
+            sumi: [ "Suminagashi", "ink floating on still water — drag to comb the rings into marble" ],
+        };
+
+        const pointer = { down: false, x: 0, y: 0 };
+        let activeName = "bulb";
+
+        function el( id ) {
+            return document.getElementById( id );
+        }
+
+        function clamp( v, lo, hi ) {
+            return Math.min( hi, Math.max( lo, v ) );
+        }
+
+        async function main() {
+            if ( !navigator.gpu ) {
+                showFallback( "navigator.gpu is undefined — WebGPU is not enabled in this browser." );
+                return;
+            }
+            let gpu;
+            try {
+                gpu = await init();
+                gpu.onError( ( err ) => {
+                    if ( /lost|destroy/i.test( String( err ) ) ) {
+                        showFallback( "The GPU device was lost — the renderer may be overloaded on this hardware. " + err );
+                    }
+                } );
+            } catch ( err ) {
+                showFallback( String( err ).indexOf( "null" ) !== -1
+                    ? "This browser exposes WebGPU but returned no adapter — the OS or GPU is likely blocklisted (in Firefox, see about:support → Graphics). Showing the static preview."
+                    : "WebGPU init failed: " + ( err && err.message ? err.message : err ) );
+                return;
+            }
+
+            const probe = await navigator.gpu.requestAdapter();
+            const softwareAdapter = !!( probe && ( probe.isFallbackAdapter
+                || ( probe.info && /swiftshader|llvmpipe|software/i.test( probe.info.architecture + " " + probe.info.description ) ) ) );
+
+            const canvas = el( "view" );
+            const canvasSurface = surface( gpu, canvas, { dpr: [ 1, 2 ] } );
+            const linear = sampler( gpu, { magFilter: "linear", minFilter: "linear" } );
+            const modes = {};
+
+            function factoryPetri() {
+                const st = { feed: 0.0545, kill: 0.0620, paused: false };
+                const seed = effect( gpu, P_SEED_WGSL, { set: { params: { seed: Math.random() * 100 } } } );
+                const sim = effect( gpu, P_SIM_WGSL );
+                const display = effect( gpu, P_DISPLAY_WGSL );
+                let pp = null;
+                let grid = [ 0, 0 ];
+                let mouse = [ -999, -999 ];
+
+                function rebuild( w, h ) {
+                    const scale = Math.min( 1, 1024 / Math.max( w, h ) ) * 0.5;
+                    grid = [ Math.max( 64, Math.round( w * scale ) ), Math.max( 64, Math.round( h * scale ) ) ];
+                    pp = pingPong( gpu, grid[ 0 ], grid[ 1 ], { format: "rgba16float" } );
+                    reseed();
+                }
+
+                function reseed() {
+                    seed.set( { params: { seed: Math.random() * 100 } } );
+                    seed.draw( pp.write );
+                    pp.swap();
+                }
+
+                rebuild( canvasSurface.size[ 0 ], canvasSurface.size[ 1 ] );
+
+                el( "reseed" ).addEventListener( "click", reseed );
+                const pause = el( "pause" );
+                pause.addEventListener( "click", () => {
+                    st.paused = !st.paused;
+                    pause.textContent = st.paused ? "Resume" : "Pause";
+                } );
+                document.querySelectorAll( "#presets button" ).forEach( ( btn ) => {
+                    btn.addEventListener( "click", () => {
+                        document.querySelectorAll( "#presets button" ).forEach( ( b ) => b.setAttribute( "aria-pressed", "false" ) );
+                        btn.setAttribute( "aria-pressed", "true" );
+                        st.feed = parseFloat( btn.dataset.f );
+                        st.kill = parseFloat( btn.dataset.k );
+                        el( "rF" ).textContent = st.feed.toFixed( 4 );
+                        el( "rK" ).textContent = st.kill.toFixed( 4 );
+                    } );
+                } );
+
+                return {
+                    pointerMove() {
+                        const r = canvas.getBoundingClientRect();
+                        mouse = [ pointer.x / r.width * grid[ 0 ], pointer.y / r.height * grid[ 1 ] ];
+                    },
+                    resize( w, h ) { rebuild( w, h ); },
+                    tick() {
+                        if ( !st.paused ) {
+                            for ( let i = 0; i < 14; i++ ) {
+                                sim.set( {
+                                    params: {
+                                        brush: 14, dt: 1.0, feed: st.feed, kill: st.kill,
+                                        mouse: mouse, mouseDown: pointer.down ? 1 : 0, pad0: 0,
+                                    },
+                                    src: pp.read,
+                                } );
+                                sim.draw( pp.write );
+                                pp.swap();
+                            }
+                        }
+                        display.set( { samp: linear, src: pp.read } );
+                        frame( gpu, ( f ) => f.pass( canvasSurface, display ) );
+                    },
+                };
+            }
+
+            function factorySumi() {
+                const st = { aspect: 1, dropping: true, lastPos: null };
+                const advect = effect( gpu, S_ADVECT_WGSL );
+                const splat = effect( gpu, S_SPLAT_WGSL );
+                const drop = effect( gpu, S_DROP_WGSL );
+                const divergence = effect( gpu, S_DIV_WGSL );
+                const jacobi = effect( gpu, S_JACOBI_WGSL );
+                const gradsub = effect( gpu, S_GRADSUB_WGSL );
+                const display = effect( gpu, S_DISPLAY_WGSL );
+                let velPP = null, dyePP = null, prsPP = null, divT = null;
+                let frameN = 0;
+                let dropCentre = [ 0.5, 0.48 ];
+                let polarity = 1;
+
+                function rebuild( w, h ) {
+                    st.aspect = w / h;
+                    const velScale = Math.min( 1, 420 / Math.max( w, h ) );
+                    const dyeScale = Math.min( 1, 1200 / Math.max( w, h ) );
+                    const vw = Math.max( 64, Math.round( w * velScale ) );
+                    const vh = Math.max( 64, Math.round( h * velScale ) );
+                    velPP = pingPong( gpu, vw, vh, { format: "rgba16float" } );
+                    dyePP = pingPong( gpu, Math.max( 128, Math.round( w * dyeScale ) ), Math.max( 128, Math.round( h * dyeScale ) ), { format: "rgba16float" } );
+                    prsPP = pingPong( gpu, vw, vh, { format: "rgba16float" } );
+                    divT = target( gpu, { size: [ vw, vh ], format: "rgba16float" } );
+                    frameN = 0;
+                }
+
+                function splatTo( pp, point, value, radius, dye, radial ) {
+                    splat.set( {
+                        params: { aspect: st.aspect, dye: dye, point: point, radial: radial, radius: radius, value: value },
+                        samp: linear,
+                        src: pp.read,
+                    } );
+                    splat.draw( pp.write );
+                    pp.swap();
+                }
+
+                function dropRing( point, pol ) {
+                    drop.set( {
+                        params: { aspect: st.aspect, ink: pol > 0 ? 1 : 0, pad0: 0, point: point, radius: 0.05 },
+                        samp: linear,
+                        src: dyePP.read,
+                    } );
+                    drop.draw( dyePP.write );
+                    dyePP.swap();
+                }
+
+                rebuild( canvasSurface.size[ 0 ], canvasSurface.size[ 1 ] );
+
+                const drops = el( "drops" );
+                drops.addEventListener( "click", () => {
+                    st.dropping = !st.dropping;
+                    drops.setAttribute( "aria-pressed", st.dropping ? "true" : "false" );
+                    drops.textContent = st.dropping ? "Dropping ink" : "Ink paused";
+                } );
+                el( "still" ).addEventListener( "click", () => rebuild( canvasSurface.size[ 0 ], canvasSurface.size[ 1 ] ) );
+
+                const dt = 1 / 60;
+                return {
+                    pointerUp() { st.lastPos = null; },
+                    resize( w, h ) { rebuild( w, h ); },
+                    tick() {
+                        frameN++;
+                        if ( frameN === 1 ) {
+                            for ( let i = 0; i < 8; i++ ) { dropRing( dropCentre, i % 2 ? -1 : 1 ); }
+                        }
+                        if ( st.dropping && frameN % 105 === 0 ) {
+                            dropCentre = [
+                                clamp( dropCentre[ 0 ] + ( Math.random() - 0.5 ) * 0.03, 0.2, 0.8 ),
+                                clamp( dropCentre[ 1 ] + ( Math.random() - 0.5 ) * 0.03, 0.2, 0.8 ),
+                            ];
+                            dropRing( dropCentre, polarity );
+                            polarity *= -1;
+                        }
+                        const r = canvas.getBoundingClientRect();
+                        const pos = [ pointer.x / r.width, pointer.y / r.height ];
+                        if ( pointer.down && st.lastPos ) {
+                            const dx = pos[ 0 ] - st.lastPos[ 0 ];
+                            const dy = pos[ 1 ] - st.lastPos[ 1 ];
+                            if ( Math.abs( dx ) + Math.abs( dy ) > 0 ) {
+                                splatTo( velPP, pos, [ dx * 28, dy * 28 ], 0.028, 0, 0 );
+                            }
+                        }
+                        st.lastPos = pointer.down ? pos : null;
+
+                        advect.set( { params: { dissipation: 0.985, dt: dt, pad0: 0, pad1: 0 }, samp: linear, src: velPP.read, vel: velPP.read } );
+                        advect.draw( velPP.write );
+                        velPP.swap();
+                        divergence.set( { vel: velPP.read } );
+                        divergence.draw( divT );
+                        for ( let i = 0; i < 20; i++ ) {
+                            jacobi.set( { div: divT, prs: prsPP.read } );
+                            jacobi.draw( prsPP.write );
+                            prsPP.swap();
+                        }
+                        gradsub.set( { prs: prsPP.read, vel: velPP.read } );
+                        gradsub.draw( velPP.write );
+                        velPP.swap();
+                        advect.set( { params: { dissipation: 0.9999, dt: dt, pad0: 0, pad1: 0 }, samp: linear, src: dyePP.read, vel: velPP.read } );
+                        advect.draw( dyePP.write );
+                        dyePP.swap();
+                        display.set( { samp: linear, src: dyePP.read } );
+                        frame( gpu, ( f ) => f.pass( canvasSurface, display ) );
+                    },
+                };
+            }
+
+            function factoryBulb() {
+                const st = {
+                    dist: 2.6, last: [ 0, 0 ], morph: false, phi: 0.42, power: 8,
+                    scale: softwareAdapter ? 0.3 : 0.8, theta: 0.9, time: 0, velP: 0, velT: 0.004,
+                };
+                const march = effect( gpu, B_MARCH_WGSL );
+                const blit = effect( gpu, B_BLIT_WGSL );
+                let frameT = null;
+
+                function rebuild() {
+                    const w = Math.max( 64, Math.round( canvasSurface.size[ 0 ] * st.scale ) );
+                    const h = Math.max( 64, Math.round( canvasSurface.size[ 1 ] * st.scale ) );
+                    if ( frameT ) { frameT.resize( [ w, h ] ); } else { frameT = target( gpu, { size: [ w, h ] } ); }
+                }
+                rebuild();
+
+                const power = el( "power" );
+                power.addEventListener( "input", () => {
+                    st.power = parseFloat( power.value );
+                    st.morph = false;
+                    el( "morph" ).setAttribute( "aria-pressed", "false" );
+                } );
+                el( "morph" ).addEventListener( "click", () => {
+                    st.morph = !st.morph;
+                    el( "morph" ).setAttribute( "aria-pressed", st.morph ? "true" : "false" );
+                } );
+                canvas.addEventListener( "wheel", ( e ) => {
+                    if ( activeName !== "bulb" ) { return; }
+                    e.preventDefault();
+                    st.dist = clamp( st.dist * Math.exp( e.deltaY * 0.001 ), 1.25, 6 );
+                }, { passive: false } );
+
+                return {
+                    fpsHint( fps ) {
+                        if ( fps < 28 && st.scale > 0.45 ) { st.scale -= 0.1; rebuild(); }
+                        else if ( fps > 55 && st.scale < 1.0 ) { st.scale += 0.05; rebuild(); }
+                    },
+                    pointerDown() { st.last = [ pointer.x, pointer.y ]; },
+                    pointerMove() {
+                        if ( !pointer.down ) { return; }
+                        st.velT = ( pointer.x - st.last[ 0 ] ) * 0.005;
+                        st.velP = ( pointer.y - st.last[ 1 ] ) * 0.005;
+                        st.theta += st.velT;
+                        st.phi = clamp( st.phi + st.velP, -1.45, 1.45 );
+                        st.last = [ pointer.x, pointer.y ];
+                    },
+                    resize() { rebuild(); },
+                    tick( dt ) {
+                        st.time += dt;
+                        if ( !pointer.down ) {
+                            st.theta += st.velT;
+                            st.phi = clamp( st.phi + st.velP, -1.45, 1.45 );
+                            st.velT = st.velT * 0.97 + 0.004 * 0.03;
+                            st.velP *= 0.94;
+                        }
+                        if ( st.morph ) {
+                            st.power = 7 + 5 * Math.sin( st.time * 0.22 );
+                            power.value = st.power;
+                        }
+                        march.set( {
+                            params: {
+                                aspect: frameT.size[ 0 ] / frameT.size[ 1 ],
+                                dist: st.dist, pad0: 0, pad1: 0, phi: st.phi,
+                                power: st.power, theta: st.theta, time: st.time,
+                            },
+                        } );
+                        march.draw( frameT );
+                        blit.set( { samp: linear, src: frameT } );
+                        frame( gpu, ( f ) => f.pass( canvasSurface, blit ) );
+                        el( "rPower" ).textContent = st.power.toFixed( 2 );
+                        el( "rDist" ).textContent = st.dist.toFixed( 2 );
+                        el( "rAng" ).textContent = ( ( st.theta * 57.2958 ) % 360 ).toFixed( 0 ) + "° / " + ( st.phi * 57.2958 ).toFixed( 0 ) + "°";
+                    },
+                };
+            }
+
+            const factories = { bulb: factoryBulb, petri: factoryPetri, sumi: factorySumi };
+
+            function setMode( name ) {
+                activeName = name;
+                if ( !modes[ name ] ) { modes[ name ] = factories[ name ](); }
+                document.body.dataset.mode = name;
+                el( "hTitle" ).textContent = HEADERS[ name ][ 0 ];
+                el( "hSub" ).textContent = HEADERS[ name ][ 1 ];
+                el( "bulbPanel" ).hidden = name !== "bulb";
+                el( "sumiPanel" ).hidden = name !== "sumi";
+                el( "petriPanel" ).hidden = name !== "petri";
+                document.querySelectorAll( "#switcher button" ).forEach( ( b ) => {
+                    b.setAttribute( "aria-pressed", b.dataset.mode === name ? "true" : "false" );
+                } );
+            }
+
+            document.querySelectorAll( "#switcher button" ).forEach( ( b ) => {
+                b.addEventListener( "click", () => setMode( b.dataset.mode ) );
+            } );
+
+            canvasSurface.onResize( ( { width, height } ) => {
+                for ( const m of Object.values( modes ) ) { m.resize( width, height ); }
+            } );
+
+            canvas.addEventListener( "pointerdown", ( e ) => {
+                pointer.down = true;
+                trackPointer( e );
+                const m = modes[ activeName ];
+                if ( m.pointerDown ) { m.pointerDown(); }
+            } );
+            window.addEventListener( "pointermove", ( e ) => {
+                trackPointer( e );
+                const m = modes[ activeName ];
+                if ( m && m.pointerMove ) { m.pointerMove(); }
+            } );
+            window.addEventListener( "pointerup", () => {
+                pointer.down = false;
+                const m = modes[ activeName ];
+                if ( m && m.pointerUp ) { m.pointerUp(); }
+            } );
+
+            function trackPointer( e ) {
+                const r = canvas.getBoundingClientRect();
+                pointer.x = e.clientX - r.left;
+                pointer.y = e.clientY - r.top;
+            }
+
+            setMode( "bulb" );
+
+            let lastNow = performance.now();
+            let fpsAccum = 0;
+            let fpsCount = 0;
+
+            function tick( now ) {
+                const dt = Math.min( ( now - lastNow ) / 1000, 0.1 );
+                lastNow = now;
+                fpsAccum += 1 / Math.max( dt, 0.001 );
+                fpsCount++;
+                if ( fpsCount === 30 ) {
+                    const fps = fpsAccum / 30;
+                    el( "rFps" ).textContent = Math.round( fps );
+                    if ( activeName === "bulb" && modes.bulb ) { modes.bulb.fpsHint( fps ); }
+                    fpsAccum = 0;
+                    fpsCount = 0;
+                }
+                modes[ activeName ].tick( dt, now );
+                booted = true;
+                requestAnimationFrame( tick );
+            }
+            requestAnimationFrame( tick );
+        }
+
+        function showFallback( detail ) {
+            const fb = document.getElementById( "fallback" );
+            fb.hidden = false;
+            fb.classList.add( "preview" );
+            document.getElementById( "fallbackDetail" ).textContent = detail || "";
+        }
+
+        main();
+    </script>
+</body>
+</html>
