@@ -169,9 +169,10 @@
     </div>
     <div id="fallback" hidden>
         <p>This experiment needs WebGPU. Try a current Chrome, Edge, Firefox, or Safari.</p>
+        <p id="fallbackDetail" style="font-size: 0.85em; opacity: 0.6;"></p>
     </div>
     <script type="module">
-        import { init, effect, sampler, surface, target } from "https://esm.sh/vgpu@0.3.1";
+        import { init, effect, sampler, surface, target } from "../vendor/vgpu.js";
 
         const MARCH_WGSL = `
             struct Params {
@@ -320,9 +321,17 @@
         };
 
         async function main() {
-            if ( !navigator.gpu ) { showFallback(); return; }
+            if ( !navigator.gpu ) {
+                showFallback( "navigator.gpu is undefined \u2014 WebGPU is not enabled in this browser." );
+                return;
+            }
             let gpu;
-            try { gpu = await init(); } catch { showFallback(); return; }
+            try {
+                gpu = await init();
+            } catch ( err ) {
+                showFallback( "WebGPU init failed: " + ( err && err.message ? err.message : err ) );
+                return;
+            }
 
             const canvas = document.getElementById( "view" );
             const canvasSurface = surface( gpu, canvas, { dpr: [ 1, 1.5 ] } );
@@ -435,8 +444,9 @@
             } );
         }
 
-        function showFallback() {
+        function showFallback( detail ) {
             document.getElementById( "fallback" ).hidden = false;
+            document.getElementById( "fallbackDetail" ).textContent = detail || "";
         }
 
         main();

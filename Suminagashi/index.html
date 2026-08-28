@@ -121,9 +121,10 @@
     <div class="seal" aria-hidden="true"></div>
     <div id="fallback" hidden>
         <p>This experiment needs WebGPU. Try a current Chrome, Edge, Firefox, or Safari.</p>
+        <p id="fallbackDetail" style="font-size: 0.85em; opacity: 0.6;"></p>
     </div>
     <script type="module">
-        import { init, effect, pingPong, sampler, surface, target } from "https://esm.sh/vgpu@0.3.1";
+        import { init, effect, pingPong, sampler, surface, target } from "../vendor/vgpu.js";
 
         const ADVECT_WGSL = `
             struct Params { dt: f32, dissipation: f32, pad0: f32, pad1: f32 }
@@ -279,9 +280,17 @@
         };
 
         async function main() {
-            if ( !navigator.gpu ) { showFallback(); return; }
+            if ( !navigator.gpu ) {
+                showFallback( "navigator.gpu is undefined \u2014 WebGPU is not enabled in this browser." );
+                return;
+            }
             let gpu;
-            try { gpu = await init(); } catch { showFallback(); return; }
+            try {
+                gpu = await init();
+            } catch ( err ) {
+                showFallback( "WebGPU init failed: " + ( err && err.message ? err.message : err ) );
+                return;
+            }
 
             const canvas = document.getElementById( "view" );
             const canvasSurface = surface( gpu, canvas, { dpr: [ 1, 2 ] } );
@@ -424,8 +433,9 @@
             }
         }
 
-        function showFallback() {
+        function showFallback( detail ) {
             document.getElementById( "fallback" ).hidden = false;
+            document.getElementById( "fallbackDetail" ).textContent = detail || "";
         }
 
         main();
