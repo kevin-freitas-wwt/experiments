@@ -144,6 +144,16 @@
         @media ( max-width: 720px ) {
             .readouts { display: none; }
         }
+        #fallback.preview {
+            background-blend-mode: multiply;
+            background-image: url( "thumb.png" );
+            background-position: center;
+            background-size: cover;
+        }
+        #fallback .notice {
+            backdrop-filter: blur( 4px );
+            padding: 22px 28px;
+        }
     </style>
 </head>
 <body>
@@ -168,8 +178,10 @@
         <button id="morph" aria-pressed="false">Morph</button>
     </div>
     <div id="fallback" hidden>
-        <p>This experiment needs WebGPU. Try a current Chrome, Edge, Firefox, or Safari.</p>
-        <p id="fallbackDetail" style="font-size: 0.85em; opacity: 0.6;"></p>
+        <div class="notice" style="background: rgba( 4, 7, 12, 0.72 );">
+            <p>This experiment needs WebGPU. Try a current Chrome, Edge, Firefox, or Safari.</p>
+            <p id="fallbackDetail" style="font-size: 0.85em; opacity: 0.6;"></p>
+        </div>
     </div>
     <script type="module">
         import { init, effect, frame, sampler, surface, target } from "../vendor/vgpu.js";
@@ -328,10 +340,22 @@
             let gpu;
             try {
                 gpu = await init();
+                gpu.onError( ( err ) => {
+                    if ( /lost|destroy/i.test( String( err ) ) ) {
+                        showFallback( "The GPU device was lost \u2014 the renderer may be overloaded on this hardware. " + err );
+                    }
+                } );
             } catch ( err ) {
-                showFallback( "WebGPU init failed: " + ( err && err.message ? err.message : err ) );
+                showFallback( err && String( err ).indexOf( "null" ) !== -1
+                    ? "This browser exposes WebGPU but returned no adapter \u2014 the OS or GPU is likely blocklisted (in Firefox, see about:support \u2192 Graphics). Showing the static preview."
+                    : "WebGPU init failed: " + ( err && err.message ? err.message : err ) );
                 return;
             }
+
+            const probe = await navigator.gpu.requestAdapter();
+            const softwareAdapter = !!( probe && ( probe.isFallbackAdapter
+                || ( probe.info && /swiftshader|llvmpipe|software/i.test( probe.info.architecture + " " + probe.info.description ) ) ) );
+            if ( softwareAdapter ) { state.scale = 0.3; }
 
             const canvas = document.getElementById( "view" );
             const canvasSurface = surface( gpu, canvas, { dpr: [ 1, 1.5 ] } );
@@ -445,7 +469,9 @@
         }
 
         function showFallback( detail ) {
-            document.getElementById( "fallback" ).hidden = false;
+            const fb = document.getElementById( "fallback" );
+            fb.hidden = false;
+            fb.classList.add( "preview" );
             document.getElementById( "fallbackDetail" ).textContent = detail || "";
         }
 

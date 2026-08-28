@@ -106,6 +106,16 @@
             z-index: 5;
         }
         #fallback p { max-width: 44ch; text-align: center; }
+        #fallback.preview {
+            background-blend-mode: multiply;
+            background-image: url( "thumb.png" );
+            background-position: center;
+            background-size: cover;
+        }
+        #fallback .notice {
+            backdrop-filter: blur( 4px );
+            padding: 22px 28px;
+        }
     </style>
 </head>
 <body>
@@ -120,8 +130,10 @@
     </div>
     <div class="seal" aria-hidden="true"></div>
     <div id="fallback" hidden>
-        <p>This experiment needs WebGPU. Try a current Chrome, Edge, Firefox, or Safari.</p>
-        <p id="fallbackDetail" style="font-size: 0.85em; opacity: 0.6;"></p>
+        <div class="notice" style="background: rgba( 244, 238, 226, 0.8 );">
+            <p>This experiment needs WebGPU. Try a current Chrome, Edge, Firefox, or Safari.</p>
+            <p id="fallbackDetail" style="font-size: 0.85em; opacity: 0.6;"></p>
+        </div>
     </div>
     <script type="module">
         import { init, effect, frame, pingPong, sampler, surface, target } from "../vendor/vgpu.js";
@@ -287,8 +299,15 @@
             let gpu;
             try {
                 gpu = await init();
+                gpu.onError( ( err ) => {
+                    if ( /lost|destroy/i.test( String( err ) ) ) {
+                        showFallback( "The GPU device was lost \u2014 the renderer may be overloaded on this hardware. " + err );
+                    }
+                } );
             } catch ( err ) {
-                showFallback( "WebGPU init failed: " + ( err && err.message ? err.message : err ) );
+                showFallback( err && String( err ).indexOf( "null" ) !== -1
+                    ? "This browser exposes WebGPU but returned no adapter \u2014 the OS or GPU is likely blocklisted (in Firefox, see about:support \u2192 Graphics). Showing the static preview."
+                    : "WebGPU init failed: " + ( err && err.message ? err.message : err ) );
                 return;
             }
 
@@ -434,7 +453,9 @@
         }
 
         function showFallback( detail ) {
-            document.getElementById( "fallback" ).hidden = false;
+            const fb = document.getElementById( "fallback" );
+            fb.hidden = false;
+            fb.classList.add( "preview" );
             document.getElementById( "fallbackDetail" ).textContent = detail || "";
         }
 
