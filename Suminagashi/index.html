@@ -136,7 +136,7 @@
         </div>
     </div>
     <script type="module">
-        import { init, effect, frame, pingPong, sampler, surface, target } from "../vendor/vgpu.js";
+        import { init, effect, frame, pingPong, sampler, surface, target } from "../vendor/vgpu.js?v=7";
 
         const ADVECT_WGSL = `
             struct Params { dt: f32, dissipation: f32, pad0: f32, pad1: f32 }
@@ -282,6 +282,16 @@
                 return vec4f( col * edge, 1.0 );
             }
         `;
+
+        const BUILD = "Suminagashi build 7 (2026-08-28)";
+        console.log( BUILD );
+        let booted = false;
+        window.addEventListener( "error", ( e ) => {
+            if ( !booted ) { showFallback( "Uncaught: " + e.message + " [" + BUILD + "]" ); }
+        } );
+        window.addEventListener( "unhandledrejection", ( e ) => {
+            if ( !booted ) { showFallback( "Unhandled rejection: " + ( e.reason && e.reason.message || e.reason ) + " [" + BUILD + "]" ); }
+        } );
 
         const state = {
             aspect: 1,
@@ -435,6 +445,7 @@
 
                 display.set( { samp: linear, src: dyePP.read } );
                 frame( gpu, ( f ) => f.pass( canvasSurface, display ) );
+                booted = true;
                 requestAnimationFrame( tick );
             }
             requestAnimationFrame( tick );

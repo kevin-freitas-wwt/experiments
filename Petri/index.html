@@ -187,7 +187,7 @@
         </div>
     </div>
     <script type="module">
-        import { init, effect, frame, pingPong, sampler, surface } from "../vendor/vgpu.js";
+        import { init, effect, frame, pingPong, sampler, surface } from "../vendor/vgpu.js?v=7";
 
         const SEED_WGSL = `
             struct Params { seed: f32, pad0: f32, pad1: f32, pad2: f32 }
@@ -271,6 +271,16 @@
                 return vec4f( col, 1.0 );
             }
         `;
+
+        const BUILD = "Petri build 7 (2026-08-28)";
+        console.log( BUILD );
+        let booted = false;
+        window.addEventListener( "error", ( e ) => {
+            if ( !booted ) { showFallback( "Uncaught: " + e.message + " [" + BUILD + "]" ); }
+        } );
+        window.addEventListener( "unhandledrejection", ( e ) => {
+            if ( !booted ) { showFallback( "Unhandled rejection: " + ( e.reason && e.reason.message || e.reason ) + " [" + BUILD + "]" ); }
+        } );
 
         const state = {
             brush: 14,
@@ -378,6 +388,7 @@
                 }
                 display.set( { src: pp.read, samp: linear } );
                 frame( gpu, ( f ) => f.pass( canvasSurface, display ) );
+                booted = true;
                 requestAnimationFrame( tick );
             }
             requestAnimationFrame( tick );

@@ -184,7 +184,7 @@
         </div>
     </div>
     <script type="module">
-        import { init, effect, frame, sampler, surface, target } from "../vendor/vgpu.js";
+        import { init, effect, frame, sampler, surface, target } from "../vendor/vgpu.js?v=7";
 
         const MARCH_WGSL = `
             struct Params {
@@ -318,6 +318,16 @@
             }
         `;
 
+        const BUILD = "Bulb build 7 (2026-08-28)";
+        console.log( BUILD );
+        let booted = false;
+        window.addEventListener( "error", ( e ) => {
+            if ( !booted ) { showFallback( "Uncaught: " + e.message + " [" + BUILD + "]" ); }
+        } );
+        window.addEventListener( "unhandledrejection", ( e ) => {
+            if ( !booted ) { showFallback( "Unhandled rejection: " + ( e.reason && e.reason.message || e.reason ) + " [" + BUILD + "]" ); }
+        } );
+
         const state = {
             dist: 2.6,
             down: false,
@@ -440,6 +450,7 @@
                 march.draw( frameT );
                 blit.set( { samp: linear, src: frameT } );
                 frame( gpu, ( f ) => f.pass( canvasSurface, blit ) );
+                booted = true;
 
                 document.getElementById( "rPower" ).textContent = state.power.toFixed( 2 );
                 document.getElementById( "rDist" ).textContent = state.dist.toFixed( 2 );
