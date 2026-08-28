@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulb</title>
+    <meta name="description" content="A raymarched Mandelbulb observatory — orbit and dive into infinite fractal detail. WebGPU, no build step.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="experiments by Kevin">
+    <meta property="og:title" content="Bulb">
+    <meta property="og:description" content="A raymarched Mandelbulb observatory — drag to orbit, scroll to dive into infinite fractal detail, slide the power to morph it. WebGPU via vgpu, no build step.">
+    <meta property="og:url" content="https://kevin-freitas-wwt.github.io/experiments/Bulb/">
+    <meta property="og:image" content="https://kevin-freitas-wwt.github.io/experiments/Bulb/thumb.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Bulb">
+    <meta name="twitter:description" content="A raymarched Mandelbulb observatory — orbit and dive into infinite fractal detail. WebGPU, no build step.">
+    <meta name="twitter:image" content="https://kevin-freitas-wwt.github.io/experiments/Bulb/thumb.png">
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #7fd4e8;
+            --hairline: rgba( 127, 212, 232, 0.28 );
+            --sky: #04070c;
+            --text: #9fc3cd;
+            --text-dim: #53707c;
+        }
+        * { box-sizing: border-box; }
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+        body {
+            background: var( --sky );
+            color: var( --text );
+            font-family: "Space Mono", ui-monospace, monospace;
+            font-size: 12px;
+            overflow: hidden;
+        }
+        canvas {
+            cursor: grab;
+            display: block;
+            height: 100%;
+            left: 0;
+            position: fixed;
+            top: 0;
+            touch-action: none;
+            width: 100%;
+        }
+        canvas:active { cursor: grabbing; }
+        .corner {
+            border-color: var( --hairline );
+            border-style: solid;
+            border-width: 0;
+            height: 18px;
+            pointer-events: none;
+            position: fixed;
+            width: 18px;
+        }
+        .corner.tl { border-left-width: 1px; border-top-width: 1px; left: 14px; top: 14px; }
+        .corner.tr { border-right-width: 1px; border-top-width: 1px; right: 14px; top: 14px; }
+        .corner.bl { border-bottom-width: 1px; border-left-width: 1px; bottom: 14px; left: 14px; }
+        .corner.br { border-bottom-width: 1px; border-right-width: 1px; bottom: 14px; right: 14px; }
+        header {
+            left: 26px;
+            pointer-events: none;
+            position: fixed;
+            top: 26px;
+        }
+        header h1 {
+            color: #d7ecf2;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.5em;
+            margin: 0 0 4px;
+        }
+        header p {
+            color: var( --text-dim );
+            letter-spacing: 0.06em;
+            margin: 0;
+        }
+        .readouts {
+            bottom: 26px;
+            left: 26px;
+            letter-spacing: 0.1em;
+            pointer-events: none;
+            position: fixed;
+        }
+        .readouts div { margin-top: 3px; }
+        .readouts span {
+            color: var( --text-dim );
+            display: inline-block;
+            width: 7ch;
+        }
+        .readouts b {
+            color: var( --accent );
+            font-weight: 400;
+        }
+        .controls {
+            align-items: center;
+            bottom: 26px;
+            display: flex;
+            gap: 12px;
+            position: fixed;
+            right: 26px;
+        }
+        .controls label {
+            color: var( --text-dim );
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+        }
+        .controls input[type="range"] {
+            accent-color: var( --accent );
+            width: 140px;
+        }
+        .controls button {
+            background: none;
+            border: 1px solid var( --hairline );
+            color: var( --text );
+            cursor: pointer;
+            font: inherit;
+            letter-spacing: 0.14em;
+            padding: 4px 10px;
+            text-transform: uppercase;
+        }
+        .controls button[aria-pressed="true"] {
+            border-color: var( --accent );
+            color: var( --accent );
+        }
+        #fallback {
+            background: var( --sky );
+            display: grid;
+            height: 100%;
+            left: 0;
+            place-items: center;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 5;
+        }
+        #fallback p { max-width: 42ch; text-align: center; }
+        @media ( max-width: 720px ) {
+            .readouts { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="view"></canvas>
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+    <header>
+        <h1>BULB</h1>
+        <p>mandelbulb observatory &mdash; drag to orbit &middot; scroll to approach</p>
+    </header>
+    <div class="readouts">
+        <div><span>POWER</span> <b id="rPower">8.00</b></div>
+        <div><span>RANGE</span> <b id="rDist">2.60</b></div>
+        <div><span>AZ/EL</span> <b id="rAng">&mdash;</b></div>
+        <div><span>FPS</span> <b id="rFps">&mdash;</b></div>
+    </div>
+    <div class="controls" id="controls" hidden>
+        <label for="power">Power</label>
+        <input id="power" type="range" min="2" max="12" step="0.01" value="8">
+        <button id="morph" aria-pressed="false">Morph</button>
+    </div>
+    <div id="fallback" hidden>
+        <p>This experiment needs WebGPU. Try a current Chrome, Edge, or Safari 26+.</p>
+    </div>
+    <script type="module">
+        import { init, effect, sampler, surface, target } from "https://esm.sh/vgpu@0.3.1";
+
+        const MARCH_WGSL = `
+            struct Params {
+                theta: f32,
+                phi: f32,
+                dist: f32,
+                power: f32,
+                aspect: f32,
+                time: f32,
+                pad0: f32,
+                pad1: f32,
+            }
+            @group(0) @binding(0) var<uniform> params: Params;
+
+            const MAX_STEPS = 110;
+            const BAILOUT = 2.0;
+            const ITER = 11;
+
+            fn bulbDE( pos: vec3f, trap: ptr<function, f32> ) -> f32 {
+                var z = pos;
+                var dr = 1.0;
+                var r = 0.0;
+                for ( var i = 0; i < ITER; i++ ) {
+                    r = length( z );
+                    if ( r > BAILOUT ) { break; }
+                    let theta = acos( clamp( z.z / max( r, 1e-6 ), -1.0, 1.0 ) ) * params.power;
+                    let phi = atan2( z.y, z.x ) * params.power;
+                    dr = pow( r, params.power - 1.0 ) * params.power * dr + 1.0;
+                    let zr = pow( r, params.power );
+                    z = zr * vec3f( sin( theta ) * cos( phi ), sin( phi ) * sin( theta ), cos( theta ) ) + pos;
+                    *trap = min( *trap, length( z ) );
+                }
+                return 0.5 * log( max( r, 1e-6 ) ) * r / dr;
+            }
+
+            fn deOnly( pos: vec3f ) -> f32 {
+                var t = 1e9;
+                return bulbDE( pos, &t );
+            }
+
+            fn hash( p: vec2f ) -> f32 {
+                return fract( sin( dot( p, vec2f( 127.1, 311.7 ) ) ) * 43758.5453123 );
+            }
+
+            fn stars( rd: vec3f ) -> vec3f {
+                let g = rd.xy / max( abs( rd.z ), 0.2 ) * 42.0 + vec2f( rd.z * 7.0, 0.0 );
+                let cell = floor( g );
+                let h = hash( cell );
+                let sparkle = step( 0.992, h ) * pow( fract( h * 91.7 ), 2.0 );
+                let d = length( fract( g ) - 0.5 );
+                return vec3f( 0.55, 0.78, 0.86 ) * sparkle * smoothstep( 0.35, 0.05, d ) * 0.8;
+            }
+
+            @fragment fn fs_main( @location(0) uv: vec2f ) -> @location(0) vec4f {
+                var p = uv * 2.0 - 1.0;
+                p.x *= params.aspect;
+                p.y = -p.y;
+
+                let cs = cos( params.theta );
+                let sn = sin( params.theta );
+                let ce = cos( params.phi );
+                let se = sin( params.phi );
+                let ro = params.dist * vec3f( cs * ce, se, sn * ce );
+                let fwd = normalize( -ro );
+                let right = normalize( cross( fwd, vec3f( 0.0, 1.0, 0.0 ) ) );
+                let up = cross( right, fwd );
+                let rd = normalize( fwd * 1.6 + right * p.x + up * p.y );
+
+                var t = max( params.dist - 1.6, 0.0 );
+                var trap = 1e9;
+                var hit = false;
+                var steps = 0;
+                for ( var i = 0; i < MAX_STEPS; i++ ) {
+                    steps = i;
+                    let pos = ro + rd * t;
+                    var localTrap = 1e9;
+                    let d = bulbDE( pos, &localTrap );
+                    if ( d < 0.0008 * t ) {
+                        trap = localTrap;
+                        hit = true;
+                        break;
+                    }
+                    t += d * 0.9;
+                    if ( t > params.dist + 4.0 ) { break; }
+                }
+
+                if ( !hit ) {
+                    let horizon = vec3f( 0.016, 0.027, 0.047 ) * ( 1.0 - 0.5 * abs( rd.y ) );
+                    return vec4f( horizon + stars( rd ), 1.0 );
+                }
+
+                let pos = ro + rd * t;
+                let e = max( 0.0004 * t, 0.0002 );
+                let n = normalize( vec3f(
+                    deOnly( pos + vec3f( e, 0.0, 0.0 ) ) - deOnly( pos - vec3f( e, 0.0, 0.0 ) ),
+                    deOnly( pos + vec3f( 0.0, e, 0.0 ) ) - deOnly( pos - vec3f( 0.0, e, 0.0 ) ),
+                    deOnly( pos + vec3f( 0.0, 0.0, e ) ) - deOnly( pos - vec3f( 0.0, 0.0, e ) ),
+                ) );
+
+                let ao = 1.0 - f32( steps ) / f32( MAX_STEPS );
+                let lightDir = normalize( vec3f( 0.6, 0.7, -0.3 ) );
+                let diff = max( dot( n, lightDir ), 0.0 );
+                let rim = pow( 1.0 - max( dot( n, -rd ), 0.0 ), 3.0 );
+                let trapT = clamp( trap * 0.85, 0.0, 1.0 );
+
+                let base = mix( vec3f( 0.10, 0.34, 0.42 ), vec3f( 0.56, 0.64, 0.68 ), trapT );
+                var col = base * ( 0.18 + 0.85 * diff ) * ( 0.35 + 0.65 * ao * ao );
+                col += vec3f( 0.50, 0.83, 0.94 ) * rim * 0.55 * ao;
+                col += vec3f( 0.07, 0.45, 0.55 ) * pow( 1.0 - trapT, 3.0 ) * ao * 0.8;
+
+                let fog = 1.0 - exp( -0.35 * max( t - params.dist + 1.4, 0.0 ) );
+                col = mix( col, vec3f( 0.016, 0.027, 0.047 ), clamp( fog, 0.0, 1.0 ) );
+                col = pow( col, vec3f( 0.85 ) );
+                return vec4f( col, 1.0 );
+            }
+        `;
+
+        const BLIT_WGSL = `
+            @group(0) @binding(0) var src: texture_2d<f32>;
+            @group(0) @binding(1) var samp: sampler;
+
+            fn hash( p: vec2f ) -> f32 {
+                return fract( sin( dot( p, vec2f( 127.1, 311.7 ) ) ) * 43758.5453123 );
+            }
+
+            @fragment fn fs_main( @location(0) uv: vec2f, @builtin(position) frag: vec4f ) -> @location(0) vec4f {
+                var col = textureSampleLevel( src, samp, uv, 0.0 ).rgb;
+                col += ( hash( frag.xy ) - 0.5 ) * 0.012;
+                let vig = 1.0 - 0.32 * pow( distance( uv, vec2f( 0.5 ) ) * 1.3, 2.4 );
+                return vec4f( col * vig, 1.0 );
+            }
+        `;
+
+        const state = {
+            dist: 2.6,
+            down: false,
+            fps: 60,
+            last: [ 0, 0 ],
+            morph: false,
+            phi: 0.42,
+            power: 8,
+            scale: 0.8,
+            theta: 0.9,
+            velT: 0.004,
+            velP: 0,
+        };
+
+        async function main() {
+            if ( !navigator.gpu ) { showFallback(); return; }
+            let gpu;
+            try { gpu = await init(); } catch { showFallback(); return; }
+
+            const canvas = document.getElementById( "view" );
+            const canvasSurface = surface( gpu, canvas, { dpr: [ 1, 1.5 ] } );
+            const linear = sampler( gpu, { magFilter: "linear", minFilter: "linear" } );
+            const march = effect( gpu, MARCH_WGSL );
+            const blit = effect( gpu, BLIT_WGSL );
+
+            let frameT = null;
+            function rebuild() {
+                const w = Math.max( 64, Math.round( canvasSurface.size[ 0 ] * state.scale ) );
+                const h = Math.max( 64, Math.round( canvasSurface.size[ 1 ] * state.scale ) );
+                if ( frameT ) { frameT.resize( [ w, h ] ); } else { frameT = target( gpu, { size: [ w, h ] } ); }
+            }
+            rebuild();
+            canvasSurface.onResize( rebuild );
+
+            canvas.addEventListener( "pointerdown", ( e ) => {
+                state.down = true;
+                state.last = [ e.clientX, e.clientY ];
+            } );
+            window.addEventListener( "pointerup", () => { state.down = false; } );
+            window.addEventListener( "pointermove", ( e ) => {
+                if ( !state.down ) { return; }
+                state.velT = ( e.clientX - state.last[ 0 ] ) * 0.005;
+                state.velP = ( e.clientY - state.last[ 1 ] ) * 0.005;
+                state.theta += state.velT;
+                state.phi = clamp( state.phi + state.velP, -1.45, 1.45 );
+                state.last = [ e.clientX, e.clientY ];
+            } );
+            canvas.addEventListener( "wheel", ( e ) => {
+                e.preventDefault();
+                state.dist = clamp( state.dist * Math.exp( e.deltaY * 0.001 ), 1.25, 6 );
+            }, { passive: false } );
+
+            wireUi();
+            document.getElementById( "controls" ).hidden = false;
+
+            let lastNow = performance.now();
+            let fpsAccum = 0;
+            let fpsCount = 0;
+            let time = 0;
+
+            function tick( now ) {
+                const dt = Math.min( ( now - lastNow ) / 1000, 0.1 );
+                lastNow = now;
+                time += dt;
+
+                fpsAccum += 1 / Math.max( dt, 0.001 );
+                fpsCount++;
+                if ( fpsCount === 30 ) {
+                    state.fps = fpsAccum / 30;
+                    document.getElementById( "rFps" ).textContent = Math.round( state.fps );
+                    fpsAccum = 0;
+                    fpsCount = 0;
+                    if ( state.fps < 28 && state.scale > 0.45 ) { state.scale -= 0.1; rebuild(); }
+                    else if ( state.fps > 55 && state.scale < 1.0 ) { state.scale += 0.05; rebuild(); }
+                }
+
+                if ( !state.down ) {
+                    state.theta += state.velT;
+                    state.phi = clamp( state.phi + state.velP, -1.45, 1.45 );
+                    state.velT = state.velT * 0.97 + 0.004 * 0.03;
+                    state.velP *= 0.94;
+                }
+                if ( state.morph ) {
+                    state.power = 7 + 5 * Math.sin( time * 0.22 );
+                    document.getElementById( "power" ).value = state.power;
+                }
+
+                march.set( {
+                    params: {
+                        aspect: frameT.size[ 0 ] / frameT.size[ 1 ],
+                        dist: state.dist,
+                        pad0: 0,
+                        pad1: 0,
+                        phi: state.phi,
+                        power: state.power,
+                        theta: state.theta,
+                        time: time,
+                    },
+                } );
+                march.draw( frameT );
+                blit.set( { samp: linear, src: frameT } );
+                blit.draw( canvasSurface );
+
+                document.getElementById( "rPower" ).textContent = state.power.toFixed( 2 );
+                document.getElementById( "rDist" ).textContent = state.dist.toFixed( 2 );
+                document.getElementById( "rAng" ).textContent =
+                    ( ( state.theta * 57.2958 ) % 360 ).toFixed( 0 ) + "° / " + ( state.phi * 57.2958 ).toFixed( 0 ) + "°";
+                requestAnimationFrame( tick );
+            }
+            requestAnimationFrame( tick );
+        }
+
+        function clamp( v, lo, hi ) {
+            return Math.min( hi, Math.max( lo, v ) );
+        }
+
+        function wireUi() {
+            const power = document.getElementById( "power" );
+            power.addEventListener( "input", () => {
+                state.power = parseFloat( power.value );
+                state.morph = false;
+                document.getElementById( "morph" ).setAttribute( "aria-pressed", "false" );
+            } );
+            const morph = document.getElementById( "morph" );
+            morph.addEventListener( "click", () => {
+                state.morph = !state.morph;
+                morph.setAttribute( "aria-pressed", state.morph ? "true" : "false" );
+            } );
+        }
+
+        function showFallback() {
+            document.getElementById( "fallback" ).hidden = false;
+        }
+
+        main();
+    </script>
+</body>
+</html>
