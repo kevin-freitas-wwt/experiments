@@ -127,7 +127,7 @@
                     if ( typeof p.activeGroups[g] === 'boolean' ) state.activeGroups[g] = p.activeGroups[g];
                 } );
             }
-            if ( typeof p.rangeDays === 'number' ) state.rangeDays = p.rangeDays;
+            if ( typeof p.rangeDays === 'number' || p.rangeDays === 'today' ) state.rangeDays = p.rangeDays;
             if ( typeof p.showTracks === 'boolean' ) state.showTracks = p.showTracks;
             if ( typeof p.alertKm === 'number' ) state.alertKm = p.alertKm;
             if ( typeof p.token === 'string' ) state.token = p.token;
@@ -320,7 +320,9 @@
     /* ---------- rendering ---------- */
 
     function filtered() {
-        var cutoff = state.rangeDays ? Date.now() - state.rangeDays * 86400000 : 0;
+        var cutoff = 0;
+        if ( state.rangeDays === 'today' ) cutoff = new Date().setHours( 0, 0, 0, 0 );
+        else if ( state.rangeDays ) cutoff = Date.now() - state.rangeDays * 86400000;
         return Object.keys( state.sightings )
             .map( function( id ) { return state.sightings[id]; } )
             .filter( function( s ) { return s.ts >= cutoff && state.activeGroups[s.group]; } )
@@ -656,7 +658,7 @@
         } );
         document.getElementById( 'range' ).value = String( state.rangeDays );
         document.getElementById( 'range' ).addEventListener( 'change', function( e ) {
-            state.rangeDays = Number( e.target.value );
+            state.rangeDays = e.target.value === 'today' ? 'today' : Number( e.target.value );
             savePrefs();
             render();
         } );
