@@ -260,6 +260,10 @@ footer {
     font: inherit;
 }
 
+.leaflet-tile-pane {
+    filter: grayscale(1) brightness(0.92) contrast(1.05);
+}
+
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
     background: var(--card);

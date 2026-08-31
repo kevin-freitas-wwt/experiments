@@ -1,4 +1,4 @@
-var SHELL_CACHE = 'soundwatch-shell-v2';
+var SHELL_CACHE = 'soundwatch-shell-v3';
 var TILE_CACHE = 'soundwatch-tiles-v1';
 var TILE_LIMIT = 500;
 

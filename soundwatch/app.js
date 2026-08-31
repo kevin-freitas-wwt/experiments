@@ -213,7 +213,9 @@
         buildTracks( list ).forEach( function( t ) {
             var color = GROUPS[t.group].color;
             var latlngs = t.pts.map( function( p ) { return [p.lat, p.lng]; } );
-            L.polyline( latlngs, { color: color, dashArray: '6 6', opacity: 0.65, weight: 2 } )
+            L.polyline( latlngs, { color: '#0b1522', dashArray: '6 6', opacity: 0.9, weight: 5 } )
+                .addTo( state.trackLayer );
+            L.polyline( latlngs, { color: color, dashArray: '6 6', opacity: 0.9, weight: 2 } )
                 .bindTooltip( esc( t.key ) + ', ' + t.pts.length + ' sightings, ' +
                     timeAgo( t.pts[0].ts ) + ' to ' + timeAgo( t.pts[t.pts.length - 1].ts ) )
                 .addTo( state.trackLayer );
