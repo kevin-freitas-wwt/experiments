@@ -264,6 +264,11 @@ footer {
     filter: grayscale(1) brightness(0.92) contrast(1.05);
 }
 
+.leaflet-control-attribution {
+    font-size: 6px;
+    padding: 1px 4px;
+}
+
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
     background: var(--card);
