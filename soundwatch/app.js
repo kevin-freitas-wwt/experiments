@@ -131,6 +131,9 @@
             if ( typeof p.showTracks === 'boolean' ) state.showTracks = p.showTracks;
             if ( typeof p.alertKm === 'number' ) state.alertKm = p.alertKm;
             if ( typeof p.token === 'string' ) state.token = p.token;
+            if ( p.mapView && isFinite( p.mapView.lat ) && isFinite( p.mapView.lng ) && isFinite( p.mapView.zoom ) ) {
+                state.mapView = p.mapView;
+            }
         } catch ( e ) {}
     }
 
@@ -141,7 +144,8 @@
                 rangeDays: state.rangeDays,
                 showTracks: state.showTracks,
                 alertKm: state.alertKm,
-                token: state.token
+                token: state.token,
+                mapView: state.mapView
             } ) );
         } catch ( e ) {}
     }
@@ -615,7 +619,13 @@
 
     function init() {
         loadPrefs();
-        state.map = L.map( 'map' ).setView( [48.1, -122.8], 8 );
+        var v = state.mapView || { lat: 48.1, lng: -122.8, zoom: 8 };
+        state.map = L.map( 'map' ).setView( [v.lat, v.lng], v.zoom );
+        state.map.on( 'moveend', function() {
+            var c = state.map.getCenter();
+            state.mapView = { lat: c.lat, lng: c.lng, zoom: state.map.getZoom() };
+            savePrefs();
+        } );
         L.tileLayer( 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors',
             crossOrigin: 'anonymous',
