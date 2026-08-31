@@ -487,7 +487,7 @@
                 ( s.via ? '<p class="via">via ' + esc( s.via ) + '</p>' : '' );
             li.querySelector( '.share-btn' ).addEventListener( 'click', function( e ) {
                 e.stopPropagation();
-                shareSighting( s );
+                shareSighting( s, e.currentTarget );
             } );
             li.addEventListener( 'click', function() {
                 state.map.setView( [s.lat, s.lng], Math.max( state.map.getZoom(), 10 ) );
@@ -565,14 +565,17 @@
             '#v=' + v.lat.toFixed( 4 ) + ',' + v.lng.toFixed( 4 ) + ',' + v.zoom );
     }
 
-    function shareSighting( s ) {
+    function shareSighting( s, btn ) {
         var url = location.origin + location.pathname +
             '#v=' + s.lat.toFixed( 4 ) + ',' + s.lng.toFixed( 4 ) + ',11&s=' + encodeURIComponent( s.id );
         var text = s.type + ( s.count > 1 ? ' ×' + s.count : '' ) + ' spotted ' + timeAgo( s.ts ) + ' in the Salish Sea';
         if ( navigator.share ) {
             navigator.share( { title: 'Sound Watch', text: text, url: url } ).catch( function() {} );
         } else if ( navigator.clipboard ) {
-            navigator.clipboard.writeText( url );
+            navigator.clipboard.writeText( url ).then( function() {
+                btn.classList.add( 'copied' );
+                setTimeout( function() { btn.classList.remove( 'copied' ); }, 1400 );
+            } ).catch( function() {} );
         }
     }
 
