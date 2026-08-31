@@ -28,6 +28,8 @@
         activeGroups: {},
         rangeDays: 7,
         showTracks: true,
+        showHeat: false,
+        heatLayer: null,
         alertKm: 0,
         token: '',
         playhead: null,
@@ -129,6 +131,7 @@
             }
             if ( typeof p.rangeDays === 'number' || p.rangeDays === 'today' ) state.rangeDays = p.rangeDays;
             if ( typeof p.showTracks === 'boolean' ) state.showTracks = p.showTracks;
+            if ( typeof p.showHeat === 'boolean' ) state.showHeat = p.showHeat;
             if ( typeof p.alertKm === 'number' ) state.alertKm = p.alertKm;
             if ( typeof p.token === 'string' ) state.token = p.token;
             if ( p.mapView && isFinite( p.mapView.lat ) && isFinite( p.mapView.lng ) && isFinite( p.mapView.zoom ) ) {
@@ -143,6 +146,7 @@
                 activeGroups: state.activeGroups,
                 rangeDays: state.rangeDays,
                 showTracks: state.showTracks,
+                showHeat: state.showHeat,
                 alertKm: state.alertKm,
                 token: state.token,
                 mapView: state.mapView
@@ -443,7 +447,7 @@
         state.trackOf = {};
         state.highlight = null;
 
-        var tracks = state.showTracks ? buildTracks( list ) : [];
+        var tracks = ( state.showTracks && !state.showHeat ) ? buildTracks( list ) : [];
         tracks.forEach( function( t, idx ) {
             t.pts.forEach( function( p ) { state.trackOf[p.id] = idx; } );
         } );
@@ -451,14 +455,17 @@
         var offsets = spiralOffsets( list );
 
         list.forEach( function( s ) {
-            var off = offsets[s.id] || [0, 0];
-            var viaLine = s.via ? '<br><em>via ' + esc( s.via ) + '</em>' : '';
-            var m = L.marker( [s.lat, s.lng], { icon: pinIcon( GROUPS[s.group].color, off[0], off[1] ) } )
-                .bindPopup( '<strong>' + esc( s.type ) + '</strong> ×' + s.count + '<br>' +
-                    new Date( s.ts ).toLocaleString() + ( s.note ? '<br>' + esc( s.note ) : '' ) + viaLine );
-            m.on( 'click', function() { setHighlight( s.id ); } );
-            state.layer.addLayer( m );
-            state.markers[s.id] = m;
+            var m = null;
+            if ( !state.showHeat ) {
+                var off = offsets[s.id] || [0, 0];
+                var viaLine = s.via ? '<br><em>via ' + esc( s.via ) + '</em>' : '';
+                m = L.marker( [s.lat, s.lng], { icon: pinIcon( GROUPS[s.group].color, off[0], off[1] ) } )
+                    .bindPopup( '<strong>' + esc( s.type ) + '</strong> ×' + s.count + '<br>' +
+                        new Date( s.ts ).toLocaleString() + ( s.note ? '<br>' + esc( s.note ) : '' ) + viaLine );
+                m.on( 'click', function() { setHighlight( s.id ); } );
+                state.layer.addLayer( m );
+                state.markers[s.id] = m;
+            }
 
             var li = document.createElement( 'li' );
             li.style.borderLeftColor = GROUPS[s.group].color;
@@ -468,13 +475,25 @@
                 ( s.via ? '<p class="via">via ' + esc( s.via ) + '</p>' : '' );
             li.addEventListener( 'click', function() {
                 state.map.setView( [s.lat, s.lng], Math.max( state.map.getZoom(), 10 ) );
-                m.openPopup();
-                setHighlight( s.id );
+                if ( m ) {
+                    m.openPopup();
+                    setHighlight( s.id );
+                }
             } );
             frag.appendChild( li );
         } );
 
         renderTracks( tracks );
+
+        if ( state.heatLayer ) {
+            state.map.removeLayer( state.heatLayer );
+            state.heatLayer = null;
+        }
+        if ( state.showHeat && typeof L.heatLayer === 'function' ) {
+            state.heatLayer = L.heatLayer( list.map( function( s ) {
+                return [s.lat, s.lng, Math.min( 1, 0.5 + s.count * 0.08 )];
+            } ), { blur: 18, maxZoom: 11, minOpacity: 0.25, radius: 26 } ).addTo( state.map );
+        }
 
         feed.innerHTML = '';
         feed.appendChild( frag );
@@ -711,6 +730,14 @@
         trackBtn.addEventListener( 'click', function() {
             state.showTracks = !state.showTracks;
             trackBtn.classList.toggle( 'active', state.showTracks );
+            savePrefs();
+            render();
+        } );
+        var heatBtn = document.getElementById( 'heat-toggle' );
+        heatBtn.classList.toggle( 'active', state.showHeat );
+        heatBtn.addEventListener( 'click', function() {
+            state.showHeat = !state.showHeat;
+            heatBtn.classList.toggle( 'active', state.showHeat );
             savePrefs();
             render();
         } );
