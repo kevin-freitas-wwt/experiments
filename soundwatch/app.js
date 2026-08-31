@@ -27,7 +27,10 @@
         map: null,
         layer: null,
         trackLayer: null,
-        markers: {}
+        markers: {},
+        trackOf: {},
+        trackShapes: [],
+        highlight: null
     };
 
     Object.keys( GROUPS ).forEach( function( g ) { state.activeGroups[g] = true; } );
@@ -231,28 +234,50 @@
         return L.divIcon( { className: 'pin', html: svg, iconSize: [16, 16], iconAnchor: [8, 8] } );
     }
 
-    function renderTracks( list ) {
+    function renderTracks( tracks ) {
         state.trackLayer.clearLayers();
+        state.trackShapes = [];
         if ( !state.showTracks ) return;
-        buildTracks( list ).forEach( function( t ) {
+        tracks.forEach( function( t, idx ) {
             var color = GROUPS[t.group].color;
             var latlngs = t.pts.map( function( p ) { return [p.lat, p.lng]; } );
-            L.polyline( latlngs, { color: '#0b1522', dashArray: '6 6', opacity: 0.9, weight: 5 } )
-                .addTo( state.trackLayer );
-            L.polyline( latlngs, { color: color, dashArray: '6 6', opacity: 0.9, weight: 2 } )
+            var shape = { lines: [], arrows: [] };
+            shape.lines.push( L.polyline( latlngs, { color: '#0b1522', dashArray: '6 6', opacity: 0.9, weight: 5 } )
+                .addTo( state.trackLayer ) );
+            shape.lines.push( L.polyline( latlngs, { color: color, dashArray: '6 6', opacity: 0.9, weight: 2 } )
                 .bindTooltip( esc( t.key ) + ', ' + t.pts.length + ' sightings, ' +
                     timeAgo( t.pts[0].ts ) + ' to ' + timeAgo( t.pts[t.pts.length - 1].ts ) )
-                .addTo( state.trackLayer );
+                .addTo( state.trackLayer ) );
             for ( var i = 1; i < t.pts.length; i++ ) {
                 var a = t.pts[i - 1];
                 var b = t.pts[i];
                 if ( distKm( a, b ) < 1 ) continue;
-                L.marker( [( a.lat + b.lat ) / 2, ( a.lng + b.lng ) / 2], {
+                shape.arrows.push( L.marker( [( a.lat + b.lat ) / 2, ( a.lng + b.lng ) / 2], {
                     icon: arrowIcon( color, bearingDeg( a, b ) ),
                     interactive: false
-                } ).addTo( state.trackLayer );
+                } ).addTo( state.trackLayer ) );
             }
+            state.trackShapes[idx] = shape;
         } );
+    }
+
+    function applyHighlight() {
+        var hi = state.highlight;
+        Object.keys( state.markers ).forEach( function( id ) {
+            var dim = hi !== null && state.trackOf[id] !== hi;
+            state.markers[id].setOpacity( dim ? 0.35 : 1 );
+        } );
+        state.trackShapes.forEach( function( shape, idx ) {
+            var dim = hi !== null && idx !== hi;
+            shape.lines.forEach( function( l ) { l.setStyle( { opacity: dim ? 0.3 : 0.9 } ); } );
+            shape.arrows.forEach( function( a ) { a.setOpacity( dim ? 0.35 : 1 ); } );
+        } );
+    }
+
+    function setHighlight( id ) {
+        var idx = state.trackOf[id];
+        state.highlight = typeof idx === 'number' ? idx : null;
+        applyHighlight();
     }
 
     function pinIcon( color ) {
@@ -274,11 +299,19 @@
 
         state.layer.clearLayers();
         state.markers = {};
+        state.trackOf = {};
+        state.highlight = null;
+
+        var tracks = state.showTracks ? buildTracks( list ) : [];
+        tracks.forEach( function( t, idx ) {
+            t.pts.forEach( function( p ) { state.trackOf[p.id] = idx; } );
+        } );
 
         list.forEach( function( s ) {
             var m = L.marker( [s.lat, s.lng], { icon: pinIcon( GROUPS[s.group].color ) } )
                 .bindPopup( '<strong>' + esc( s.type ) + '</strong> ×' + s.count + '<br>' +
                     new Date( s.ts ).toLocaleString() + ( s.note ? '<br>' + esc( s.note ) : '' ) );
+            m.on( 'click', function() { setHighlight( s.id ); } );
             state.layer.addLayer( m );
             state.markers[s.id] = m;
 
@@ -290,11 +323,12 @@
             li.addEventListener( 'click', function() {
                 state.map.setView( [s.lat, s.lng], Math.max( state.map.getZoom(), 10 ) );
                 m.openPopup();
+                setHighlight( s.id );
             } );
             frag.appendChild( li );
         } );
 
-        renderTracks( list );
+        renderTracks( tracks );
 
         feed.innerHTML = '';
         feed.appendChild( frag );
@@ -333,6 +367,17 @@
         } ).addTo( state.map );
         state.trackLayer = L.layerGroup().addTo( state.map );
         state.layer = L.layerGroup().addTo( state.map );
+
+        var pendingClear;
+        state.map.on( 'popupclose', function() {
+            pendingClear = setTimeout( function() {
+                state.highlight = null;
+                applyHighlight();
+            }, 50 );
+        } );
+        state.map.on( 'popupopen', function() {
+            clearTimeout( pendingClear );
+        } );
 
         buildChips();
         var trackBtn = document.getElementById( 'tracks-toggle' );
