@@ -7,6 +7,7 @@
     var SYNC_KEY = 'soundwatch.lastSync';
     var MAX_RECORDS = 5000;
     var SYNC_INTERVAL = 5 * 60 * 1000;
+    var TRACK_RULES = { maxGapMs: 12 * 3600000, maxKmh: 20, minSegKm: 0.15 };
 
     var GROUPS = {
         Orca: { color: '#5eead4', match: /orca|killer|srkw|biggs|transient/i },
@@ -21,8 +22,10 @@
         sightings: loadStore(),
         activeGroups: {},
         rangeDays: 7,
+        showTracks: true,
         map: null,
         layer: null,
+        trackLayer: null,
         markers: {}
     };
 
@@ -62,6 +65,17 @@
         return found;
     }
 
+    function extractTag( type, note ) {
+        var hay = String( type || '' ) + ' ' + String( note || '' );
+        var m = hay.match( /\bT\d{2,3}[A-Z]{0,2}\d?\b/ );
+        if ( m ) return m[0];
+        m = hay.match( /\b([JKL])\s?-?\s?pod\b/i );
+        if ( m ) return m[1].toUpperCase() + ' pod';
+        m = hay.match( /\bCRC-?\s?\d+\b/i );
+        if ( m ) return m[0].toUpperCase().replace( /[-\s]/g, '' );
+        return null;
+    }
+
     function normalize( raw ) {
         var lat = Number( raw.latitude );
         var lng = Number( raw.longitude );
@@ -75,6 +89,7 @@
             lng: lng,
             type: raw.type || 'Unspecified',
             group: groupOf( raw.type, raw.data_source_comments ),
+            tag: extractTag( raw.type, raw.data_source_comments ),
             count: Number( raw.no_sighted ) || 1,
             note: String( raw.data_source_comments || '' ).slice( 0, 400 ),
             source: raw.data_source_entity || raw.data_source_name || 'Unknown',
@@ -138,6 +153,82 @@
             .sort( function( a, b ) { return b.ts - a.ts; } );
     }
 
+    function distKm( a, b ) {
+        var rad = Math.PI / 180;
+        var dLat = ( b.lat - a.lat ) * rad;
+        var dLng = ( b.lng - a.lng ) * rad;
+        var h = Math.sin( dLat / 2 ) * Math.sin( dLat / 2 ) +
+            Math.cos( a.lat * rad ) * Math.cos( b.lat * rad ) *
+            Math.sin( dLng / 2 ) * Math.sin( dLng / 2 );
+        return 12742 * Math.asin( Math.sqrt( h ) );
+    }
+
+    function bearingDeg( a, b ) {
+        var rad = Math.PI / 180;
+        var dLng = ( b.lng - a.lng ) * rad;
+        var y = Math.sin( dLng ) * Math.cos( b.lat * rad );
+        var x = Math.cos( a.lat * rad ) * Math.sin( b.lat * rad ) -
+            Math.sin( a.lat * rad ) * Math.cos( b.lat * rad ) * Math.cos( dLng );
+        return ( Math.atan2( y, x ) * 180 / Math.PI + 360 ) % 360;
+    }
+
+    function buildTracks( list ) {
+        var byKey = {};
+        list.forEach( function( s ) {
+            var key = s.tag || ( s.group !== 'Other' ? s.group : null );
+            if ( !key ) return;
+            ( byKey[key] = byKey[key] || [] ).push( s );
+        } );
+
+        var tracks = [];
+        Object.keys( byKey ).forEach( function( key ) {
+            var pts = byKey[key].slice().sort( function( a, b ) { return a.ts - b.ts; } );
+            var run = [pts[0]];
+            for ( var i = 1; i < pts.length; i++ ) {
+                var prev = run[run.length - 1];
+                var gapH = ( pts[i].ts - prev.ts ) / 3600000;
+                var km = distKm( prev, pts[i] );
+                if ( gapH <= TRACK_RULES.maxGapMs / 3600000 && ( gapH === 0 || km / gapH <= TRACK_RULES.maxKmh ) ) {
+                    if ( km >= TRACK_RULES.minSegKm ) run.push( pts[i] );
+                } else {
+                    if ( run.length > 1 ) tracks.push( { key: key, pts: run, group: run[0].group } );
+                    run = [pts[i]];
+                }
+            }
+            if ( run.length > 1 ) tracks.push( { key: key, pts: run, group: run[0].group } );
+        } );
+        return tracks;
+    }
+
+    function arrowIcon( color, deg ) {
+        var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"' +
+            ' style="transform:rotate(' + deg.toFixed( 0 ) + 'deg)">' +
+            '<path d="M8 1.5 L13 13 L8 10 L3 13 Z" fill="' + color + '" stroke="#0b1522" stroke-width="1"/></svg>';
+        return L.divIcon( { className: 'pin', html: svg, iconSize: [16, 16], iconAnchor: [8, 8] } );
+    }
+
+    function renderTracks( list ) {
+        state.trackLayer.clearLayers();
+        if ( !state.showTracks ) return;
+        buildTracks( list ).forEach( function( t ) {
+            var color = GROUPS[t.group].color;
+            var latlngs = t.pts.map( function( p ) { return [p.lat, p.lng]; } );
+            L.polyline( latlngs, { color: color, dashArray: '6 6', opacity: 0.65, weight: 2 } )
+                .bindTooltip( esc( t.key ) + ', ' + t.pts.length + ' sightings, ' +
+                    timeAgo( t.pts[0].ts ) + ' to ' + timeAgo( t.pts[t.pts.length - 1].ts ) )
+                .addTo( state.trackLayer );
+            for ( var i = 1; i < t.pts.length; i++ ) {
+                var a = t.pts[i - 1];
+                var b = t.pts[i];
+                if ( distKm( a, b ) < 1 ) continue;
+                L.marker( [( a.lat + b.lat ) / 2, ( a.lng + b.lng ) / 2], {
+                    icon: arrowIcon( color, bearingDeg( a, b ) ),
+                    interactive: false
+                } ).addTo( state.trackLayer );
+            }
+        } );
+    }
+
     function pinIcon( color ) {
         var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">' +
             '<circle cx="9" cy="9" r="6.5" fill="' + color + '" stroke="#0b1522" stroke-width="2"/></svg>';
@@ -177,6 +268,8 @@
             frag.appendChild( li );
         } );
 
+        renderTracks( list );
+
         feed.innerHTML = '';
         feed.appendChild( frag );
         document.getElementById( 'empty' ).hidden = list.length > 0;
@@ -210,9 +303,16 @@
             attribution: '© OpenStreetMap contributors',
             maxZoom: 17
         } ).addTo( state.map );
+        state.trackLayer = L.layerGroup().addTo( state.map );
         state.layer = L.layerGroup().addTo( state.map );
 
         buildChips();
+        var trackBtn = document.getElementById( 'tracks-toggle' );
+        trackBtn.addEventListener( 'click', function() {
+            state.showTracks = !state.showTracks;
+            trackBtn.classList.toggle( 'active', state.showTracks );
+            render();
+        } );
         netStatus();
         refreshSyncLabel();
         render();
