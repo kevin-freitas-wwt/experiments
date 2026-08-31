@@ -153,6 +153,11 @@ h1 {
     z-index: 999;
 }
 
+.panel-glass[hidden],
+.empty[hidden] {
+    display: none;
+}
+
 .panel-glass header {
     align-items: center;
     display: flex;
@@ -423,6 +428,20 @@ select,
 
 .leaflet-popup-content-wrapper {
     border-radius: 14px;
+}
+
+.leaflet-popup-content {
+    font-size: 12px;
+    line-height: 1.45;
+    margin: 9px 13px;
+}
+
+@media (max-width: 600px) {
+    .leaflet-popup-content {
+        font-size: 9.75px;
+        line-height: 1.4;
+        margin: 8px 12px;
+    }
 }
 
 .leaflet-top.leaflet-left {
