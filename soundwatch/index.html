@@ -41,8 +41,11 @@
         <button class="icon-btn glass" type="button" data-panel="feed" title="Sightings list" aria-label="Sightings list">
             <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="4" cy="6" r="1.4" fill="currentColor"/><circle cx="4" cy="12" r="1.4" fill="currentColor"/><circle cx="4" cy="18" r="1.4" fill="currentColor"/></svg>
         </button>
+        <button id="timeline-btn" class="icon-btn glass" type="button" title="Timeline" aria-label="Timeline">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7.5V12l3.2 2.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
         <button class="icon-btn glass" type="button" data-panel="settings" title="Settings" aria-label="Settings">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.8v3M12 18.2v3M21.2 12h-3M5.8 12h-3M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1M18.5 18.5l-2.1-2.1M7.6 7.6 5.5 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M10.2 3.2h3.6l.5 2.2a6.9 6.9 0 0 1 1.7 1l2.1-.8 1.8 3.1-1.6 1.5a7 7 0 0 1 0 1.9l1.6 1.5-1.8 3.1-2.1-.8a6.9 6.9 0 0 1-1.7 1l-.5 2.2h-3.6l-.5-2.2a6.9 6.9 0 0 1-1.7-1l-2.1.8-1.8-3.1 1.6-1.5a7 7 0 0 1 0-1.9L3.6 8.7l1.8-3.1 2.1.8a6.9 6.9 0 0 1 1.7-1Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
         </button>
     </nav>
 
@@ -90,7 +93,7 @@
         <p class="credits">Data: <a href="https://acartia.io" rel="noopener">Acartia cooperative</a>, incl. Orca Network and Whale Alert reports. Map © OpenStreetMap contributors.</p>
     </section>
 
-    <div class="time-bar glass">
+    <div class="time-bar glass" hidden>
         <button id="play-btn" type="button" aria-label="Play timeline">
             <svg class="ic-play" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5Z" fill="currentColor"/></svg>
             <svg class="ic-pause" viewBox="0 0 24 24"><path d="M7 5h3.5v14H7ZM13.5 5H17v14h-3.5Z" fill="currentColor"/></svg>

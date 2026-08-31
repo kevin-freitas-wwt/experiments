@@ -604,6 +604,31 @@
         document.getElementById( 'net-dot' ).classList.toggle( 'online', navigator.onLine );
     }
 
+    function measureTimeBar() {
+        var bar = document.querySelector( '.time-bar' );
+        if ( !bar.hidden ) {
+            document.documentElement.style.setProperty( '--timebar-h', bar.offsetHeight + 'px' );
+        }
+    }
+
+    function initTimeline() {
+        var btn = document.getElementById( 'timeline-btn' );
+        var bar = document.querySelector( '.time-bar' );
+        btn.addEventListener( 'click', function() {
+            bar.hidden = !bar.hidden;
+            btn.classList.toggle( 'open', !bar.hidden );
+            document.body.classList.toggle( 'timeline-open', !bar.hidden );
+            if ( bar.hidden ) {
+                if ( state.playing ) togglePlay();
+                document.getElementById( 'scrub' ).value = 100;
+                setPlayhead( 100 );
+            } else {
+                measureTimeBar();
+            }
+        } );
+        window.addEventListener( 'resize', measureTimeBar );
+    }
+
     function initPanels() {
         var buttons = document.querySelectorAll( '.icon-btn[data-panel]' );
         var panels = document.querySelectorAll( '.panel-glass[data-panel]' );
@@ -677,6 +702,7 @@
 
         buildChips();
         initPanels();
+        initTimeline();
         var trackBtn = document.getElementById( 'tracks-toggle' );
         trackBtn.classList.toggle( 'active', state.showTracks );
         trackBtn.addEventListener( 'click', function() {
