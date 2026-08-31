@@ -15,12 +15,12 @@
     var TILE_SEED_CAP = 320;
 
     var GROUPS = {
-        Orca: { color: '#5eead4', match: /orca|killer|srkw|biggs|transient/i },
-        Humpback: { color: '#7dd3fc', match: /humpback/i },
-        Gray: { color: '#c4b5fd', match: /gray|grey/i },
-        Minke: { color: '#fbbf24', match: /minke|fin whale|sei/i },
-        Porpoise: { color: '#fb7185', match: /porpoise|dolphin/i },
-        Other: { color: '#8aa2b8', match: /./ }
+        Orca: { color: '#0e8f81', match: /orca|killer|srkw|biggs|transient/i },
+        Humpback: { color: '#2f86d4', match: /humpback/i },
+        Gray: { color: '#7c5cd6', match: /gray|grey/i },
+        Minke: { color: '#d68f00', match: /minke|fin whale|sei/i },
+        Porpoise: { color: '#d64f6e', match: /porpoise|dolphin/i },
+        Other: { color: '#5b83a6', match: /./ }
     };
 
     var state = {
@@ -215,6 +215,7 @@
     function sync() {
         var btn = document.getElementById( 'sync-btn' );
         btn.disabled = true;
+        btn.classList.add( 'spinning' );
         setSyncLabel( 'Syncing…' );
         fetch( apiUrl() )
             .then( function( res ) {
@@ -247,6 +248,7 @@
             } )
             .then( function() {
                 btn.disabled = false;
+                btn.classList.remove( 'spinning' );
             } );
     }
 
@@ -345,7 +347,7 @@
 
     function pinIcon( color, dx, dy ) {
         var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">' +
-            '<circle cx="9" cy="9" r="6.5" fill="' + color + '" stroke="#0b1522" stroke-width="2"/></svg>';
+            '<circle cx="9" cy="9" r="6.5" fill="' + color + '" stroke="#ffffff" stroke-width="2.5"/></svg>';
         return L.divIcon( {
             className: 'pin',
             html: svg,
@@ -357,7 +359,7 @@
     function arrowIcon( color, deg ) {
         var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"' +
             ' style="transform:rotate(' + deg.toFixed( 0 ) + 'deg)">' +
-            '<path d="M8 1.5 L13 13 L8 10 L3 13 Z" fill="' + color + '" stroke="#0b1522" stroke-width="1"/></svg>';
+            '<path d="M8 1.5 L13 13 L8 10 L3 13 Z" fill="' + color + '" stroke="#ffffff" stroke-width="1.2"/></svg>';
         return L.divIcon( { className: 'pin', html: svg, iconSize: [16, 16], iconAnchor: [8, 8] } );
     }
 
@@ -538,11 +540,11 @@
         if ( state.playing ) {
             clearInterval( state.playing );
             state.playing = null;
-            btn.textContent = 'Play';
+            btn.classList.remove( 'playing' );
             return;
         }
         if ( Number( slider.value ) >= 100 ) slider.value = 0;
-        btn.textContent = 'Pause';
+        btn.classList.add( 'playing' );
         state.playing = setInterval( function() {
             var v = Number( slider.value ) + 1;
             slider.value = v;
@@ -602,6 +604,32 @@
         document.getElementById( 'net-dot' ).classList.toggle( 'online', navigator.onLine );
     }
 
+    function initPanels() {
+        var buttons = document.querySelectorAll( '.icon-btn[data-panel]' );
+        var panels = document.querySelectorAll( '.panel-glass[data-panel]' );
+        function close( name ) {
+            panels.forEach( function( p ) { if ( p.dataset.panel === name ) p.hidden = true; } );
+            buttons.forEach( function( b ) { if ( b.dataset.panel === name ) b.classList.remove( 'open' ); } );
+        }
+        buttons.forEach( function( btn ) {
+            btn.addEventListener( 'click', function() {
+                var name = btn.dataset.panel;
+                var opening = btn.classList.contains( 'open' ) === false;
+                panels.forEach( function( p ) { p.hidden = true; } );
+                buttons.forEach( function( b ) { b.classList.remove( 'open' ); } );
+                if ( opening ) {
+                    panels.forEach( function( p ) { if ( p.dataset.panel === name ) p.hidden = false; } );
+                    btn.classList.add( 'open' );
+                }
+            } );
+        } );
+        panels.forEach( function( p ) {
+            p.querySelector( '.close-btn' ).addEventListener( 'click', function() {
+                close( p.dataset.panel );
+            } );
+        } );
+    }
+
     function buildChips() {
         var wrap = document.getElementById( 'species-chips' );
         Object.keys( GROUPS ).forEach( function( g ) {
@@ -648,6 +676,7 @@
         } );
 
         buildChips();
+        initPanels();
         var trackBtn = document.getElementById( 'tracks-toggle' );
         trackBtn.classList.toggle( 'active', state.showTracks );
         trackBtn.addEventListener( 'click', function() {
