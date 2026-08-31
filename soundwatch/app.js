@@ -5,6 +5,7 @@
     var BOUNDS = { latMin: 46.9, latMax: 49.7, lngMin: -125.3, lngMax: -121.9 };
     var STORE_KEY = 'soundwatch.sightings';
     var SYNC_KEY = 'soundwatch.lastSync';
+    var PREFS_KEY = 'soundwatch.prefs';
     var MAX_RECORDS = 5000;
     var SYNC_INTERVAL = 5 * 60 * 1000;
     var TRACK_RULES = { maxGapMs: 12 * 3600000, maxKmh: 20, minSegKm: 0.15 };
@@ -30,6 +31,29 @@
     };
 
     Object.keys( GROUPS ).forEach( function( g ) { state.activeGroups[g] = true; } );
+
+    function loadPrefs() {
+        try {
+            var p = JSON.parse( localStorage.getItem( PREFS_KEY ) ) || {};
+            if ( p.activeGroups ) {
+                Object.keys( GROUPS ).forEach( function( g ) {
+                    if ( typeof p.activeGroups[g] === 'boolean' ) state.activeGroups[g] = p.activeGroups[g];
+                } );
+            }
+            if ( typeof p.rangeDays === 'number' ) state.rangeDays = p.rangeDays;
+            if ( typeof p.showTracks === 'boolean' ) state.showTracks = p.showTracks;
+        } catch ( e ) {}
+    }
+
+    function savePrefs() {
+        try {
+            localStorage.setItem( PREFS_KEY, JSON.stringify( {
+                activeGroups: state.activeGroups,
+                rangeDays: state.rangeDays,
+                showTracks: state.showTracks
+            } ) );
+        } catch ( e ) {}
+    }
 
     function loadStore() {
         try {
@@ -283,12 +307,13 @@
         var wrap = document.getElementById( 'species-chips' );
         Object.keys( GROUPS ).forEach( function( g ) {
             var chip = document.createElement( 'button' );
-            chip.className = 'chip active';
+            chip.className = state.activeGroups[g] ? 'chip active' : 'chip';
             chip.type = 'button';
             chip.innerHTML = '<span class="swatch" style="background:' + GROUPS[g].color + '"></span>' + g;
             chip.addEventListener( 'click', function() {
                 state.activeGroups[g] = !state.activeGroups[g];
                 chip.classList.toggle( 'active', state.activeGroups[g] );
+                savePrefs();
                 render();
             } );
             wrap.appendChild( chip );
@@ -300,6 +325,7 @@
     }
 
     function init() {
+        loadPrefs();
         state.map = L.map( 'map' ).setView( [48.1, -122.8], 8 );
         L.tileLayer( 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors',
@@ -310,11 +336,14 @@
 
         buildChips();
         var trackBtn = document.getElementById( 'tracks-toggle' );
+        trackBtn.classList.toggle( 'active', state.showTracks );
         trackBtn.addEventListener( 'click', function() {
             state.showTracks = !state.showTracks;
             trackBtn.classList.toggle( 'active', state.showTracks );
+            savePrefs();
             render();
         } );
+        document.getElementById( 'range' ).value = String( state.rangeDays );
         netStatus();
         refreshSyncLabel();
         render();
@@ -322,6 +351,7 @@
         document.getElementById( 'sync-btn' ).addEventListener( 'click', sync );
         document.getElementById( 'range' ).addEventListener( 'change', function( e ) {
             state.rangeDays = Number( e.target.value );
+            savePrefs();
             render();
         } );
         window.addEventListener( 'online', function() { netStatus(); sync(); } );
