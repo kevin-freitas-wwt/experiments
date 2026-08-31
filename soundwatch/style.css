@@ -471,7 +471,12 @@ select,
 }
 
 .leaflet-top.leaflet-left {
-    top: 4.6rem;
+    left: 0;
+    top: calc(2 * var(--edge) + var(--brand-h, 52px));
+}
+
+.leaflet-top.leaflet-left .leaflet-control {
+    margin: 0 0 0 var(--edge);
 }
 
 .leaflet-touch .leaflet-bar {
@@ -512,7 +517,4 @@ select,
         white-space: nowrap;
     }
 
-    .leaflet-top.leaflet-left {
-        top: 4.2rem;
-    }
 }

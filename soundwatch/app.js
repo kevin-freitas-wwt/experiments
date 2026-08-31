@@ -609,6 +609,8 @@
         if ( !bar.hidden ) {
             document.documentElement.style.setProperty( '--timebar-h', bar.offsetHeight + 'px' );
         }
+        document.documentElement.style.setProperty( '--brand-h',
+            document.querySelector( '.brand-card' ).offsetHeight + 'px' );
     }
 
     function initTimeline() {
@@ -703,6 +705,7 @@
         buildChips();
         initPanels();
         initTimeline();
+        measureTimeBar();
         var trackBtn = document.getElementById( 'tracks-toggle' );
         trackBtn.classList.toggle( 'active', state.showTracks );
         trackBtn.addEventListener( 'click', function() {
