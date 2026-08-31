@@ -258,6 +258,33 @@ main {
 }
 
 @media (max-width: 600px) {
+    .topbar {
+        flex-wrap: nowrap;
+    }
+
+    .brand {
+        min-width: 0;
+    }
+
+    .tagline {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .sync {
+        align-items: center;
+        display: grid;
+        flex-shrink: 0;
+        gap: 0.3rem 0.4rem;
+        grid-template-columns: auto auto;
+        justify-items: end;
+    }
+
+    #sync-btn {
+        grid-column: 1 / -1;
+    }
+
     .chips {
         -webkit-overflow-scrolling: touch;
         flex: 1 1 100%;
