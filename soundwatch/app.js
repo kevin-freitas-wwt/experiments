@@ -315,13 +315,26 @@
 
     /* ---------- rendering ---------- */
 
-    function visible() {
-        var end = state.playhead || Date.now();
+    function filtered() {
         var cutoff = state.rangeDays ? Date.now() - state.rangeDays * 86400000 : 0;
         return Object.keys( state.sightings )
             .map( function( id ) { return state.sightings[id]; } )
-            .filter( function( s ) { return s.ts >= cutoff && s.ts <= end && state.activeGroups[s.group]; } )
+            .filter( function( s ) { return s.ts >= cutoff && state.activeGroups[s.group]; } )
             .sort( function( a, b ) { return b.ts - a.ts; } );
+    }
+
+    function visible() {
+        var list = filtered();
+        if ( state.playhead ) {
+            list = list.filter( function( s ) { return s.ts <= state.playhead; } );
+        }
+        return list;
+    }
+
+    function timeDomain() {
+        var list = filtered();
+        if ( !list.length ) return null;
+        return { min: list[list.length - 1].ts, max: list[0].ts };
     }
 
     function pinIcon( color, dx, dy ) {
@@ -504,20 +517,12 @@
 
     /* ---------- time scrubber ---------- */
 
-    function windowStart() {
-        if ( state.rangeDays ) return Date.now() - state.rangeDays * 86400000;
-        var ids = Object.keys( state.sightings );
-        var min = Date.now();
-        ids.forEach( function( id ) { min = Math.min( min, state.sightings[id].ts ); } );
-        return min;
-    }
-
     function setPlayhead( pct ) {
-        var start = windowStart();
-        state.playhead = pct >= 100 ? null : start + ( Date.now() - start ) * pct / 100;
+        var d = timeDomain();
+        state.playhead = ( !d || pct >= 100 ) ? null : d.min + ( d.max - d.min ) * pct / 100;
         document.getElementById( 'scrub-label' ).textContent = state.playhead
-            ? new Date( state.playhead ).toLocaleString()
-            : 'Live';
+            ? 'Through ' + new Date( state.playhead ).toLocaleString()
+            : 'All sightings';
         render();
     }
 
