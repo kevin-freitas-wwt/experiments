@@ -1,0 +1,267 @@
+:root {
+    --accent: #5eead4;
+    --amber: #fbbf24;
+    --bg: #0b1522;
+    --border: #1d3048;
+    --card: #0e1e30;
+    --coral: #fb7185;
+    --ink: #e6edf5;
+    --muted: #8aa2b8;
+    --sky: #7dd3fc;
+    --violet: #c4b5fd;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+a {
+    color: var(--accent);
+}
+
+.topbar {
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: space-between;
+    padding: 0.9rem 1.25rem;
+}
+
+.brand {
+    align-items: center;
+    display: flex;
+    gap: 0.75rem;
+}
+
+.mark {
+    height: 40px;
+    width: 40px;
+}
+
+h1 {
+    font-size: 1.15rem;
+    font-weight: 650;
+    letter-spacing: 0.01em;
+}
+
+.tagline {
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+.sync {
+    align-items: center;
+    display: flex;
+    font-size: 0.8rem;
+    gap: 0.6rem;
+}
+
+.dot {
+    background: var(--coral);
+    border-radius: 50%;
+    display: inline-block;
+    height: 9px;
+    width: 9px;
+}
+
+.dot.online {
+    background: var(--accent);
+}
+
+#sync-label {
+    color: var(--muted);
+}
+
+#sync-btn {
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: #06281f;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 650;
+    padding: 0.45rem 0.9rem;
+}
+
+#sync-btn:disabled {
+    background: var(--border);
+    color: var(--muted);
+    cursor: wait;
+}
+
+main {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr;
+    margin: 0 auto;
+    max-width: 1200px;
+    padding: 1rem 1.25rem;
+}
+
+@media (min-width: 900px) {
+    main {
+        grid-template-columns: 3fr 2fr;
+    }
+}
+
+#map {
+    background: #0d2237;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    min-height: 340px;
+    height: clamp(340px, 62vh, 640px);
+}
+
+.panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.controls {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: space-between;
+}
+
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.chip {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 0.3rem 0.7rem;
+}
+
+.chip.active {
+    border-color: currentColor;
+    color: var(--ink);
+}
+
+.chip .swatch {
+    border-radius: 50%;
+    display: inline-block;
+    height: 8px;
+    margin-right: 0.35rem;
+    width: 8px;
+}
+
+#range {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--ink);
+    font-size: 0.8rem;
+    padding: 0.35rem 0.5rem;
+}
+
+.count-line {
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+.feed {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    list-style: none;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+}
+
+.feed li {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--muted);
+    border-radius: 10px;
+    cursor: pointer;
+    padding: 0.65rem 0.8rem;
+}
+
+.feed li:hover {
+    border-color: var(--accent);
+}
+
+.feed .row {
+    align-items: baseline;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: space-between;
+}
+
+.feed .species {
+    font-size: 0.9rem;
+    font-weight: 650;
+}
+
+.feed .when {
+    color: var(--muted);
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.feed .note {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-top: 0.2rem;
+    overflow-wrap: anywhere;
+}
+
+.empty {
+    color: var(--muted);
+    padding: 2rem 1rem;
+    text-align: center;
+}
+
+.empty svg {
+    height: 60px;
+    opacity: 0.5;
+    width: 120px;
+}
+
+footer {
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.75rem;
+    margin-top: 1rem;
+    padding: 1rem 1.25rem;
+}
+
+.pin {
+    background: transparent;
+    border: none;
+}
+
+.leaflet-container {
+    background: #0d2237;
+    font: inherit;
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+    background: var(--card);
+    color: var(--ink);
+}

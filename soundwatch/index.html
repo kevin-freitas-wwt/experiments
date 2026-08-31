@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sound Watch — Puget Sound Whale Sightings</title>
+    <meta name="description" content="Offline-capable map of recent whale sightings across the Salish Sea, from southern BC to Olympia. Data from the Acartia cooperative.">
+    <meta property="og:title" content="Sound Watch">
+    <meta property="og:description" content="Recent whale sightings across Puget Sound and the Salish Sea, on and offline.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="og-image.png">
+    <meta name="theme-color" content="#0b1522">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%230b1522'/%3E%3Cpath d='M7 21c4-9 10-13 18-13-2 3-3 5-3 8 0 2 1 4 3 5-3 1-6 0-8-2-2 3-6 4-10 2z' fill='%235eead4'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand">
+            <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+                <circle cx="16" cy="16" r="16" fill="#0e1e30"/>
+                <path d="M7 21c4-9 10-13 18-13-2 3-3 5-3 8 0 2 1 4 3 5-3 1-6 0-8-2-2 3-6 4-10 2z" fill="#5eead4"/>
+            </svg>
+            <div>
+                <h1>Sound Watch</h1>
+                <p class="tagline">Salish Sea whale sightings, on and offline</p>
+            </div>
+        </div>
+        <div class="sync">
+            <span id="net-dot" class="dot" title="Connection status"></span>
+            <span id="sync-label">Never synced</span>
+            <button id="sync-btn" type="button">Sync now</button>
+        </div>
+    </header>
+
+    <main>
+        <div id="map" role="application" aria-label="Sighting map"></div>
+
+        <section class="panel">
+            <div class="controls">
+                <div id="species-chips" class="chips" role="group" aria-label="Filter by species"></div>
+                <select id="range" aria-label="Time range">
+                    <option value="1">Last 24 hours</option>
+                    <option value="3">Last 3 days</option>
+                    <option value="7" selected>Last 7 days</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="0">All cached</option>
+                </select>
+            </div>
+            <p id="count-line" class="count-line"></p>
+            <ol id="feed" class="feed"></ol>
+            <div id="empty" class="empty" hidden>
+                <svg viewBox="0 0 120 60" aria-hidden="true">
+                    <path d="M10 45 C30 10 60 5 105 12 c-8 8-11 15-10 22 1 5 4 9 9 11-8 3-15 1-20-4-6 8-16 11-28 8-14-3-32-2-46 8z" fill="none" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <p>No sightings match. Widen the time range or sync while online.</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Data: <a href="https://acartia.io" rel="noopener">Acartia cooperative</a> (includes Orca Network and Whale Alert reports), CC-licensed community science. Map © OpenStreetMap contributors.</p>
+    </footer>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="app.js"></script>
+</body>
+</html>
