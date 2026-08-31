@@ -272,6 +272,10 @@ main {
         white-space: nowrap;
     }
 
+    .tagline-extra {
+        display: none;
+    }
+
     .sync {
         align-items: center;
         display: grid;
