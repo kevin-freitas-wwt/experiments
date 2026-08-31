@@ -30,6 +30,11 @@
         showTracks: true,
         showHeat: false,
         heatLayer: null,
+        showVps: true,
+        vpLayer: null,
+        deepSighting: null,
+        wakeLock: null,
+        watchTimer: null,
         alertKm: 0,
         token: '',
         playhead: null,
@@ -132,6 +137,7 @@
             if ( typeof p.rangeDays === 'number' || p.rangeDays === 'today' ) state.rangeDays = p.rangeDays;
             if ( typeof p.showTracks === 'boolean' ) state.showTracks = p.showTracks;
             if ( typeof p.showHeat === 'boolean' ) state.showHeat = p.showHeat;
+            if ( typeof p.showVps === 'boolean' ) state.showVps = p.showVps;
             if ( typeof p.alertKm === 'number' ) state.alertKm = p.alertKm;
             if ( typeof p.token === 'string' ) state.token = p.token;
             if ( p.mapView && isFinite( p.mapView.lat ) && isFinite( p.mapView.lng ) && isFinite( p.mapView.zoom ) ) {
@@ -147,6 +153,7 @@
                 rangeDays: state.rangeDays,
                 showTracks: state.showTracks,
                 showHeat: state.showHeat,
+                showVps: state.showVps,
                 alertKm: state.alertKm,
                 token: state.token,
                 mapView: state.mapView
@@ -471,8 +478,17 @@
             li.style.borderLeftColor = GROUPS[s.group].color;
             li.innerHTML = '<div class="row"><span class="species">' + esc( s.type ) +
                 ( s.count > 1 ? ' ×' + s.count : '' ) + '</span><span class="when">' + timeAgo( s.ts ) +
-                '</span></div>' + ( s.note ? '<p class="note">' + esc( s.note ) + '</p>' : '' ) +
+                '</span><button class="share-btn" type="button" title="Share" aria-label="Share">' +
+                '<svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.4" fill="none" stroke="currentColor" stroke-width="2"/>' +
+                '<circle cx="17.5" cy="5.5" r="2.4" fill="none" stroke="currentColor" stroke-width="2"/>' +
+                '<circle cx="17.5" cy="18.5" r="2.4" fill="none" stroke="currentColor" stroke-width="2"/>' +
+                '<path d="M8.2 10.9 15.3 6.7M8.2 13.1l7.1 4.2" stroke="currentColor" stroke-width="2"/></svg></button></div>' +
+                ( s.note ? '<p class="note">' + esc( s.note ) + '</p>' : '' ) +
                 ( s.via ? '<p class="via">via ' + esc( s.via ) + '</p>' : '' );
+            li.querySelector( '.share-btn' ).addEventListener( 'click', function( e ) {
+                e.stopPropagation();
+                shareSighting( s );
+            } );
             li.addEventListener( 'click', function() {
                 state.map.setView( [s.lat, s.lng], Math.max( state.map.getZoom(), 10 ) );
                 if ( m ) {
@@ -500,6 +516,195 @@
         document.getElementById( 'empty' ).hidden = list.length > 0;
         document.getElementById( 'count-line' ).textContent =
             list.length + ' sightings shown, ' + Object.keys( state.sightings ).length + ' cached locally';
+
+        if ( isPanelOpen( 'watch' ) ) renderWatch();
+        if ( isPanelOpen( 'stats' ) ) renderStats();
+    }
+
+    /* ---------- viewpoints ---------- */
+
+    function vpIcon() {
+        var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">' +
+            '<rect x="3" y="3" width="8" height="8" rx="2" transform="rotate(45 7 7)" fill="#123a5c" stroke="#ffffff" stroke-width="1.6"/></svg>';
+        return L.divIcon( { className: 'pin', html: svg, iconSize: [14, 14], iconAnchor: [7, 7] } );
+    }
+
+    function renderViewpoints() {
+        state.vpLayer.clearLayers();
+        if ( !state.showVps || !window.VIEWPOINTS ) return;
+        window.VIEWPOINTS.forEach( function( v ) {
+            L.marker( [v.lat, v.lng], { icon: vpIcon(), opacity: 0.85 } )
+                .bindPopup( '<strong>' + esc( v.n ) + '</strong><br>' + esc( v.r ) +
+                    '<br><a href="https://www.google.com/maps?q=' + v.lat + ',' + v.lng + '" rel="noopener">Directions</a>' )
+                .addTo( state.vpLayer );
+        } );
+    }
+
+    /* ---------- deep links + share ---------- */
+
+    function parseHash() {
+        var out = {};
+        var h = location.hash.replace( /^#/, '' );
+        h.split( '&' ).forEach( function( part ) {
+            var kv = part.split( '=' );
+            if ( kv[0] === 'v' ) {
+                var nums = decodeURIComponent( kv[1] || '' ).split( ',' ).map( Number );
+                if ( nums.length === 3 && nums.every( isFinite ) ) {
+                    out.view = { lat: nums[0], lng: nums[1], zoom: nums[2] };
+                }
+            }
+            if ( kv[0] === 's' ) out.sighting = decodeURIComponent( kv[1] || '' );
+        } );
+        return out;
+    }
+
+    function updateHash() {
+        var v = state.mapView;
+        if ( !v ) return;
+        history.replaceState( null, '',
+            '#v=' + v.lat.toFixed( 4 ) + ',' + v.lng.toFixed( 4 ) + ',' + v.zoom );
+    }
+
+    function shareSighting( s ) {
+        var url = location.origin + location.pathname +
+            '#v=' + s.lat.toFixed( 4 ) + ',' + s.lng.toFixed( 4 ) + ',11&s=' + encodeURIComponent( s.id );
+        var text = s.type + ( s.count > 1 ? ' ×' + s.count : '' ) + ' spotted ' + timeAgo( s.ts ) + ' in the Salish Sea';
+        if ( navigator.share ) {
+            navigator.share( { title: 'Sound Watch', text: text, url: url } ).catch( function() {} );
+        } else if ( navigator.clipboard ) {
+            navigator.clipboard.writeText( url );
+        }
+    }
+
+    function openDeepSighting() {
+        if ( !state.deepSighting ) return;
+        var s = state.sightings[state.deepSighting];
+        state.deepSighting = null;
+        if ( !s ) return;
+        state.map.setView( [s.lat, s.lng], Math.max( state.map.getZoom(), 11 ) );
+        var m = state.markers[s.id];
+        if ( m ) {
+            m.openPopup();
+            setHighlight( s.id );
+        }
+    }
+
+    /* ---------- watch mode ---------- */
+
+    function compass( deg ) {
+        var dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+        return dirs[Math.round( deg / 45 ) % 8];
+    }
+
+    function isPanelOpen( name ) {
+        var p = document.querySelector( '.panel-glass[data-panel="' + name + '"]' );
+        return p && !p.hidden;
+    }
+
+    function renderWatch() {
+        var body = document.getElementById( 'watch-body' );
+        var list = visible();
+        if ( !list.length ) {
+            body.innerHTML = '<p class="watch-none">No sightings in range. Keep watching.</p>';
+            return;
+        }
+        var s = list[0];
+        var whereBits = '';
+        if ( state.pos ) {
+            whereBits = ' · ' + distKm( state.pos, s ).toFixed( 1 ) + ' km ' + compass( bearingDeg( state.pos, s ) );
+        }
+        body.innerHTML =
+            '<p class="watch-when">' + timeAgo( s.ts ) + whereBits + '</p>' +
+            '<h3 class="watch-species" style="color:' + GROUPS[s.group].color + '">' + esc( s.type ) +
+            ( s.count > 1 ? ' ×' + s.count : '' ) + '</h3>' +
+            ( s.note ? '<p class="watch-note">' + esc( s.note ) + '</p>' : '' );
+    }
+
+    function acquireWakeLock() {
+        if ( !navigator.wakeLock ) return;
+        navigator.wakeLock.request( 'screen' ).then( function( lock ) {
+            state.wakeLock = lock;
+        } ).catch( function() {} );
+    }
+
+    function enterWatch() {
+        watchPosition();
+        renderWatch();
+        acquireWakeLock();
+        state.watchTimer = setInterval( function() {
+            if ( navigator.onLine ) sync();
+            renderWatch();
+        }, 60000 );
+    }
+
+    function exitWatch() {
+        clearInterval( state.watchTimer );
+        state.watchTimer = null;
+        if ( state.wakeLock ) {
+            state.wakeLock.release().catch( function() {} );
+            state.wakeLock = null;
+        }
+    }
+
+    /* ---------- stats ---------- */
+
+    function renderStats() {
+        var body = document.getElementById( 'stats-body' );
+        var cutoff = 0;
+        if ( state.rangeDays === 'today' ) cutoff = new Date().setHours( 0, 0, 0, 0 );
+        else if ( state.rangeDays ) cutoff = Date.now() - state.rangeDays * 86400000;
+
+        var days = [];
+        var dayIndex = {};
+        for ( var i = 13; i >= 0; i-- ) {
+            var d = new Date();
+            d.setHours( 0, 0, 0, 0 );
+            d.setDate( d.getDate() - i );
+            dayIndex[d.getTime()] = days.length;
+            days.push( 0 );
+        }
+        var groups = {};
+        var hours = new Array( 24 ).fill( 0 );
+        var inRange = 0;
+        Object.keys( state.sightings ).forEach( function( id ) {
+            var s = state.sightings[id];
+            var day = new Date( s.ts );
+            day.setHours( 0, 0, 0, 0 );
+            if ( dayIndex[day.getTime()] !== undefined ) days[dayIndex[day.getTime()]]++;
+            if ( s.ts >= cutoff ) {
+                inRange++;
+                groups[s.group] = ( groups[s.group] || 0 ) + 1;
+                hours[new Date( s.ts ).getHours()]++;
+            }
+        } );
+
+        var max = Math.max.apply( null, days.concat( [1] ) );
+        var bars = days.map( function( c, idx ) {
+            var h = Math.max( 2, Math.round( c / max * 40 ) );
+            return '<rect x="' + ( idx * 20 + 3 ) + '" y="' + ( 44 - h ) + '" width="14" height="' + h +
+                '" rx="3" fill="' + ( idx === 13 ? '#16b8a6' : '#9fc4e4' ) + '"/>';
+        } ).join( '' );
+
+        var groupRows = Object.keys( groups ).sort( function( a, b ) { return groups[b] - groups[a]; } )
+            .map( function( g ) {
+                var pct = Math.round( groups[g] / inRange * 100 );
+                return '<div class="stat-row"><span>' + g + '</span>' +
+                    '<span class="stat-bar"><span style="background:' + GROUPS[g].color + ';width:' + pct + '%"></span></span>' +
+                    '<span class="stat-n">' + groups[g] + '</span></div>';
+            } ).join( '' );
+
+        var peak = hours.indexOf( Math.max.apply( null, hours ) );
+        var peakLabel = inRange
+            ? 'Most reports ' + ( peak % 12 || 12 ) + ( peak < 12 ? ' am' : ' pm' ) + ' to ' +
+                ( ( peak + 1 ) % 12 || 12 ) + ( peak + 1 < 12 || peak + 1 === 24 ? ' am' : ' pm' )
+            : 'No reports in this range yet';
+
+        body.innerHTML =
+            '<p class="stat-label">Sightings per day, last 14 days</p>' +
+            '<svg class="spark" viewBox="0 0 283 46">' + bars + '</svg>' +
+            '<p class="stat-label">Species mix in selected range (' + inRange + ')</p>' +
+            groupRows +
+            '<p class="stat-peak">' + peakLabel + '</p>';
     }
 
     /* ---------- alerts ---------- */
@@ -650,29 +855,39 @@
         window.addEventListener( 'resize', measureTimeBar );
     }
 
+    function panelChanged( name, open ) {
+        if ( name === 'watch' ) {
+            if ( open ) enterWatch();
+            else exitWatch();
+        }
+        if ( name === 'stats' && open ) renderStats();
+    }
+
     function initPanels() {
         var buttons = document.querySelectorAll( '.icon-btn[data-panel]' );
         var panels = document.querySelectorAll( '.panel-glass[data-panel]' );
-        function close( name ) {
-            panels.forEach( function( p ) { if ( p.dataset.panel === name ) p.hidden = true; } );
-            buttons.forEach( function( b ) { if ( b.dataset.panel === name ) b.classList.remove( 'open' ); } );
+        var current = null;
+        function closeAll() {
+            panels.forEach( function( p ) { p.hidden = true; } );
+            buttons.forEach( function( b ) { b.classList.remove( 'open' ); } );
+            if ( current ) panelChanged( current, false );
+            current = null;
         }
         buttons.forEach( function( btn ) {
             btn.addEventListener( 'click', function() {
                 var name = btn.dataset.panel;
-                var opening = btn.classList.contains( 'open' ) === false;
-                panels.forEach( function( p ) { p.hidden = true; } );
-                buttons.forEach( function( b ) { b.classList.remove( 'open' ); } );
+                var opening = current !== name;
+                closeAll();
                 if ( opening ) {
                     panels.forEach( function( p ) { if ( p.dataset.panel === name ) p.hidden = false; } );
                     btn.classList.add( 'open' );
+                    current = name;
+                    panelChanged( name, true );
                 }
             } );
         } );
         panels.forEach( function( p ) {
-            p.querySelector( '.close-btn' ).addEventListener( 'click', function() {
-                close( p.dataset.panel );
-            } );
+            p.querySelector( '.close-btn' ).addEventListener( 'click', closeAll );
         } );
     }
 
@@ -695,12 +910,15 @@
 
     function init() {
         loadPrefs();
-        var v = state.mapView || { lat: 48.1, lng: -122.8, zoom: 8 };
+        var deep = parseHash();
+        if ( deep.sighting ) state.deepSighting = deep.sighting;
+        var v = deep.view || state.mapView || { lat: 48.1, lng: -122.8, zoom: 8 };
         state.map = L.map( 'map' ).setView( [v.lat, v.lng], v.zoom );
         state.map.on( 'moveend', function() {
             var c = state.map.getCenter();
             state.mapView = { lat: c.lat, lng: c.lng, zoom: state.map.getZoom() };
             savePrefs();
+            updateHash();
         } );
         L.tileLayer( 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors',
@@ -709,6 +927,8 @@
         } ).addTo( state.map );
         state.trackLayer = L.layerGroup().addTo( state.map );
         state.layer = L.layerGroup().addTo( state.map );
+        state.vpLayer = L.layerGroup().addTo( state.map );
+        renderViewpoints();
 
         var pendingClear;
         state.map.on( 'popupclose', function() {
@@ -732,6 +952,14 @@
             trackBtn.classList.toggle( 'active', state.showTracks );
             savePrefs();
             render();
+        } );
+        var vpBtn = document.getElementById( 'vp-toggle' );
+        vpBtn.classList.toggle( 'active', state.showVps );
+        vpBtn.addEventListener( 'click', function() {
+            state.showVps = !state.showVps;
+            vpBtn.classList.toggle( 'active', state.showVps );
+            savePrefs();
+            renderViewpoints();
         } );
         var heatBtn = document.getElementById( 'heat-toggle' );
         heatBtn.classList.toggle( 'active', state.showHeat );
@@ -776,6 +1004,9 @@
             navigator.storage.persist();
         }
         if ( state.alertKm > 0 ) watchPosition();
+        document.addEventListener( 'visibilitychange', function() {
+            if ( document.visibilityState === 'visible' && isPanelOpen( 'watch' ) ) acquireWakeLock();
+        } );
 
         idbOpen().then( function( d ) {
             db = d;
@@ -784,6 +1015,7 @@
             state.sightings = all;
             migrateLegacy();
             render();
+            openDeepSighting();
             if ( navigator.onLine ) sync();
         } ).catch( function() {
             render();

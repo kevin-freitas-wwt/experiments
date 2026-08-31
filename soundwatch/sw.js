@@ -1,4 +1,4 @@
-var SHELL_CACHE = 'soundwatch-shell-v20';
+var SHELL_CACHE = 'soundwatch-shell-v21';
 var TILE_CACHE = 'soundwatch-tiles-v1';
 var TILE_LIMIT = 500;
 
@@ -7,6 +7,7 @@ var SHELL = [
     'index.html',
     'style.css',
     'app.js',
+    'viewpoints.js',
     'manifest.webmanifest',
     'og-image.png',
     'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',

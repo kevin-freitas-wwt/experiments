@@ -316,6 +316,121 @@ select,
     margin-top: 0.1rem;
 }
 
+.share-btn {
+    align-items: center;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    display: inline-flex;
+    flex-shrink: 0;
+    height: 18px;
+    padding: 0;
+    width: 18px;
+}
+
+.share-btn svg {
+    height: 13px;
+    width: 13px;
+}
+
+.share-btn:hover {
+    color: var(--ink);
+}
+
+/* ---------- watch mode ---------- */
+
+.watch-when {
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.watch-species {
+    font-size: 1.7rem;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.watch-note {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-top: 0.3rem;
+    overflow-wrap: anywhere;
+}
+
+.watch-none {
+    color: var(--muted);
+    font-size: 0.85rem;
+    padding: 0.5rem 0;
+}
+
+.watch-meta {
+    border-top: 1px solid rgba(18, 58, 92, 0.12);
+    color: var(--muted);
+    font-size: 0.65rem;
+    padding-top: 0.5rem;
+}
+
+/* ---------- stats ---------- */
+
+.stat-label {
+    color: var(--muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin-top: 0.5rem;
+    text-transform: uppercase;
+}
+
+.spark {
+    display: block;
+    margin-top: 0.3rem;
+    width: 100%;
+}
+
+.stat-row {
+    align-items: center;
+    display: flex;
+    font-size: 0.75rem;
+    font-weight: 700;
+    gap: 0.5rem;
+    margin-top: 0.35rem;
+}
+
+.stat-row > span:first-child {
+    flex-shrink: 0;
+    width: 5.2rem;
+}
+
+.stat-bar {
+    background: rgba(18, 58, 92, 0.1);
+    border-radius: 999px;
+    flex: 1;
+    height: 8px;
+    overflow: hidden;
+}
+
+.stat-bar span {
+    border-radius: 999px;
+    display: block;
+    height: 100%;
+}
+
+.stat-n {
+    color: var(--muted);
+    flex-shrink: 0;
+    min-width: 2ch;
+    text-align: right;
+}
+
+.stat-peak {
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-top: 0.6rem;
+}
+
 .empty {
     color: var(--muted);
     padding: 1.5rem 1rem;

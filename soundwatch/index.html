@@ -38,6 +38,12 @@
         <button class="icon-btn glass" type="button" data-panel="feed" title="Sightings list" aria-label="Sightings list">
             <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="4" cy="6" r="1.4" fill="currentColor"/><circle cx="4" cy="12" r="1.4" fill="currentColor"/><circle cx="4" cy="18" r="1.4" fill="currentColor"/></svg>
         </button>
+        <button class="icon-btn glass" type="button" data-panel="stats" title="Stats" aria-label="Stats">
+            <svg viewBox="0 0 24 24"><path d="M5 20V12M12 20V4M19 20v-6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </button>
+        <button class="icon-btn glass" type="button" data-panel="watch" title="Watch mode" aria-label="Watch mode">
+            <svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
         <button id="timeline-btn" class="icon-btn glass" type="button" title="Timeline" aria-label="Timeline">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7.5V12l3.2 2.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
@@ -52,6 +58,7 @@
         <div class="filter-row">
             <button id="tracks-toggle" class="chip active" type="button" title="Connect ID'd sightings with direction of travel">Tracks</button>
             <button id="heat-toggle" class="chip" type="button" title="Show sighting density instead of dots">Heatmap</button>
+            <button id="vp-toggle" class="chip active" type="button" title="Public shore viewing spots">Viewpoints</button>
             <select id="range" aria-label="Time range">
                 <option value="today">Today</option>
                 <option value="1">Last 24 hours</option>
@@ -73,6 +80,17 @@
             </svg>
             <p>No sightings match. Widen the time range or sync while online.</p>
         </div>
+    </section>
+
+    <section class="panel-glass glass" data-panel="stats" hidden aria-label="Stats">
+        <header><h2>Stats</h2><button class="close-btn" type="button" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></header>
+        <div id="stats-body"></div>
+    </section>
+
+    <section class="panel-glass glass" data-panel="watch" hidden aria-label="Watch mode">
+        <header><h2>Watch mode</h2><button class="close-btn" type="button" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></header>
+        <div id="watch-body"></div>
+        <p class="watch-meta">Syncing every minute · screen kept awake</p>
     </section>
 
     <section class="panel-glass glass" data-panel="settings" hidden aria-label="Settings">
@@ -102,6 +120,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" crossorigin=""></script>
+    <script src="viewpoints.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
