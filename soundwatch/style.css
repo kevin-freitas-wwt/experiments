@@ -124,12 +124,29 @@ h1 {
     color: #dff0ff;
 }
 
-.icon-btn:disabled {
+#sync-btn {
+    align-items: center;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    display: inline-flex;
+    height: 16px;
+    padding: 0;
+    width: 16px;
+}
+
+#sync-btn svg {
+    height: 12px;
+    width: 12px;
+}
+
+#sync-btn:disabled {
     cursor: wait;
     opacity: 0.6;
 }
 
-.icon-btn.spinning svg {
+#sync-btn.spinning svg {
     animation: spin 1s linear infinite;
 }
 
