@@ -182,6 +182,80 @@ main {
     font-size: 0.8rem;
 }
 
+.map-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.scrubber {
+    align-items: center;
+    display: flex;
+    font-size: 0.75rem;
+    gap: 0.6rem;
+}
+
+.scrubber input {
+    accent-color: var(--accent);
+    flex: 1;
+}
+
+#play-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--ink);
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 0.3rem 0.7rem;
+}
+
+#scrub-label {
+    color: var(--muted);
+    min-width: 8ch;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.settings {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.8rem;
+    padding: 0.5rem 0.8rem;
+}
+
+.settings summary {
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.settings label {
+    color: var(--muted);
+    display: block;
+    margin-top: 0.6rem;
+}
+
+.settings input,
+.settings select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--ink);
+    display: block;
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+    padding: 0.35rem 0.5rem;
+    width: 100%;
+}
+
+.feed .via {
+    color: var(--muted);
+    font-size: 0.7rem;
+    font-style: italic;
+    margin-top: 0.15rem;
+}
+
 .feed {
     display: flex;
     flex-direction: column;

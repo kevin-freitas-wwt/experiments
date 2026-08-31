@@ -1,4 +1,4 @@
-var SHELL_CACHE = 'soundwatch-shell-v7';
+var SHELL_CACHE = 'soundwatch-shell-v8';
 var TILE_CACHE = 'soundwatch-tiles-v1';
 var TILE_LIMIT = 500;
 
@@ -59,7 +59,7 @@ self.addEventListener( 'fetch', function( e ) {
             caches.open( TILE_CACHE ).then( function( cache ) {
                 return cache.match( e.request ).then( function( hit ) {
                     var net = fetch( e.request ).then( function( res ) {
-                        if ( res.ok ) {
+                        if ( res.ok || res.type === 'opaque' ) {
                             cache.put( e.request, res.clone() );
                             trimCache( TILE_CACHE, TILE_LIMIT );
                         }

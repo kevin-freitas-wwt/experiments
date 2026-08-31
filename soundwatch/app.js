@@ -1,14 +1,18 @@
 (function() {
     'use strict';
 
-    var API = 'https://acartia.io/api/v1/sightings/current';
+    var API_CURRENT = 'https://acartia.io/api/v1/sightings/current';
+    var API_TRUSTED = 'https://acartia.io/api/v1/sightings/trusted';
     var BOUNDS = { latMin: 46.9, latMax: 49.7, lngMin: -125.3, lngMax: -121.9 };
-    var STORE_KEY = 'soundwatch.sightings';
     var SYNC_KEY = 'soundwatch.lastSync';
     var PREFS_KEY = 'soundwatch.prefs';
-    var MAX_RECORDS = 5000;
+    var LEGACY_KEY = 'soundwatch.sightings';
+    var SEED_KEY = 'soundwatch.tilesSeeded.v1';
+    var MAX_RECORDS = 20000;
     var SYNC_INTERVAL = 5 * 60 * 1000;
     var TRACK_RULES = { maxGapMs: 12 * 3600000, maxKmh: 20, minSegKm: 0.15 };
+    var TILE_ZOOMS = [7, 8, 9, 10];
+    var TILE_SEED_CAP = 320;
 
     var GROUPS = {
         Orca: { color: '#5eead4', match: /orca|killer|srkw|biggs|transient/i },
@@ -20,10 +24,16 @@
     };
 
     var state = {
-        sightings: loadStore(),
+        sightings: {},
         activeGroups: {},
         rangeDays: 7,
         showTracks: true,
+        alertKm: 0,
+        token: '',
+        playhead: null,
+        playing: null,
+        pos: null,
+        posMarker: null,
         map: null,
         layer: null,
         trackLayer: null,
@@ -35,6 +45,80 @@
 
     Object.keys( GROUPS ).forEach( function( g ) { state.activeGroups[g] = true; } );
 
+    /* ---------- storage ---------- */
+
+    var db = null;
+
+    function idbOpen() {
+        return new Promise( function( resolve, reject ) {
+            var req = indexedDB.open( 'soundwatch', 1 );
+            req.onupgradeneeded = function() {
+                req.result.createObjectStore( 'sightings', { keyPath: 'id' } );
+            };
+            req.onsuccess = function() { resolve( req.result ); };
+            req.onerror = function() { reject( req.error ); };
+        } );
+    }
+
+    function idbAll() {
+        return new Promise( function( resolve ) {
+            var out = {};
+            var tx = db.transaction( 'sightings', 'readonly' );
+            tx.objectStore( 'sightings' ).openCursor().onsuccess = function( e ) {
+                var cur = e.target.result;
+                if ( cur ) {
+                    out[cur.value.id] = cur.value;
+                    cur.continue();
+                } else {
+                    resolve( out );
+                }
+            };
+            tx.onerror = function() { resolve( out ); };
+        } );
+    }
+
+    function idbPutMany( items ) {
+        return new Promise( function( resolve ) {
+            var tx = db.transaction( 'sightings', 'readwrite' );
+            var store = tx.objectStore( 'sightings' );
+            items.forEach( function( s ) { store.put( s ); } );
+            tx.oncomplete = resolve;
+            tx.onerror = resolve;
+        } );
+    }
+
+    function idbDeleteMany( ids ) {
+        return new Promise( function( resolve ) {
+            var tx = db.transaction( 'sightings', 'readwrite' );
+            var store = tx.objectStore( 'sightings' );
+            ids.forEach( function( id ) { store.delete( id ); } );
+            tx.oncomplete = resolve;
+            tx.onerror = resolve;
+        } );
+    }
+
+    function prune() {
+        var ids = Object.keys( state.sightings );
+        if ( ids.length <= MAX_RECORDS ) return;
+        ids.sort( function( a, b ) { return state.sightings[a].ts - state.sightings[b].ts; } );
+        var drop = ids.slice( 0, ids.length - MAX_RECORDS );
+        drop.forEach( function( id ) { delete state.sightings[id]; } );
+        idbDeleteMany( drop );
+    }
+
+    function migrateLegacy() {
+        try {
+            var old = JSON.parse( localStorage.getItem( LEGACY_KEY ) );
+            if ( old ) {
+                var items = Object.keys( old ).map( function( id ) { return old[id]; } );
+                items.forEach( function( s ) { state.sightings[s.id] = s; } );
+                idbPutMany( items ).then( function() {
+                    localStorage.removeItem( LEGACY_KEY );
+                } );
+            }
+        } catch ( e ) {}
+    }
+
     function loadPrefs() {
         try {
             var p = JSON.parse( localStorage.getItem( PREFS_KEY ) ) || {};
@@ -45,6 +129,8 @@
             }
             if ( typeof p.rangeDays === 'number' ) state.rangeDays = p.rangeDays;
             if ( typeof p.showTracks === 'boolean' ) state.showTracks = p.showTracks;
+            if ( typeof p.alertKm === 'number' ) state.alertKm = p.alertKm;
+            if ( typeof p.token === 'string' ) state.token = p.token;
         } catch ( e ) {}
     }
 
@@ -53,31 +139,14 @@
             localStorage.setItem( PREFS_KEY, JSON.stringify( {
                 activeGroups: state.activeGroups,
                 rangeDays: state.rangeDays,
-                showTracks: state.showTracks
+                showTracks: state.showTracks,
+                alertKm: state.alertKm,
+                token: state.token
             } ) );
         } catch ( e ) {}
     }
 
-    function loadStore() {
-        try {
-            return JSON.parse( localStorage.getItem( STORE_KEY ) ) || {};
-        } catch ( e ) {
-            return {};
-        }
-    }
-
-    function saveStore() {
-        var ids = Object.keys( state.sightings );
-        if ( ids.length > MAX_RECORDS ) {
-            ids.sort( function( a, b ) { return state.sightings[a].ts - state.sightings[b].ts; } );
-            ids.slice( 0, ids.length - MAX_RECORDS ).forEach( function( id ) { delete state.sightings[id]; } );
-        }
-        try {
-            localStorage.setItem( STORE_KEY, JSON.stringify( state.sightings ) );
-        } catch ( e ) {
-            console.warn( 'Storage full, could not persist', e );
-        }
-    }
+    /* ---------- parsing ---------- */
 
     function groupOf( type, comments ) {
         var hay = String( type || '' ) + ' ' + String( comments || '' );
@@ -103,49 +172,71 @@
         return null;
     }
 
+    function extractVia( note ) {
+        var m = String( note || '' ).match( /^\s*\[([^\]]{2,40})\]/ );
+        return m ? m[1] : null;
+    }
+
     function normalize( raw ) {
         var lat = Number( raw.latitude );
         var lng = Number( raw.longitude );
         var ts = Date.parse( String( raw.created || '' ).replace( ' ', 'T' ) + 'Z' );
         if ( !isFinite( lat ) || !isFinite( lng ) || !isFinite( ts ) ) return null;
         if ( lat < BOUNDS.latMin || lat > BOUNDS.latMax || lng < BOUNDS.lngMin || lng > BOUNDS.lngMax ) return null;
+        var rawNote = String( raw.data_source_comments || '' ).slice( 0, 400 );
         return {
             id: raw.entry_id || raw.ssemmi_id,
             ts: ts,
             lat: lat,
             lng: lng,
             type: raw.type || 'Unspecified',
-            group: groupOf( raw.type, raw.data_source_comments ),
-            tag: extractTag( raw.type, raw.data_source_comments ),
+            group: groupOf( raw.type, rawNote ),
+            tag: extractTag( raw.type, rawNote ),
+            via: extractVia( rawNote ),
             count: Number( raw.no_sighted ) || 1,
-            note: String( raw.data_source_comments || '' ).slice( 0, 400 ),
+            note: rawNote.replace( /^\s*\[[^\]]*\]\s*/, '' ),
             source: raw.data_source_entity || raw.data_source_name || 'Unknown',
             trusted: raw.trusted === 1
         };
+    }
+
+    /* ---------- sync ---------- */
+
+    function apiUrl() {
+        return state.token
+            ? API_TRUSTED + '?access_token=' + encodeURIComponent( state.token )
+            : API_CURRENT;
     }
 
     function sync() {
         var btn = document.getElementById( 'sync-btn' );
         btn.disabled = true;
         setSyncLabel( 'Syncing…' );
-        fetch( API )
+        fetch( apiUrl() )
             .then( function( res ) {
+                if ( res.status === 401 && state.token ) {
+                    setSyncLabel( 'Token rejected, using public feed' );
+                    return fetch( API_CURRENT ).then( function( r ) { return r.json(); } );
+                }
                 if ( !res.ok ) throw new Error( 'HTTP ' + res.status );
                 return res.json();
             } )
             .then( function( rows ) {
-                var added = 0;
+                var fresh = [];
                 ( rows || [] ).forEach( function( raw ) {
                     var s = normalize( raw );
                     if ( s && s.id ) {
-                        if ( !state.sightings[s.id] ) added++;
+                        if ( !state.sightings[s.id] ) fresh.push( s );
                         state.sightings[s.id] = s;
                     }
                 } );
-                saveStore();
+                idbPutMany( fresh );
+                prune();
                 localStorage.setItem( SYNC_KEY, String( Date.now() ) );
                 render();
-                setSyncLabel( 'Synced ' + timeAgo( Date.now() ) + ( added ? ', +' + added + ' new' : '' ) );
+                setSyncLabel( 'Synced ' + timeAgo( Date.now() ) + ( fresh.length ? ', +' + fresh.length + ' new' : '' ) );
+                notifyNearby( fresh );
+                seedTiles();
             } )
             .catch( function( err ) {
                 setSyncLabel( navigator.onLine ? 'Sync failed: ' + err.message : 'Offline, showing cached data' );
@@ -172,13 +263,7 @@
         return Math.floor( s / 86400 ) + 'd ago';
     }
 
-    function visible() {
-        var cutoff = state.rangeDays ? Date.now() - state.rangeDays * 86400000 : 0;
-        return Object.keys( state.sightings )
-            .map( function( id ) { return state.sightings[id]; } )
-            .filter( function( s ) { return s.ts >= cutoff && state.activeGroups[s.group]; } )
-            .sort( function( a, b ) { return b.ts - a.ts; } );
-    }
+    /* ---------- geometry ---------- */
 
     function distKm( a, b ) {
         var rad = Math.PI / 180;
@@ -199,17 +284,18 @@
         return ( Math.atan2( y, x ) * 180 / Math.PI + 360 ) % 360;
     }
 
+    /* ---------- tracks (ID-tagged animals only) ---------- */
+
     function buildTracks( list ) {
-        var byKey = {};
+        var byTag = {};
         list.forEach( function( s ) {
-            var key = s.tag || ( s.group !== 'Other' ? s.group : null );
-            if ( !key ) return;
-            ( byKey[key] = byKey[key] || [] ).push( s );
+            if ( !s.tag ) return;
+            ( byTag[s.tag] = byTag[s.tag] || [] ).push( s );
         } );
 
         var tracks = [];
-        Object.keys( byKey ).forEach( function( key ) {
-            var pts = byKey[key].slice().sort( function( a, b ) { return a.ts - b.ts; } );
+        Object.keys( byTag ).forEach( function( tag ) {
+            var pts = byTag[tag].slice().sort( function( a, b ) { return a.ts - b.ts; } );
             var run = [pts[0]];
             for ( var i = 1; i < pts.length; i++ ) {
                 var prev = run[run.length - 1];
@@ -218,13 +304,35 @@
                 if ( gapH <= TRACK_RULES.maxGapMs / 3600000 && ( gapH === 0 || km / gapH <= TRACK_RULES.maxKmh ) ) {
                     if ( km >= TRACK_RULES.minSegKm ) run.push( pts[i] );
                 } else {
-                    if ( run.length > 1 ) tracks.push( { key: key, pts: run, group: run[0].group } );
+                    if ( run.length > 1 ) tracks.push( { key: tag, pts: run, group: run[0].group } );
                     run = [pts[i]];
                 }
             }
-            if ( run.length > 1 ) tracks.push( { key: key, pts: run, group: run[0].group } );
+            if ( run.length > 1 ) tracks.push( { key: tag, pts: run, group: run[0].group } );
         } );
         return tracks;
+    }
+
+    /* ---------- rendering ---------- */
+
+    function visible() {
+        var end = state.playhead || Date.now();
+        var cutoff = state.rangeDays ? Date.now() - state.rangeDays * 86400000 : 0;
+        return Object.keys( state.sightings )
+            .map( function( id ) { return state.sightings[id]; } )
+            .filter( function( s ) { return s.ts >= cutoff && s.ts <= end && state.activeGroups[s.group]; } )
+            .sort( function( a, b ) { return b.ts - a.ts; } );
+    }
+
+    function pinIcon( color, dx, dy ) {
+        var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">' +
+            '<circle cx="9" cy="9" r="6.5" fill="' + color + '" stroke="#0b1522" stroke-width="2"/></svg>';
+        return L.divIcon( {
+            className: 'pin',
+            html: svg,
+            iconSize: [18, 18],
+            iconAnchor: [9 - ( dx || 0 ), 9 - ( dy || 0 )]
+        } );
     }
 
     function arrowIcon( color, deg ) {
@@ -232,6 +340,30 @@
             ' style="transform:rotate(' + deg.toFixed( 0 ) + 'deg)">' +
             '<path d="M8 1.5 L13 13 L8 10 L3 13 Z" fill="' + color + '" stroke="#0b1522" stroke-width="1"/></svg>';
         return L.divIcon( { className: 'pin', html: svg, iconSize: [16, 16], iconAnchor: [8, 8] } );
+    }
+
+    function spiralOffsets( list ) {
+        var cells = {};
+        var offsets = {};
+        list.forEach( function( s ) {
+            var cell = s.lat.toFixed( 3 ) + ',' + s.lng.toFixed( 3 );
+            var i = cells[cell] = ( cells[cell] || 0 );
+            cells[cell]++;
+            if ( i === 0 ) {
+                offsets[s.id] = [0, 0];
+            } else {
+                var a = i * 2.4;
+                var r = 7 + 3.5 * Math.sqrt( i );
+                offsets[s.id] = [Math.round( r * Math.cos( a ) ), Math.round( r * Math.sin( a ) )];
+            }
+        } );
+        return offsets;
+    }
+
+    function esc( text ) {
+        var div = document.createElement( 'div' );
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     function renderTracks( tracks ) {
@@ -280,18 +412,6 @@
         applyHighlight();
     }
 
-    function pinIcon( color ) {
-        var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">' +
-            '<circle cx="9" cy="9" r="6.5" fill="' + color + '" stroke="#0b1522" stroke-width="2"/></svg>';
-        return L.divIcon( { className: 'pin', html: svg, iconSize: [18, 18], iconAnchor: [9, 9] } );
-    }
-
-    function esc( text ) {
-        var div = document.createElement( 'div' );
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
     function render() {
         var list = visible();
         var feed = document.getElementById( 'feed' );
@@ -307,10 +427,14 @@
             t.pts.forEach( function( p ) { state.trackOf[p.id] = idx; } );
         } );
 
+        var offsets = spiralOffsets( list );
+
         list.forEach( function( s ) {
-            var m = L.marker( [s.lat, s.lng], { icon: pinIcon( GROUPS[s.group].color ) } )
+            var off = offsets[s.id] || [0, 0];
+            var viaLine = s.via ? '<br><em>via ' + esc( s.via ) + '</em>' : '';
+            var m = L.marker( [s.lat, s.lng], { icon: pinIcon( GROUPS[s.group].color, off[0], off[1] ) } )
                 .bindPopup( '<strong>' + esc( s.type ) + '</strong> ×' + s.count + '<br>' +
-                    new Date( s.ts ).toLocaleString() + ( s.note ? '<br>' + esc( s.note ) : '' ) );
+                    new Date( s.ts ).toLocaleString() + ( s.note ? '<br>' + esc( s.note ) : '' ) + viaLine );
             m.on( 'click', function() { setHighlight( s.id ); } );
             state.layer.addLayer( m );
             state.markers[s.id] = m;
@@ -319,7 +443,8 @@
             li.style.borderLeftColor = GROUPS[s.group].color;
             li.innerHTML = '<div class="row"><span class="species">' + esc( s.type ) +
                 ( s.count > 1 ? ' ×' + s.count : '' ) + '</span><span class="when">' + timeAgo( s.ts ) +
-                '</span></div>' + ( s.note ? '<p class="note">' + esc( s.note ) + '</p>' : '' );
+                '</span></div>' + ( s.note ? '<p class="note">' + esc( s.note ) + '</p>' : '' ) +
+                ( s.via ? '<p class="via">via ' + esc( s.via ) + '</p>' : '' );
             li.addEventListener( 'click', function() {
                 state.map.setView( [s.lat, s.lng], Math.max( state.map.getZoom(), 10 ) );
                 m.openPopup();
@@ -335,6 +460,135 @@
         document.getElementById( 'empty' ).hidden = list.length > 0;
         document.getElementById( 'count-line' ).textContent =
             list.length + ' sightings shown, ' + Object.keys( state.sightings ).length + ' cached locally';
+    }
+
+    /* ---------- alerts ---------- */
+
+    function watchPosition() {
+        if ( !navigator.geolocation ) return;
+        navigator.geolocation.watchPosition( function( p ) {
+            state.pos = { lat: p.coords.latitude, lng: p.coords.longitude };
+            if ( state.posMarker ) {
+                state.posMarker.setLatLng( [state.pos.lat, state.pos.lng] );
+            } else {
+                state.posMarker = L.circleMarker( [state.pos.lat, state.pos.lng], {
+                    color: '#0b1522', fillColor: '#ffffff', fillOpacity: 1, radius: 6, weight: 2
+                } ).bindTooltip( 'You are here' ).addTo( state.map );
+            }
+        }, function() {}, { enableHighAccuracy: false, maximumAge: 60000 } );
+    }
+
+    function notifyNearby( fresh ) {
+        if ( !state.alertKm || !state.pos || !fresh.length ) return;
+        if ( !( 'Notification' in window ) || Notification.permission !== 'granted' ) return;
+        var near = fresh.filter( function( s ) {
+            return distKm( state.pos, s ) <= state.alertKm;
+        } ).sort( function( a, b ) { return distKm( state.pos, a ) - distKm( state.pos, b ); } );
+        if ( !near.length ) return;
+        var top = near[0];
+        var body = top.type + ' ' + distKm( state.pos, top ).toFixed( 1 ) + ' km away' +
+            ( near.length > 1 ? ', +' + ( near.length - 1 ) + ' more nearby' : '' );
+        new Notification( 'Whale sighting nearby', { body: body } );
+    }
+
+    function setAlertKm( km ) {
+        state.alertKm = km;
+        savePrefs();
+        if ( km > 0 ) {
+            if ( 'Notification' in window && Notification.permission === 'default' ) {
+                Notification.requestPermission();
+            }
+            watchPosition();
+        }
+    }
+
+    /* ---------- time scrubber ---------- */
+
+    function windowStart() {
+        if ( state.rangeDays ) return Date.now() - state.rangeDays * 86400000;
+        var ids = Object.keys( state.sightings );
+        var min = Date.now();
+        ids.forEach( function( id ) { min = Math.min( min, state.sightings[id].ts ); } );
+        return min;
+    }
+
+    function setPlayhead( pct ) {
+        var start = windowStart();
+        state.playhead = pct >= 100 ? null : start + ( Date.now() - start ) * pct / 100;
+        document.getElementById( 'scrub-label' ).textContent = state.playhead
+            ? new Date( state.playhead ).toLocaleString()
+            : 'Live';
+        render();
+    }
+
+    function togglePlay() {
+        var btn = document.getElementById( 'play-btn' );
+        var slider = document.getElementById( 'scrub' );
+        if ( state.playing ) {
+            clearInterval( state.playing );
+            state.playing = null;
+            btn.textContent = 'Play';
+            return;
+        }
+        if ( Number( slider.value ) >= 100 ) slider.value = 0;
+        btn.textContent = 'Pause';
+        state.playing = setInterval( function() {
+            var v = Number( slider.value ) + 1;
+            slider.value = v;
+            setPlayhead( v );
+            if ( v >= 100 ) togglePlay();
+        }, 150 );
+    }
+
+    /* ---------- tile pre-seeding ---------- */
+
+    function tileRange( z ) {
+        var n = Math.pow( 2, z );
+        var rad = Math.PI / 180;
+        function tx( lng ) { return Math.floor( ( lng + 180 ) / 360 * n ); }
+        function ty( lat ) {
+            return Math.floor( ( 1 - Math.log( Math.tan( lat * rad ) + 1 / Math.cos( lat * rad ) ) / Math.PI ) / 2 * n );
+        }
+        return {
+            x0: tx( BOUNDS.lngMin ), x1: tx( BOUNDS.lngMax ),
+            y0: ty( BOUNDS.latMax ), y1: ty( BOUNDS.latMin )
+        };
+    }
+
+    function seedTiles() {
+        if ( localStorage.getItem( SEED_KEY ) ) return;
+        if ( !navigator.onLine || !navigator.serviceWorker || !navigator.serviceWorker.controller ) return;
+        var urls = [];
+        TILE_ZOOMS.forEach( function( z ) {
+            var r = tileRange( z );
+            for ( var x = r.x0; x <= r.x1; x++ ) {
+                for ( var y = r.y0; y <= r.y1; y++ ) {
+                    urls.push( 'https://tile.openstreetmap.org/' + z + '/' + x + '/' + y + '.png' );
+                }
+            }
+        } );
+        urls = urls.slice( 0, TILE_SEED_CAP );
+        var i = 0;
+        function next() {
+            if ( i >= urls.length ) {
+                localStorage.setItem( SEED_KEY, String( Date.now() ) );
+                return;
+            }
+            var batch = urls.slice( i, i + 4 );
+            i += 4;
+            Promise.all( batch.map( function( u ) {
+                return fetch( u ).catch( function() {} );
+            } ) ).then( function() {
+                setTimeout( next, 250 );
+            } );
+        }
+        next();
+    }
+
+    /* ---------- misc ---------- */
+
+    function netStatus() {
+        document.getElementById( 'net-dot' ).classList.toggle( 'online', navigator.onLine );
     }
 
     function buildChips() {
@@ -354,15 +608,12 @@
         } );
     }
 
-    function netStatus() {
-        document.getElementById( 'net-dot' ).classList.toggle( 'online', navigator.onLine );
-    }
-
     function init() {
         loadPrefs();
         state.map = L.map( 'map' ).setView( [48.1, -122.8], 8 );
         L.tileLayer( 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors',
+            crossOrigin: 'anonymous',
             maxZoom: 17
         } ).addTo( state.map );
         state.trackLayer = L.layerGroup().addTo( state.map );
@@ -389,22 +640,56 @@
             render();
         } );
         document.getElementById( 'range' ).value = String( state.rangeDays );
-        netStatus();
-        refreshSyncLabel();
-        render();
-
-        document.getElementById( 'sync-btn' ).addEventListener( 'click', sync );
         document.getElementById( 'range' ).addEventListener( 'change', function( e ) {
             state.rangeDays = Number( e.target.value );
             savePrefs();
             render();
         } );
+
+        document.getElementById( 'scrub' ).addEventListener( 'input', function( e ) {
+            setPlayhead( Number( e.target.value ) );
+        } );
+        document.getElementById( 'play-btn' ).addEventListener( 'click', togglePlay );
+
+        var alertSel = document.getElementById( 'alert-km' );
+        alertSel.value = String( state.alertKm );
+        alertSel.addEventListener( 'change', function( e ) {
+            setAlertKm( Number( e.target.value ) );
+        } );
+
+        var tokenInput = document.getElementById( 'token' );
+        tokenInput.value = state.token;
+        tokenInput.addEventListener( 'change', function( e ) {
+            state.token = e.target.value.trim();
+            savePrefs();
+        } );
+
+        netStatus();
+        refreshSyncLabel();
+        document.getElementById( 'sync-btn' ).addEventListener( 'click', sync );
         window.addEventListener( 'online', function() { netStatus(); sync(); } );
         window.addEventListener( 'offline', netStatus );
 
-        if ( navigator.onLine ) sync();
-        setInterval( function() {
+        if ( navigator.storage && navigator.storage.persist ) {
+            navigator.storage.persist();
+        }
+        if ( state.alertKm > 0 ) watchPosition();
+
+        idbOpen().then( function( d ) {
+            db = d;
+            return idbAll();
+        } ).then( function( all ) {
+            state.sightings = all;
+            migrateLegacy();
+            render();
             if ( navigator.onLine ) sync();
+        } ).catch( function() {
+            render();
+            if ( navigator.onLine ) sync();
+        } );
+
+        setInterval( function() {
+            if ( navigator.onLine && !state.playing ) sync();
             else refreshSyncLabel();
         }, SYNC_INTERVAL );
 

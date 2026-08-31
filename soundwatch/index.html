@@ -37,7 +37,14 @@
     </header>
 
     <main>
-        <div id="map" role="application" aria-label="Sighting map"></div>
+        <div class="map-col">
+            <div id="map" role="application" aria-label="Sighting map"></div>
+            <div class="scrubber">
+                <button id="play-btn" type="button">Play</button>
+                <input id="scrub" type="range" min="0" max="100" value="100" aria-label="Time playback">
+                <span id="scrub-label">Live</span>
+            </div>
+        </div>
 
         <section class="panel">
             <div class="controls">
@@ -52,6 +59,20 @@
                 </select>
             </div>
             <p id="count-line" class="count-line"></p>
+            <details class="settings">
+                <summary>Settings</summary>
+                <label>Nearby alerts
+                    <select id="alert-km">
+                        <option value="0">Off</option>
+                        <option value="5">Within 5 km</option>
+                        <option value="10">Within 10 km</option>
+                        <option value="25">Within 25 km</option>
+                    </select>
+                </label>
+                <label>Acartia API token (optional, enables trusted-only feed)
+                    <input id="token" type="password" autocomplete="off" placeholder="Paste token from acartia.io">
+                </label>
+            </details>
             <ol id="feed" class="feed"></ol>
             <div id="empty" class="empty" hidden>
                 <svg viewBox="0 0 120 60" aria-hidden="true">
