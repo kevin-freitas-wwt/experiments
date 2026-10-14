@@ -1022,6 +1022,7 @@
         resetDoc();
         closeFind();
         setStatus( "" );
+        tabBusy( "" );
         main.classList.remove( "is-empty" );
         $( "stage" ).hidden = false;
         $( "fileName" ).textContent = f.name;
@@ -1049,6 +1050,57 @@
     for ( const ev of [ "dragenter", "dragover" ] ) main.addEventListener( ev, ( e ) => { if ( moving ) return; e.preventDefault(); main.classList.add( "is-drag" ); } );
     for ( const ev of [ "dragleave", "drop" ] ) main.addEventListener( ev, ( e ) => { if ( moving ) return; e.preventDefault(); main.classList.remove( "is-drag" ); } );
     main.addEventListener( "drop", ( e ) => { if ( !moving ) openFile( e.dataTransfer.files[ 0 ] ); } );
+
+    /* ---------- tab title + typing favicon ---------- */
+
+    const iconLink = document.querySelector( "link[rel~='icon']" );
+    const iconHome = iconLink?.href;
+    const baseTitle = document.title;
+    let iconTimer = 0, iconFrame = 0;
+    const iconCanvas = document.createElement( "canvas" );
+    iconCanvas.width = iconCanvas.height = 32;
+
+    function drawIcon( frame ) {
+        const ctx = iconCanvas.getContext( "2d" );
+        ctx.clearRect( 0, 0, 32, 32 );
+        ctx.lineCap = "round";
+        ctx.lineWidth = 3;
+        const dark = matchMedia( "(prefers-color-scheme: dark)" ).matches;
+        const lens = [ 24, 18, 22, 14 ];
+        const total = lens.reduce( ( a, b ) => a + b, 0 );
+        let budget = ( frame % 40 ) / 32 * total;
+        ctx.strokeStyle = dark ? "#ebe3d6" : "#1f1a16";
+        lens.forEach( ( len, k ) => {
+            const w = Math.max( 0, Math.min( len, budget ) );
+            budget -= len;
+            if ( w <= 0 ) return;
+            const y = 6 + k * 7;
+            ctx.beginPath(); ctx.moveTo( 4, y ); ctx.lineTo( 4 + w, y ); ctx.stroke();
+            if ( w < len && Math.floor( frame / 2 ) % 2 === 0 ) {
+                ctx.fillStyle = ctx.strokeStyle;
+                ctx.fillRect( 4 + w + 2, y - 4, 2, 8 );
+            }
+        } );
+        if ( frame % 40 >= 34 ) {
+            ctx.strokeStyle = dark ? "#ff6b55" : "#c7301c";
+            ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.moveTo( 3, 20 ); ctx.quadraticCurveTo( 16, 15, 29, 19 ); ctx.stroke();
+        }
+        return iconCanvas.toDataURL( "image/png" );
+    }
+
+    function tabBusy( text ) {
+        document.title = text ? `${ text } · ${ baseTitle }` : baseTitle;
+        if ( text && !iconTimer && iconLink ) {
+            iconTimer = setInterval( () => { iconLink.href = drawIcon( iconFrame++ ); }, 160 );
+        }
+        if ( !text && iconTimer ) {
+            clearInterval( iconTimer ); iconTimer = 0; iconFrame = 0;
+            if ( iconLink && iconHome ) iconLink.href = iconHome;
+        }
+    }
+
+    document.addEventListener( "visibilitychange", () => { if ( !document.hidden && transcribing && iconTimer ) iconLink.href = drawIcon( iconFrame ); } );
 
     /* ---------- transcription ---------- */
 
@@ -1088,7 +1140,7 @@
         worker.onmessage = async ( ev ) => {
             const m = ev.data;
             if ( m.run !== run ) return;
-            if ( m.type === "status" ) { setStatus( m.text ); $( "progressText" ).textContent = m.text; }
+            if ( m.type === "status" ) { setStatus( m.text ); $( "progressText" ).textContent = m.text; tabBusy( /Loading/.test( m.text ) ? "Loading model" : "Reading audio" ); }
             if ( m.type === "model" ) {
                 if ( m.phase === "download" && m.total ) {
                     $( "progressFill" ).style.width = ( m.loaded / m.total * 100 ).toFixed( 1 ) + "%";
@@ -1099,6 +1151,7 @@
             if ( m.type === "progress" ) {
                 $( "progressFill" ).style.width = ( m.fraction * 100 ).toFixed( 1 ) + "%";
                 const eta = estimate( m.fraction );
+                tabBusy( eta === "finishing" ? "Finishing" : eta ? `${ eta } remaining` : `Transcribing ${ Math.round( m.fraction * 100 ) }%` );
                 setStatus( `Transcribing · ${ Math.round( m.fraction * 100 ) }%${ eta === "finishing" ? " · finishing" : eta ? ` · ${ eta } remaining` : "" } · ${ m.model.split( "/" ).pop().replace( "_timestamped", "" ) } on ${ m.device }` );
             }
             if ( m.type === "live" ) $( "progressText" ).textContent = "… " + m.text.trim();
@@ -1130,6 +1183,7 @@
             if ( m.type === "stats" ) skippedSec = m.skipped || 0;
             if ( m.type === "done" ) {
                 transcribing = false;
+                tabBusy( "" );
                 $( "progress" ).hidden = true;
                 const secs = ( ( performance.now() - startedAt ) / 1000 ).toFixed( 0 );
                 const skip = skippedSec > 1 ? ` · ${ tc( skippedSec, false ) } of silence skipped` : "";
@@ -1144,6 +1198,7 @@
 
     function fail( msg ) {
         transcribing = false;
+        tabBusy( "" );
         $( "progressText" ).textContent = "Failed: " + msg;
         setStatus( "Transcription failed" );
         console.error( msg );
