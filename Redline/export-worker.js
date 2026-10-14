@@ -1,7 +1,10 @@
 import * as mb from "https://cdn.jsdelivr.net/npm/mediabunny@1.61.4/dist/bundles/mediabunny.min.mjs";
 
-const post = ( type, data ) => self.postMessage( { type, ...data } );
+const post = ( type, data, transfer ) => self.postMessage( { type, ...data }, transfer || [] );
 let cancelled = false;
+const FADE = 0.008;
+const BLEEP_HZ = 1000;
+const BLEEP_GAIN = 0.25;
 
 async function pickVideoCodec( track ) {
     const w = track.codedWidth, h = track.codedHeight;
@@ -12,20 +15,16 @@ async function pickVideoCodec( track ) {
     return null;
 }
 
-async function run( { file, segments, handle } ) {
+async function run( { file, segments, handle, audioOnly, bleeps = [], captions = null, capSize = "m", punch = 0 } ) {
     cancelled = false;
     let output = null;
     try {
         const input = new mb.Input( { source: new mb.BlobSource( file ), formats: mb.ALL_FORMATS } );
-        const vTrack = await input.getPrimaryVideoTrack();
+        const vTrack = audioOnly ? null : await input.getPrimaryVideoTrack();
         const aTrack = await input.getPrimaryAudioTrack();
-        if ( !vTrack ) throw new Error( "No video track found." );
-        if ( !( await vTrack.canDecode() ) ) throw new Error( `This browser can't decode ${ vTrack.codec } video.` );
-
-        const codec = await pickVideoCodec( vTrack );
-        if ( !codec ) throw new Error( "This browser can't encode video with WebCodecs. Try Chrome, Edge or Safari 17+." );
-        const srcBitrate = ( await vTrack.getAverageBitrate() ) || ( await vTrack.getBitrate() ) || 8e6;
-        const bitrate = Math.round( Math.min( srcBitrate * 1.25, 120e6 ) );
+        if ( !audioOnly && !vTrack ) throw new Error( "No video track found." );
+        if ( audioOnly && !aTrack ) throw new Error( "No audio track found." );
+        if ( vTrack && !( await vTrack.canDecode() ) ) throw new Error( `This browser can't decode ${ vTrack.codec } video.` );
 
         const format = new mb.Mp4OutputFormat( { fastStart: handle ? false : "in-memory" } );
         let target, writable = null;
@@ -37,8 +36,21 @@ async function run( { file, segments, handle } ) {
         }
         output = new mb.Output( { format, target } );
 
-        const vSource = new mb.VideoSampleSource( { codec, bitrate, keyFrameInterval: 2 } );
-        output.addVideoTrack( vSource, { rotation: vTrack.rotation } );
+        let codec = null, bitrate = 0, vSource = null, composite = false, canvas = null, ctx = null, W = 0, H = 0;
+        if ( vTrack ) {
+            codec = await pickVideoCodec( vTrack );
+            if ( !codec ) throw new Error( "This browser can't encode video with WebCodecs. Try Chrome, Edge or Safari 17+." );
+            const srcBitrate = ( await vTrack.getAverageBitrate() ) || ( await vTrack.getBitrate() ) || 8e6;
+            bitrate = Math.round( Math.min( srcBitrate * 1.25, 120e6 ) );
+            composite = !!( captions?.length || punch );
+            W = vTrack.displayWidth; H = vTrack.displayHeight;
+            vSource = new mb.VideoSampleSource( { codec, bitrate, keyFrameInterval: 2 } );
+            output.addVideoTrack( vSource, composite ? {} : { rotation: vTrack.rotation } );
+            if ( composite ) {
+                canvas = new OffscreenCanvas( W, H );
+                ctx = canvas.getContext( "2d", { alpha: false } );
+            }
+        }
 
         let aMode = "none", aSource = null, aCodec = null, outCodec = null;
         if ( aTrack && await aTrack.canDecode() ) {
@@ -56,35 +68,49 @@ async function run( { file, segments, handle } ) {
             }
             if ( aSource ) output.addAudioTrack( aSource );
         }
+        if ( audioOnly && aMode === "none" ) throw new Error( "This browser can't decode or re-encode the audio track." );
         output.setMetadataTags( await input.getMetadataTags().catch( () => ( {} ) ) );
         await output.start();
 
         const total = segments.reduce( ( s, [ a, b ] ) => s + ( b - a ), 0 );
         const srcDuration = await input.computeDuration();
-        post( "info", { codec, audio: aMode, audioCodec: aMode === "encode" ? outCodec : aCodec, bitrate, width: vTrack.displayWidth, height: vTrack.displayHeight } );
+        post( "info", { codec, audio: aMode, audioCodec: aMode === "encode" ? outCodec : aCodec, bitrate, width: W, height: H, composite, bleeps: bleeps.length } );
 
-        const vSink = new mb.VideoSampleSink( vTrack );
+        const vSink = vTrack ? new mb.VideoSampleSink( vTrack ) : null;
         const aPackets = aMode === "copy" ? new mb.EncodedPacketSink( aTrack ) : null;
         const aSink = aMode === "encode" ? new mb.AudioSampleSink( aTrack ) : null;
         const aMeta = aMode === "copy" ? { decoderConfig: await aTrack.getDecoderConfig() } : null;
+        const capFont = Math.round( H * ( capSize === "s" ? 0.036 : capSize === "l" ? 0.06 : 0.046 ) );
 
         let outT = 0;
         let lastA = -Infinity;
         for ( let si = 0; si < segments.length; si++ ) {
             const [ s, e ] = segments[ si ];
             const shift = outT - s;
-            let first = true;
-            for await ( const sample of vSink.samples( s, e ) ) {
-                if ( cancelled ) { sample.close(); throw new Error( "cancelled" ); }
-                const t = Math.max( sample.timestamp, s ) + shift;
-                const end = Math.min( sample.timestamp + sample.duration, e ) + shift;
-                if ( end <= t ) { sample.close(); continue; }
-                sample.setTimestamp( t );
-                sample.setDuration( end - t );
-                await vSource.add( sample, first ? { keyFrame: true } : undefined );
-                sample.close();
-                first = false;
-                post( "progress", { fraction: Math.min( ( outT + ( sample.timestamp - s ) ) / total, 0.999 ) } );
+            const zoom = punch && si % 2 === 1 ? 1 + punch : 1;
+            if ( vSink ) {
+                let first = true;
+                for await ( const sample of vSink.samples( s, e ) ) {
+                    if ( cancelled ) { sample.close(); throw new Error( "cancelled" ); }
+                    const t = Math.max( sample.timestamp, s ) + shift;
+                    const end = Math.min( sample.timestamp + sample.duration, e ) + shift;
+                    if ( end <= t ) { sample.close(); continue; }
+                    let outSample = sample;
+                    if ( composite ) {
+                        const dw = W * zoom, dh = H * zoom;
+                        sample.draw( ctx, ( W - dw ) / 2, ( H - dh ) / 2, dw, dh );
+                        if ( captions ) drawCaption( ctx, captions, t + ( end - t ) / 2, W, H, capFont );
+                        outSample = new mb.VideoSample( canvas, { timestamp: t, duration: end - t } );
+                        sample.close();
+                    } else {
+                        sample.setTimestamp( t );
+                        sample.setDuration( end - t );
+                    }
+                    await vSource.add( outSample, first ? { keyFrame: true } : undefined );
+                    outSample.close();
+                    first = false;
+                    post( "progress", { fraction: Math.min( ( outT + ( t - shift - s ) ) / total, 0.999 ) } );
+                }
             }
             if ( aPackets ) {
                 const startP = await aPackets.getPacket( s );
@@ -102,9 +128,11 @@ async function run( { file, segments, handle } ) {
                 const fadeOut = si < segments.length - 1 || e < srcDuration - 0.001;
                 for await ( const a of aSink.samples( s, e ) ) {
                     if ( cancelled ) { a.close(); throw new Error( "cancelled" ); }
-                    const trimmed = trimAudio( a, s, e, shift, fadeIn, fadeOut );
+                    const trimmed = trimAudio( a, s, e, shift, fadeIn, fadeOut, bleeps );
+                    const at = a.timestamp;
                     a.close();
                     if ( trimmed ) { await aSource.add( trimmed ); trimmed.close(); }
+                    if ( !vSink ) post( "progress", { fraction: Math.min( ( outT + ( at - s ) ) / total, 0.999 ) } );
                 }
             }
             outT += e - s;
@@ -118,9 +146,35 @@ async function run( { file, segments, handle } ) {
     }
 }
 
-const FADE = 0.008;
+function drawCaption( ctx, cues, t, W, H, font ) {
+    const cue = cues.find( ( c ) => t >= c.start && t < c.end );
+    if ( !cue ) return;
+    const lines = cue.text.split( "\n" );
+    ctx.font = `600 ${ font }px -apple-system, "Helvetica Neue", Arial, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    const lh = font * 1.25, padX = font * 0.5, padY = font * 0.28;
+    const bottom = H - H * 0.06;
+    for ( let k = lines.length - 1, y = bottom; k >= 0; k--, y -= lh ) {
+        const tw = ctx.measureText( lines[ k ] ).width;
+        ctx.fillStyle = "rgba( 0, 0, 0, 0.62 )";
+        roundRect( ctx, W / 2 - tw / 2 - padX, y - font - padY * 0.6, tw + padX * 2, lh + padY * 0.2, font * 0.22 );
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.fillText( lines[ k ], W / 2, y );
+    }
+}
 
-function trimAudio( a, s, e, shift, fadeIn, fadeOut ) {
+function roundRect( ctx, x, y, w, h, r ) {
+    ctx.beginPath();
+    ctx.moveTo( x + r, y ); ctx.lineTo( x + w - r, y ); ctx.quadraticCurveTo( x + w, y, x + w, y + r );
+    ctx.lineTo( x + w, y + h - r ); ctx.quadraticCurveTo( x + w, y + h, x + w - r, y + h );
+    ctx.lineTo( x + r, y + h ); ctx.quadraticCurveTo( x, y + h, x, y + h - r );
+    ctx.lineTo( x, y + r ); ctx.quadraticCurveTo( x, y, x + r, y );
+    ctx.closePath();
+}
+
+function trimAudio( a, s, e, shift, fadeIn, fadeOut, bleeps ) {
     const rate = a.sampleRate, ch = a.numberOfChannels, n = a.numberOfFrames;
     const t0 = a.timestamp, t1 = t0 + n / rate;
     if ( t1 <= s || t0 >= e ) return null;
@@ -137,11 +191,24 @@ function trimAudio( a, s, e, shift, fadeIn, fadeOut ) {
     const fadeN = Math.round( FADE * rate );
     const segStart = Math.round( ( t0 - s ) * rate ) + from;
     const segEnd = Math.round( ( e - s ) * rate );
+    const local = bleeps.filter( ( [ bs, be ] ) => be > t0 && bs < t1 );
     for ( let i = 0; i < len; i++ ) {
         const pos = segStart + i;
         let g = 1;
         if ( fadeIn && pos < fadeN ) g *= pos / fadeN;
         if ( fadeOut && segEnd - pos <= fadeN ) g *= Math.max( 0, segEnd - pos - 1 ) / fadeN;
+        let mix = 0;
+        if ( local.length ) {
+            const srcT = t0 + ( from + i ) / rate;
+            for ( const [ bs, be ] of local ) {
+                if ( srcT >= bs && srcT < be ) { mix = Math.min( 1, Math.min( srcT - bs, be - srcT ) / FADE ); break; }
+            }
+            if ( mix > 0 ) {
+                const tone = Math.sin( 2 * Math.PI * BLEEP_HZ * srcT ) * BLEEP_GAIN * mix * g;
+                for ( let c = 0; c < ch; c++ ) data[ c * len + i ] = data[ c * len + i ] * ( 1 - mix ) * g + tone;
+                continue;
+            }
+        }
         if ( g !== 1 ) for ( let c = 0; c < ch; c++ ) data[ c * len + i ] *= g;
     }
     return new mb.AudioSample( {

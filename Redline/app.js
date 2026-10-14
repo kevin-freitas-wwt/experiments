@@ -3,15 +3,17 @@
 
     const $ = ( id ) => document.getElementById( id );
     const main = $( "main" ), video = $( "video" ), transcript = $( "transcript" );
-    const float = $( "float" );
+    const float = $( "float" ), insert = $( "insert" );
     const MOBILE = navigator.userAgentData?.mobile ?? /Android|iPhone|iPad|Mobile/i.test( navigator.userAgent );
     const IOS = /iPhone|iPad|iPod/.test( navigator.userAgent ) || ( navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1 );
     const MODELS = {
         small: "onnx-community/whisper-small.en_timestamped",
         base: "onnx-community/whisper-base.en_timestamped"
     };
+    const KEEP = 0, CUT = 1, BLEEP = 2;
     const SNAP = 0.35;
     const PAD = 0.04;
+    const BLEEP_PAD = 0.03;
     const FALLBACK_MAX_SEC = 2 * 3600;
     const MEM_EXPORT_MAX = 1.5e9;
 
@@ -19,20 +21,23 @@
 
     let file = null, url = null, duration = 0, docKey = null;
     let words = [];
-    let cut = [];
+    let mark = [];
+    let seq = [];
+    let moved = [];
     let undo = [];
-    let ranges = [];
+    let segments = [];
     let spans = [];
     let sel = null;
     let caret = -1, anchor = -1;
     let nowIndex = -1;
-    let lastPara = null, lastWord = null, paraStart = 0;
     let worker = null, exporter = null;
     let userScrolledAt = 0;
     let transcribing = false;
     let env = null;
     let outputTime = false;
     let skipping = false;
+    let moving = null;
+    let settings = { pauses: false, pauseMin: 1.5, pauseTo: 0.4, captions: false, capSize: "m", punch: false, punchPct: 5 };
 
     /* ---------- helpers ---------- */
 
@@ -63,16 +68,21 @@
         return best;
     }
 
+    function segAt( t ) {
+        for ( const g of segments ) if ( t >= g.s && t < g.e ) return g;
+        return null;
+    }
+
     function outTime( t ) {
-        let removed = 0;
-        for ( const r of ranges ) {
-            if ( r.start >= t ) break;
-            removed += Math.min( r.end, t ) - r.start;
-        }
-        return t - removed;
+        const g = segAt( t );
+        if ( g ) return g.out + ( t - g.s );
+        let best = null;
+        for ( const g2 of segments ) if ( g2.e <= t && ( !best || g2.e > best.e ) ) best = g2;
+        return best ? best.out + ( best.e - best.s ) : 0;
     }
 
     const shown = ( t ) => outputTime ? outTime( t ) : t;
+    const outLength = () => segments.reduce( ( s, g ) => s + ( g.e - g.s ), 0 );
 
     /* ---------- persistence (IndexedDB) ---------- */
 
@@ -91,7 +101,7 @@
         saveTimer = setTimeout( () => {
             if ( !idb ) return;
             const tx = idb.transaction( "docs", "readwrite" );
-            tx.objectStore( "docs" ).put( { words, cut: cut.map( Number ).join( "" ), env, done: !transcribing, at: Date.now() }, docKey );
+            tx.objectStore( "docs" ).put( { words, mark: mark.join( "" ), seq, moved: moved.map( Number ).join( "" ), env, done: !transcribing, at: Date.now() }, docKey );
             tx.oncomplete = () => prune();
         }, 300 );
     }
@@ -120,29 +130,52 @@
         } );
         if ( !d || !d.done || !d.words?.length ) return false;
         words = d.words;
-        cut = [ ...d.cut ].map( ( c ) => c === "1" );
+        mark = d.mark ? [ ...d.mark ].map( Number ) : ( d.cut ? [ ...d.cut ].map( ( c ) => c === "1" ? CUT : KEEP ) : words.map( () => KEEP ) );
+        seq = d.seq?.length === words.length ? d.seq : words.map( ( _, i ) => i );
+        moved = d.moved ? [ ...d.moved ].map( ( c ) => c === "1" ) : words.map( () => false );
         env = d.env || null;
         return true;
+    }
+
+    function loadSettings() {
+        try { Object.assign( settings, JSON.parse( localStorage.getItem( "redline.settings" ) || "{}" ) ); } catch {}
+        $( "setPauses" ).checked = settings.pauses; $( "setPauseMin" ).value = settings.pauseMin; $( "setPauseTo" ).value = settings.pauseTo;
+        $( "setCaptions" ).checked = settings.captions; $( "setCapSize" ).value = settings.capSize;
+        $( "setPunch" ).checked = settings.punch; $( "setPunchPct" ).value = settings.punchPct;
+    }
+
+    function readSettings() {
+        settings = {
+            pauses: $( "setPauses" ).checked, pauseMin: +$( "setPauseMin" ).value || 1.5, pauseTo: +$( "setPauseTo" ).value || 0,
+            captions: $( "setCaptions" ).checked, capSize: $( "setCapSize" ).value,
+            punch: $( "setPunch" ).checked, punchPct: Math.min( 15, Math.max( 1, +$( "setPunchPct" ).value || 5 ) )
+        };
+        try { localStorage.setItem( "redline.settings", JSON.stringify( settings ) ); } catch {}
+        $( "btnSettings" ).setAttribute( "aria-pressed", String( settings.pauses || settings.captions || settings.punch ) );
+        rebuildAll();
     }
 
     /* ---------- transcript rendering ---------- */
 
     function resetDoc() {
         transcript.innerHTML = "";
-        spans = []; lastPara = null; lastWord = null; paraStart = 0; nowIndex = -1; caret = -1; anchor = -1;
+        spans = []; nowIndex = -1; caret = -1; anchor = -1;
     }
 
-    function appendWords( list, startIndex ) {
+    function renderAll() {
+        resetDoc();
+        let para = null, lastW = null, paraStart = 0, prevIdx = -2;
         const frag = document.createDocumentFragment();
-        let para = lastPara;
-        list.forEach( ( w, k ) => {
-            const i = startIndex + k;
-            const gap = lastWord ? w.start - lastWord.end : 0;
-            const sentenceEnd = lastWord && /[.?!]["')\]]?$/.test( lastWord.text );
-            const breakPara = !para || gap > 1.1 || ( sentenceEnd && gap > 0.45 ) || ( sentenceEnd && w.start - paraStart > 40 );
+        for ( const i of seq ) {
+            const w = words[ i ];
+            const contiguous = i === prevIdx + 1;
+            const gap = lastW && contiguous ? w.start - lastW.end : 0;
+            const sentenceEnd = lastW && /[.?!]["')\]]?$/.test( lastW.text );
+            const blockEdge = !contiguous || ( lastW && moved[ i ] !== moved[ prevIdx ] );
+            const breakPara = !para || blockEdge || gap > 1.1 || ( sentenceEnd && gap > 0.45 ) || ( sentenceEnd && w.start - paraStart > 40 );
             if ( breakPara ) {
                 para = document.createElement( "p" );
-                para.className = "para";
+                para.className = "para" + ( moved[ i ] ? " is-moved" : "" );
                 const label = document.createElement( "span" );
                 label.className = "para-tc";
                 label.dataset.t = w.start;
@@ -154,28 +187,37 @@
                 para.appendChild( document.createTextNode( " " ) );
             }
             const span = document.createElement( "span" );
-            span.className = "w" + ( cut[ i ] ? " is-cut" : "" );
+            span.className = "w";
             span.dataset.i = i;
             span.textContent = w.text;
             para.appendChild( span );
             spans[ i ] = span;
-            lastWord = w;
-        } );
-        lastPara = para;
-        if ( frag.childNodes.length ) transcript.appendChild( frag );
+            lastW = w; prevIdx = i;
+        }
+        transcript.appendChild( frag );
+        decorate();
     }
 
-    function renderAll() {
-        resetDoc();
-        appendWords( words, 0 );
-        refreshCuts();
+    function appendStreaming( list, startIndex ) {
+        for ( let k = 0; k < list.length; k++ ) { seq.push( startIndex + k ); mark.push( KEEP ); moved.push( false ); }
+        renderAll();
+    }
+
+    function decorate() {
+        for ( let i = 0; i < spans.length; i++ ) {
+            const sp = spans[ i ];
+            if ( !sp ) continue;
+            sp.classList.toggle( "is-cut", mark[ i ] === CUT );
+            sp.classList.toggle( "is-bleep", mark[ i ] === BLEEP );
+            sp.classList.toggle( "is-moved", !!moved[ i ] );
+        }
     }
 
     function relabel() {
         for ( const l of transcript.querySelectorAll( ".para-tc" ) ) l.textContent = tc( shown( +l.dataset.t ), false );
     }
 
-    /* ---------- silence snapping ---------- */
+    /* ---------- silence ---------- */
 
     function energyAt( t ) {
         if ( !env ) return 255;
@@ -186,86 +228,236 @@
     function snapEdge( t, dir, limit ) {
         if ( !env ) return t;
         const n = Math.round( SNAP * 100 );
-        let best = t, bestE = energyAt( t );
-        const floor = Math.min( ...Array.from( { length: n }, ( _, k ) => energyAt( t + dir * k / 100 ) ) );
+        let best = t, bestE = energyAt( t ), floor = 255;
+        for ( let k = 0; k <= n; k++ ) floor = Math.min( floor, energyAt( t + dir * k / 100 ) );
         for ( let k = 1; k <= n; k++ ) {
             const x = t + dir * k / 100;
             if ( dir < 0 ? x < limit : x > limit ) break;
             const e = energyAt( x );
-            if ( e <= floor + 6 ) { best = x; bestE = e; break; }
+            if ( e <= floor + 6 ) { best = x; break; }
             if ( e < bestE ) { best = x; bestE = e; }
         }
         return best;
     }
 
-    /* ---------- cuts ---------- */
-
-    function refreshCuts() {
-        ranges = [];
-        let a = -1;
-        for ( let i = 0; i <= words.length; i++ ) {
-            const on = i < words.length && cut[ i ];
-            if ( on && a < 0 ) a = i;
-            if ( !on && a >= 0 ) {
-                const prevEnd = a > 0 ? words[ a - 1 ].end : 0;
-                const nextStart = i < words.length ? words[ i ].start : duration;
-                let start = snapEdge( words[ a ].start - PAD, -1, prevEnd );
-                let end = snapEdge( words[ i - 1 ].end + PAD, 1, nextStart );
-                start = Math.max( 0, Math.min( start, words[ a ].start ) );
-                end = Math.min( duration || Infinity, Math.max( end, words[ i - 1 ].end ) );
-                ranges.push( { from: a, to: i - 1, start, end } );
-                a = -1;
+    function pauseCuts( a, b ) {
+        if ( !settings.pauses || !env ) return [];
+        const out = [];
+        for ( let i = a; i < b; i++ ) {
+            const gapStart = words[ i ].end, gapEnd = words[ i + 1 ].start;
+            if ( gapEnd - gapStart < settings.pauseMin ) continue;
+            let floor = 255;
+            for ( let t = gapStart; t < gapEnd; t += 0.01 ) floor = Math.min( floor, energyAt( t ) );
+            let s0 = -1, run = [];
+            for ( let t = gapStart; t <= gapEnd + 1e-6; t += 0.01 ) {
+                const quiet = t < gapEnd && energyAt( t ) <= floor + 9;
+                if ( quiet && s0 < 0 ) s0 = t;
+                if ( !quiet && s0 >= 0 ) { run.push( [ s0, t ] ); s0 = -1; }
+            }
+            for ( const [ qs, qe ] of run ) {
+                if ( qe - qs < settings.pauseMin ) continue;
+                const half = settings.pauseTo / 2;
+                out.push( [ qs + half, qe - half ] );
             }
         }
-        for ( let i = 1; i < ranges.length; i++ ) {
-            if ( ranges[ i ].start < ranges[ i - 1 ].end ) ranges[ i ].start = ranges[ i - 1 ].end;
+        return out;
+    }
+
+    /* ---------- timeline ---------- */
+
+    let pauses = [];
+
+    function rebuildAll() {
+        segments = []; pauses = [];
+        const n = words.length;
+        if ( !n ) { paintStrip(); return; }
+        const blocks = [];
+        let k = 0;
+        while ( k < seq.length ) {
+            const i = seq[ k ];
+            if ( mark[ i ] === CUT ) { k++; continue; }
+            let j = k;
+            while ( j + 1 < seq.length && seq[ j + 1 ] === seq[ j ] + 1 && mark[ seq[ j + 1 ] ] !== CUT && moved[ seq[ j + 1 ] ] === moved[ i ] ) j++;
+            blocks.push( { a: i, b: seq[ j ], moved: !!moved[ i ] } );
+            k = j + 1;
         }
-        for ( let i = 0; i < spans.length; i++ ) spans[ i ]?.classList.toggle( "is-cut", !!cut[ i ] );
-        const cutSec = ranges.reduce( ( s, r ) => s + ( r.end - r.start ), 0 );
-        $( "stripCuts" ).innerHTML = ranges.map( ( r ) =>
-            `<div class="strip-cut" style="left:${ ( r.start / duration * 100 ).toFixed( 3 ) }%;width:${ Math.max( 0.15, ( r.end - r.start ) / duration * 100 ).toFixed( 3 ) }%"></div>` ).join( "" );
-        $( "tcLen" ).textContent = tc( outputTime ? duration - cutSec : duration, false );
-        $( "tcCut" ).textContent = cutSec ? ( outputTime ? `(−${ tc( cutSec, false ) })` : `−${ tc( cutSec, false ) } → ${ tc( duration - cutSec, false ) }` ) : "";
-        $( "toolsNote" ).textContent = ranges.length ? `${ ranges.length } cut${ ranges.length > 1 ? "s" : "" } · ${ cutSec.toFixed( 1 ) }s removed` : "";
+        let out = 0, order = 0;
+        for ( const bl of blocks ) {
+            const prevEnd = bl.a > 0 ? words[ bl.a - 1 ].end : 0;
+            const nextStart = bl.b < n - 1 ? words[ bl.b + 1 ].start : duration;
+            let s = bl.a === 0 && mark[ 0 ] !== CUT ? 0 : Math.max( prevEnd, Math.min( words[ bl.a ].start, snapEdge( words[ bl.a ].start - PAD, -1, prevEnd ) ) );
+            let e = bl.b === n - 1 ? duration : Math.min( nextStart, Math.max( words[ bl.b ].end, snapEdge( words[ bl.b ].end + PAD, 1, nextStart ) ) );
+            if ( bl.a === 0 && mark[ 0 ] !== CUT && !bl.moved ) s = 0;
+            const pieces = [];
+            let cur = s;
+            for ( const [ ps, pe ] of pauseCuts( bl.a, bl.b ) ) {
+                if ( ps > cur ) pieces.push( [ cur, ps ] );
+                pieces.push( [ ps, pe, "pause" ] );
+                cur = pe;
+            }
+            pieces.push( [ cur, e ] );
+            for ( const [ ps, pe, kind ] of pieces ) {
+                if ( pe - ps <= 0.001 ) continue;
+                if ( kind === "pause" ) { pauses.push( [ ps, pe ] ); continue; }
+                segments.push( { s: ps, e: pe, out, moved: bl.moved, order: order++, a: bl.a, b: bl.b } );
+                out += pe - ps;
+            }
+        }
+        paintStrip();
+        $( "tcLen" ).textContent = tc( outputTime ? out : duration, false );
+        const removed = duration - out;
+        $( "tcCut" ).textContent = removed > 0.05 ? ( outputTime ? `(−${ tc( removed, false ) })` : `−${ tc( removed, false ) } → ${ tc( out, false ) }` ) : "";
+        const cuts = countRuns( CUT ), bleeps = countRuns( BLEEP ), moves = blocks.filter( ( b ) => b.moved ).length;
+        const bits = [];
+        if ( cuts ) bits.push( `${ cuts } cut${ cuts > 1 ? "s" : "" }` );
+        if ( pauses.length ) bits.push( `${ pauses.length } pause${ pauses.length > 1 ? "s" : "" }` );
+        if ( bleeps ) bits.push( `${ bleeps } bleep${ bleeps > 1 ? "s" : "" }` );
+        if ( moves ) bits.push( `${ moves } moved` );
+        if ( removed > 0.05 ) bits.push( `${ removed.toFixed( 1 ) }s removed` );
+        $( "toolsNote" ).textContent = bits.join( " · " );
+        const edited = cuts || bleeps || moves || pauses.length;
         $( "btnUndo" ).disabled = !undo.length;
-        $( "btnExport" ).disabled = transcribing || !words.length || !ranges.length;
-        $( "btnFillers" ).disabled = transcribing || !words.length;
-        $( "btnTranscript" ).disabled = transcribing || !words.length;
+        $( "btnExport" ).disabled = transcribing || !words.length || !edited;
+        for ( const id of [ "btnFillers", "btnTranscript", "btnFind" ] ) $( id ).disabled = transcribing || !words.length;
         if ( outputTime ) relabel();
+        decorate();
         updateSelButtons();
         save();
     }
 
+    function countRuns( kind ) {
+        let n = 0;
+        for ( let k = 0; k < seq.length; k++ ) {
+            const i = seq[ k ];
+            if ( mark[ i ] === kind && ( k === 0 || mark[ seq[ k - 1 ] ] !== kind || seq[ k - 1 ] !== i - 1 ) ) n++;
+        }
+        return n;
+    }
+
+    function paintStrip() {
+        if ( !duration ) return;
+        const pct = ( t ) => ( t / duration * 100 ).toFixed( 3 ) + "%";
+        const w = ( a, b ) => Math.max( 0.15, ( b - a ) / duration * 100 ).toFixed( 3 ) + "%";
+        let html = "";
+        let cs = -1;
+        const flush = ( e ) => { if ( cs >= 0 ) { html += `<div class="strip-cut" style="left:${ pct( cs ) };width:${ w( cs, e ) }"></div>`; cs = -1; } };
+        for ( let i = 0; i < words.length; i++ ) {
+            if ( mark[ i ] === CUT ) { if ( cs < 0 ) cs = i > 0 ? Math.min( words[ i ].start, segEndBefore( i ) ) : 0; }
+            else flush( Math.max( words[ i - 1 ]?.end ?? 0, segStartAfter( i ) ) );
+        }
+        flush( duration );
+        for ( const [ a, b ] of pauses ) html += `<div class="strip-cut is-pause" style="left:${ pct( a ) };width:${ w( a, b ) }"></div>`;
+        for ( const g of segments ) if ( g.moved ) html += `<div class="strip-cut is-moved" style="left:${ pct( g.s ) };width:${ w( g.s, g.e ) }"></div>`;
+        for ( let i = 0; i < words.length; i++ ) {
+            if ( mark[ i ] !== BLEEP ) continue;
+            let j = i;
+            while ( j + 1 < words.length && mark[ j + 1 ] === BLEEP ) j++;
+            html += `<div class="strip-cut is-bleep" style="left:${ pct( words[ i ].start - BLEEP_PAD ) };width:${ w( words[ i ].start - BLEEP_PAD, words[ j ].end + BLEEP_PAD ) }"></div>`;
+            i = j;
+        }
+        $( "stripCuts" ).innerHTML = html;
+    }
+
+    function segEndBefore( i ) {
+        for ( const g of segments ) if ( g.b === i - 1 ) return g.e;
+        return words[ i - 1 ].end;
+    }
+
+    function segStartAfter( i ) {
+        for ( const g of segments ) if ( g.a === i ) return g.s;
+        return words[ i ].start;
+    }
+
+    function bleepRanges() {
+        const out = [];
+        for ( let i = 0; i < words.length; i++ ) {
+            if ( mark[ i ] !== BLEEP ) continue;
+            let j = i;
+            while ( j + 1 < words.length && mark[ j + 1 ] === BLEEP ) j++;
+            out.push( [ Math.max( 0, words[ i ].start - BLEEP_PAD ), words[ j ].end + BLEEP_PAD ] );
+            i = j;
+        }
+        return out;
+    }
+
+    /* ---------- edits ---------- */
+
     function pushUndo() {
-        undo.push( cut.slice() );
+        undo.push( { mark: mark.slice(), seq: seq.slice(), moved: moved.slice() } );
         if ( undo.length > 100 ) undo.shift();
     }
 
-    function applyCut( from, to, on ) {
+    function selIndices( s ) {
+        const out = [];
+        for ( let k = s.from; k <= s.to; k++ ) out.push( seq[ k ] );
+        return out;
+    }
+
+    function setMark( s, kind ) {
+        if ( !s ) return;
         pushUndo();
-        for ( let i = from; i <= to; i++ ) cut[ i ] = on;
-        refreshCuts();
+        for ( const i of selIndices( s ) ) mark[ i ] = kind;
+        afterEdit( kind === KEEP ? seq[ s.from ] : seq[ s.to ] );
+    }
+
+    function restoreSel( s ) {
+        if ( !s ) return;
+        pushUndo();
+        const ids = selIndices( s );
+        const anyMoved = ids.some( ( i ) => moved[ i ] );
+        for ( const i of ids ) mark[ i ] = KEEP;
+        if ( anyMoved ) {
+            const set = new Set( ids.filter( ( i ) => moved[ i ] ) );
+            for ( const i of set ) moved[ i ] = false;
+            seq = seq.filter( ( i ) => !set.has( i ) );
+            for ( const i of [ ...set ].sort( ( a, b ) => a - b ) ) {
+                let pos = seq.findIndex( ( x ) => x > i && !moved[ x ] );
+                if ( pos < 0 ) pos = seq.length;
+                seq.splice( pos, 0, i );
+            }
+            renderAll();
+        }
+        afterEdit( ids[ 0 ] );
+    }
+
+    function keepOnly( s ) {
+        if ( !s ) return;
+        pushUndo();
+        const keep = new Set( selIndices( s ) );
+        for ( let i = 0; i < words.length; i++ ) if ( !keep.has( i ) && mark[ i ] !== BLEEP ) mark[ i ] = CUT;
+        afterEdit( seq[ s.from ] );
+    }
+
+    function moveWords( ids, beforeIndex ) {
+        pushUndo();
+        const set = new Set( ids );
+        const rest = seq.filter( ( i ) => !set.has( i ) );
+        let pos = beforeIndex < 0 ? rest.length : rest.indexOf( beforeIndex );
+        if ( pos < 0 ) pos = rest.length;
+        const naturalPos = rest.findIndex( ( x ) => x > ids[ 0 ] && !moved[ x ] );
+        const backHome = pos === ( naturalPos < 0 ? rest.length : naturalPos );
+        for ( const i of ids ) moved[ i ] = !backHome;
+        seq = [ ...rest.slice( 0, pos ), ...ids, ...rest.slice( pos ) ];
+        renderAll();
+        afterEdit( ids[ 0 ] );
+        selectWords( seq.indexOf( ids[ 0 ] ), seq.indexOf( ids[ ids.length - 1 ] ) );
+    }
+
+    function afterEdit( focusIndex ) {
+        rebuildAll();
         window.getSelection()?.removeAllRanges();
         sel = null;
         hideFloat();
-        setCaret( on ? to : from, false );
+        if ( focusIndex >= 0 ) setCaret( seq.indexOf( focusIndex ), false );
     }
 
     function doUndo() {
         if ( !undo.length ) return;
-        cut = undo.pop();
-        refreshCuts();
-    }
-
-    function keepSegments() {
-        const segs = [];
-        let t = 0;
-        for ( const r of ranges ) {
-            if ( r.start > t + 0.02 ) segs.push( [ t, r.start ] );
-            t = Math.max( t, r.end );
-        }
-        if ( duration > t + 0.02 ) segs.push( [ t, duration ] );
-        return segs;
+        const u = undo.pop();
+        const reorder = u.seq.join() !== seq.join();
+        mark = u.mark; seq = u.seq; moved = u.moved;
+        if ( reorder ) renderAll();
+        rebuildAll();
     }
 
     /* ---------- filler pass ---------- */
@@ -299,11 +491,11 @@
     }
 
     $( "btnFillers" ).onclick = () => {
-        const hits = findFillers().filter( ( i ) => !cut[ i ] );
+        const hits = findFillers().filter( ( i ) => mark[ i ] === KEEP );
         if ( !hits.length ) { flashNote( "No fillers found" ); return; }
         pushUndo();
-        for ( const i of hits ) { cut[ i ] = true; spans[ i ]?.classList.add( "is-filler" ); }
-        refreshCuts();
+        for ( const i of hits ) mark[ i ] = CUT;
+        rebuildAll();
         flashNote( `${ hits.length } filler word${ hits.length > 1 ? "s" : "" } struck · ⌘Z to undo` );
         spans[ hits[ 0 ] ]?.scrollIntoView( { block: "center", behavior: "smooth" } );
     };
@@ -317,6 +509,71 @@
         noteTimer = setTimeout( () => { if ( el.textContent === text ) el.textContent = prev; }, 3500 );
     }
 
+    /* ---------- find ---------- */
+
+    let matches = [];
+    function openFind() {
+        $( "find" ).hidden = false;
+        $( "btnFind" ).setAttribute( "aria-pressed", "true" );
+        $( "findInput" ).focus();
+        $( "findInput" ).select();
+    }
+
+    function closeFind() {
+        $( "find" ).hidden = true;
+        $( "btnFind" ).setAttribute( "aria-pressed", "false" );
+        for ( const i of matches.flat() ) spans[ i ]?.classList.remove( "is-match" );
+        matches = [];
+        $( "findCount" ).textContent = "";
+        $( "findStrike" ).disabled = $( "findBleep" ).disabled = true;
+    }
+
+    function runFind() {
+        for ( const i of matches.flat() ) spans[ i ]?.classList.remove( "is-match" );
+        matches = [];
+        const q = $( "findInput" ).value.trim().split( /\s+/ ).map( norm ).filter( Boolean );
+        if ( q.length ) {
+            const n = words.map( ( w ) => norm( w.text ) );
+            for ( let i = 0; i + q.length <= words.length; i++ ) {
+                if ( q.every( ( t, k ) => n[ i + k ] === t ) ) {
+                    matches.push( Array.from( { length: q.length }, ( _, k ) => i + k ) );
+                    i += q.length - 1;
+                }
+            }
+        }
+        for ( const i of matches.flat() ) spans[ i ]?.classList.add( "is-match" );
+        $( "findCount" ).textContent = q.length ? `${ matches.length } match${ matches.length === 1 ? "" : "es" }` : "";
+        $( "findStrike" ).disabled = $( "findBleep" ).disabled = !matches.length;
+        if ( matches.length ) spans[ matches[ 0 ][ 0 ] ]?.scrollIntoView( { block: "center", behavior: "smooth" } );
+    }
+
+    function markMatches( kind ) {
+        if ( !matches.length ) return;
+        pushUndo();
+        for ( const i of matches.flat() ) mark[ i ] = kind;
+        rebuildAll();
+        flashNote( `${ matches.length } match${ matches.length === 1 ? "" : "es" } ${ kind === CUT ? "struck" : "bleeped" } · ⌘Z to undo` );
+    }
+
+    $( "btnFind" ).onclick = () => $( "find" ).hidden ? openFind() : closeFind();
+    $( "findClose" ).onclick = closeFind;
+    $( "findInput" ).addEventListener( "input", runFind );
+    $( "findInput" ).addEventListener( "keydown", ( e ) => {
+        if ( e.key === "Escape" ) { e.preventDefault(); closeFind(); }
+        if ( e.key === "Enter" ) { e.preventDefault(); if ( e.shiftKey ) markMatches( BLEEP ); else if ( e.metaKey || e.ctrlKey ) markMatches( CUT ); else cycleMatch(); }
+    } );
+    $( "findStrike" ).onclick = () => markMatches( CUT );
+    $( "findBleep" ).onclick = () => markMatches( BLEEP );
+
+    let matchCursor = -1;
+    function cycleMatch() {
+        if ( !matches.length ) return;
+        matchCursor = ( matchCursor + 1 ) % matches.length;
+        const m = matches[ matchCursor ];
+        spans[ m[ 0 ] ]?.scrollIntoView( { block: "center", behavior: "smooth" } );
+        seek( words[ m[ 0 ] ].start + 0.001 );
+    }
+
     /* ---------- selection ---------- */
 
     function wordIndexOf( node ) {
@@ -324,6 +581,8 @@
         const w = el?.closest?.( ".w" );
         return w ? +w.dataset.i : -1;
     }
+
+    const posOf = ( i ) => seq.indexOf( i );
 
     function readSelection() {
         const s = window.getSelection();
@@ -334,8 +593,9 @@
         if ( a < 0 ) a = walkWord( r.startContainer, r.startOffset, 1 );
         if ( b < 0 ) b = walkWord( r.endContainer, r.endOffset, -1 );
         if ( a < 0 || b < 0 ) return null;
-        if ( a > b ) [ a, b ] = [ b, a ];
-        return { from: a, to: b };
+        let pa = posOf( a ), pb = posOf( b );
+        if ( pa > pb ) [ pa, pb ] = [ pb, pa ];
+        return { from: pa, to: pb };
     }
 
     function walkWord( node, offset, dir ) {
@@ -349,23 +609,31 @@
         return -1;
     }
 
-    function selectWords( a, b ) {
-        if ( a > b ) [ a, b ] = [ b, a ];
+    function selectWords( pa, pb ) {
+        if ( pa > pb ) [ pa, pb ] = [ pb, pa ];
         const r = document.createRange();
-        r.setStartBefore( spans[ a ] );
-        r.setEndAfter( spans[ b ] );
+        r.setStartBefore( spans[ seq[ pa ] ] );
+        r.setEndAfter( spans[ seq[ pb ] ] );
         const s = window.getSelection();
         s.removeAllRanges();
         s.addRange( r );
     }
 
     function updateSelButtons() {
-        let anyCut = false, anyKept = false;
-        if ( sel ) for ( let i = sel.from; i <= sel.to; i++ ) { if ( cut[ i ] ) anyCut = true; else anyKept = true; }
-        $( "btnRedline" ).disabled = $( "floatRedline" ).disabled = !sel || !anyKept;
-        $( "btnRestore" ).disabled = $( "floatRestore" ).disabled = !sel || !anyCut;
-        $( "floatRedline" ).hidden = !anyKept;
-        $( "floatRestore" ).hidden = !anyCut;
+        let anyCut = false, anyKept = false, anyBleep = false, anyMoved = false;
+        if ( sel ) for ( const i of selIndices( sel ) ) {
+            if ( mark[ i ] === CUT ) anyCut = true; else if ( mark[ i ] === BLEEP ) anyBleep = true; else anyKept = true;
+            if ( moved[ i ] ) anyMoved = true;
+        }
+        const restorable = anyCut || anyBleep || anyMoved;
+        $( "btnRedline" ).disabled = $( "floatRedline" ).disabled = !sel || !( anyKept || anyBleep );
+        $( "btnBleep" ).disabled = $( "floatBleep" ).disabled = !sel || !( anyKept || anyCut );
+        $( "btnKeep" ).disabled = !sel;
+        $( "btnRestore" ).disabled = $( "floatRestore" ).disabled = !sel || !restorable;
+        $( "floatMove" ).disabled = !sel;
+        $( "floatRedline" ).hidden = !( anyKept || anyBleep );
+        $( "floatBleep" ).hidden = !( anyKept || anyCut );
+        $( "floatRestore" ).hidden = !restorable;
     }
 
     function showFloat() {
@@ -376,7 +644,7 @@
         float.hidden = false;
         const top = rect.top - 10;
         const flip = top < 60;
-        float.style.left = Math.min( Math.max( rect.left + rect.width / 2, 90 ), innerWidth - 90 ) + "px";
+        float.style.left = Math.min( Math.max( rect.left + rect.width / 2, 130 ), innerWidth - 130 ) + "px";
         float.style.top = ( flip ? rect.bottom + 10 : top ) + "px";
         float.style.transform = flip ? "translate( -50%, 0 )" : "translate( -50%, -100% )";
     }
@@ -384,81 +652,167 @@
     function hideFloat() { float.hidden = true; }
 
     document.addEventListener( "selectionchange", () => {
+        if ( moving ) return;
         const s = readSelection();
         sel = s;
         updateSelButtons();
         if ( s ) showFloat(); else hideFloat();
     } );
 
-    for ( const b of [ $( "btnRedline" ), $( "btnRestore" ), $( "btnUndo" ), $( "btnFillers" ), $( "floatRedline" ), $( "floatRestore" ) ] ) {
-        b.addEventListener( "pointerdown", ( e ) => e.preventDefault() );
-    }
-    $( "btnRedline" ).onclick = $( "floatRedline" ).onclick = () => sel && applyCut( sel.from, sel.to, true );
-    $( "btnRestore" ).onclick = $( "floatRestore" ).onclick = () => sel && applyCut( sel.from, sel.to, false );
+    for ( const b of float.querySelectorAll( "button" ) ) b.addEventListener( "pointerdown", ( e ) => e.preventDefault() );
+    for ( const id of [ "btnRedline", "btnBleep", "btnKeep", "btnRestore", "btnUndo", "btnFillers" ] ) $( id ).addEventListener( "pointerdown", ( e ) => e.preventDefault() );
+    $( "btnRedline" ).onclick = $( "floatRedline" ).onclick = () => setMark( sel, CUT );
+    $( "btnBleep" ).onclick = $( "floatBleep" ).onclick = () => setMark( sel, BLEEP );
+    $( "btnKeep" ).onclick = () => keepOnly( sel );
+    $( "btnRestore" ).onclick = $( "floatRestore" ).onclick = () => restoreSel( sel );
     $( "btnUndo" ).onclick = doUndo;
+
+    /* ---------- move ---------- */
+
+    function startMove( ids ) {
+        if ( !ids?.length ) return;
+        moving = { ids, before: null };
+        document.body.classList.add( "is-moving" );
+        $( "moveHint" ).hidden = false;
+        hideFloat();
+    }
+
+    function endMove() {
+        moving = null;
+        document.body.classList.remove( "is-moving" );
+        $( "moveHint" ).hidden = true;
+        insert.hidden = true;
+    }
+
+    function insertionAt( x, y ) {
+        const el = document.elementFromPoint( x, y );
+        const w = el?.closest?.( ".w" );
+        if ( !w ) return null;
+        const r = w.getBoundingClientRect();
+        const i = +w.dataset.i;
+        const after = x > r.left + r.width / 2;
+        const pos = posOf( i );
+        return { before: after ? ( seq[ pos + 1 ] ?? -1 ) : i, rect: r, side: after ? "right" : "left" };
+    }
+
+    function showInsert( ins ) {
+        if ( !ins ) { insert.hidden = true; return; }
+        insert.hidden = false;
+        insert.style.left = ( ins.side === "right" ? ins.rect.right : ins.rect.left ) - 1 + "px";
+        insert.style.top = ins.rect.top - 2 + "px";
+        insert.style.height = ins.rect.height + 4 + "px";
+    }
+
+    $( "floatMove" ).onclick = () => { if ( sel ) startMove( selIndices( sel ) ); };
+
+    transcript.addEventListener( "pointermove", ( e ) => { if ( moving ) showInsert( insertionAt( e.clientX, e.clientY ) ); } );
+    transcript.addEventListener( "click", ( e ) => {
+        if ( !moving ) return;
+        e.preventDefault(); e.stopPropagation();
+        const ins = insertionAt( e.clientX, e.clientY );
+        const ids = moving.ids;
+        endMove();
+        if ( ins && !ids.includes( ins.before ) ) moveWords( ids, ins.before );
+    }, true );
+
+    transcript.addEventListener( "dragstart", ( e ) => {
+        if ( !sel || MOBILE ) { e.preventDefault(); return; }
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData( "text/plain", selIndices( sel ).map( ( i ) => words[ i ].text ).join( " " ) );
+        moving = { ids: selIndices( sel ), drag: true };
+        document.body.classList.add( "is-moving" );
+    } );
+    transcript.addEventListener( "dragover", ( e ) => {
+        if ( !moving?.drag ) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        showInsert( insertionAt( e.clientX, e.clientY ) );
+    } );
+    transcript.addEventListener( "drop", ( e ) => {
+        if ( !moving?.drag ) return;
+        e.preventDefault();
+        const ins = insertionAt( e.clientX, e.clientY );
+        const ids = moving.ids;
+        endMove();
+        if ( ins && !ids.includes( ins.before ) ) moveWords( ids, ins.before );
+    } );
+    transcript.addEventListener( "dragend", () => { if ( moving?.drag ) endMove(); } );
 
     /* ---------- keyboard editing ---------- */
 
-    function setCaret( i, extend ) {
-        if ( !words.length ) return;
-        i = Math.max( 0, Math.min( words.length - 1, i ) );
-        spans[ caret ]?.classList.remove( "is-caret" );
-        caret = i;
-        if ( !extend || anchor < 0 ) anchor = i;
-        spans[ i ].classList.add( "is-caret" );
+    function setCaret( pos, extend ) {
+        if ( !seq.length || pos < 0 ) return;
+        pos = Math.max( 0, Math.min( seq.length - 1, pos ) );
+        if ( caret >= 0 ) spans[ seq[ caret ] ]?.classList.remove( "is-caret" );
+        caret = pos;
+        if ( !extend || anchor < 0 ) anchor = pos;
+        const sp = spans[ seq[ pos ] ];
+        sp.classList.add( "is-caret" );
         if ( extend ) selectWords( anchor, caret );
         else { window.getSelection()?.removeAllRanges(); sel = null; updateSelButtons(); hideFloat(); }
-        const r = spans[ i ].getBoundingClientRect();
-        if ( r.top < 80 || r.bottom > innerHeight - 40 ) spans[ i ].scrollIntoView( { block: "center", behavior: "smooth" } );
+        const r = sp.getBoundingClientRect();
+        if ( r.top < 80 || r.bottom > innerHeight - 40 ) sp.scrollIntoView( { block: "center", behavior: "smooth" } );
     }
 
     function caretLine( dir ) {
-        if ( caret < 0 ) return;
-        const base = spans[ caret ].getBoundingClientRect();
+        const base = spans[ seq[ caret ] ].getBoundingClientRect();
         const cx = base.left + base.width / 2;
-        let i = caret, best = -1, bestDx = Infinity;
-        while ( ( i += dir ) >= 0 && i < words.length ) {
-            const r = spans[ i ].getBoundingClientRect();
-            const sameLine = Math.abs( r.top - base.top ) < base.height * 0.5;
-            if ( sameLine ) continue;
-            if ( best >= 0 && Math.abs( r.top - spans[ best ].getBoundingClientRect().top ) > base.height * 0.5 ) break;
+        let p = caret, best = -1, bestDx = Infinity, lineTop = null;
+        while ( ( p += dir ) >= 0 && p < seq.length ) {
+            const r = spans[ seq[ p ] ].getBoundingClientRect();
+            if ( Math.abs( r.top - base.top ) < base.height * 0.5 ) continue;
+            if ( lineTop === null ) lineTop = r.top;
+            if ( Math.abs( r.top - lineTop ) > base.height * 0.5 ) break;
             const dx = Math.abs( r.left + r.width / 2 - cx );
-            if ( dx < bestDx ) { bestDx = dx; best = i; }
+            if ( dx < bestDx ) { bestDx = dx; best = p; }
         }
-        return best < 0 ? ( dir > 0 ? words.length - 1 : 0 ) : best;
+        return best < 0 ? ( dir > 0 ? seq.length - 1 : 0 ) : best;
     }
 
     document.addEventListener( "keydown", ( e ) => {
         const tag = e.target.tagName;
-        if ( tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || e.target.isContentEditable ) return;
         const mod = e.metaKey || e.ctrlKey;
+        if ( mod && e.key.toLowerCase() === "f" && words.length ) { e.preventDefault(); openFind(); return; }
+        if ( tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || e.target.isContentEditable ) return;
         if ( mod && e.key.toLowerCase() === "z" ) { e.preventDefault(); doUndo(); return; }
         if ( !words.length ) return;
-        if ( e.key === "Backspace" || e.key === "Delete" ) {
-            e.preventDefault();
-            if ( sel ) applyCut( sel.from, sel.to, true );
-            else if ( caret >= 0 ) applyCut( caret, caret, !cut[ caret ] );
+        if ( e.key === "Escape" ) {
+            if ( moving ) { endMove(); return; }
+            window.getSelection()?.removeAllRanges();
+            if ( caret >= 0 ) spans[ seq[ caret ] ]?.classList.remove( "is-caret" );
+            caret = anchor = -1; hideFloat();
             return;
         }
+        if ( e.key === "Backspace" || e.key === "Delete" ) {
+            e.preventDefault();
+            if ( sel ) setMark( sel, CUT );
+            else if ( caret >= 0 ) { const i = seq[ caret ]; setMark( { from: caret, to: caret }, mark[ i ] === CUT ? KEEP : CUT ); }
+            return;
+        }
+        if ( e.key.toLowerCase() === "b" && !mod ) {
+            if ( sel ) { e.preventDefault(); setMark( sel, BLEEP ); }
+            else if ( caret >= 0 ) { e.preventDefault(); const i = seq[ caret ]; setMark( { from: caret, to: caret }, mark[ i ] === BLEEP ? KEEP : BLEEP ); }
+            return;
+        }
+        if ( e.key.toLowerCase() === "m" && !mod && sel ) { e.preventDefault(); startMove( selIndices( sel ) ); return; }
         if ( e.key === "ArrowLeft" || e.key === "ArrowRight" ) {
             if ( tag === "VIDEO" || e.target === $( "strip" ) ) return;
             e.preventDefault();
             const dir = e.key === "ArrowLeft" ? -1 : 1;
-            const from = caret >= 0 ? caret : ( nowIndex >= 0 ? nowIndex : 0 );
-            let i = from + dir;
-            if ( mod ) { while ( i > 0 && i < words.length - 1 && !/[.?!]$/.test( words[ i + ( dir < 0 ? -1 : 0 ) ].text ) ) i += dir; }
-            setCaret( caret < 0 ? from : i, e.shiftKey );
+            const from = caret >= 0 ? caret : ( nowIndex >= 0 ? posOf( nowIndex ) : 0 );
+            let p = from + dir;
+            if ( mod ) { while ( p > 0 && p < seq.length - 1 && !/[.?!]$/.test( words[ seq[ p + ( dir < 0 ? -1 : 0 ) ] ].text ) ) p += dir; }
+            setCaret( caret < 0 ? from : p, e.shiftKey );
             return;
         }
         if ( e.key === "ArrowUp" || e.key === "ArrowDown" ) {
             if ( tag === "VIDEO" ) return;
-            if ( caret < 0 ) { setCaret( nowIndex >= 0 ? nowIndex : 0, false ); e.preventDefault(); return; }
             e.preventDefault();
+            if ( caret < 0 ) { setCaret( nowIndex >= 0 ? posOf( nowIndex ) : 0, false ); return; }
             setCaret( caretLine( e.key === "ArrowUp" ? -1 : 1 ), e.shiftKey );
             return;
         }
-        if ( e.key === "Enter" && caret >= 0 ) { e.preventDefault(); seek( words[ caret ].start + 0.001 ); return; }
-        if ( e.key === "Escape" ) { window.getSelection()?.removeAllRanges(); spans[ caret ]?.classList.remove( "is-caret" ); caret = anchor = -1; hideFloat(); return; }
+        if ( e.key === "Enter" && caret >= 0 ) { e.preventDefault(); seek( words[ seq[ caret ] ].start + 0.001 ); return; }
         if ( e.key === " " && tag !== "BUTTON" && tag !== "VIDEO" ) {
             e.preventDefault();
             video.paused ? video.play() : video.pause();
@@ -468,14 +822,15 @@
     /* ---------- word click / seek ---------- */
 
     let downAt = null;
-    transcript.addEventListener( "pointerdown", ( e ) => { downAt = { x: e.clientX, y: e.clientY, t: Date.now() }; } );
+    transcript.addEventListener( "pointerdown", ( e ) => { downAt = { x: e.clientX, y: e.clientY }; } );
     transcript.addEventListener( "click", ( e ) => {
+        if ( moving ) return;
         const i = wordIndexOf( e.target );
         if ( i < 0 || !downAt ) return;
-        const moved = Math.hypot( e.clientX - downAt.x, e.clientY - downAt.y ) > 6;
+        const movedPtr = Math.hypot( e.clientX - downAt.x, e.clientY - downAt.y ) > 6;
         const s = window.getSelection();
-        if ( moved || ( s && !s.isCollapsed ) ) return;
-        setCaret( i, false );
+        if ( movedPtr || ( s && !s.isCollapsed ) ) return;
+        setCaret( posOf( i ), false );
         seek( words[ i ].start + 0.001 );
     } );
 
@@ -486,13 +841,62 @@
 
     /* ---------- playback loop ---------- */
 
+    let curSeg = null;
+    let actx = null, osc = null, oscGain = null, bleeping = false, bleepMuted = false;
+
+    function tone( on ) {
+        if ( on === bleeping ) return;
+        bleeping = on;
+        if ( on ) {
+            try {
+                actx ||= new ( window.AudioContext || window.webkitAudioContext )();
+                if ( actx.state === "suspended" ) actx.resume();
+                osc = actx.createOscillator(); oscGain = actx.createGain();
+                osc.type = "sine"; osc.frequency.value = 1000;
+                oscGain.gain.setValueAtTime( 0.0001, actx.currentTime );
+                oscGain.gain.exponentialRampToValueAtTime( 0.18, actx.currentTime + 0.01 );
+                osc.connect( oscGain ).connect( actx.destination ); osc.start();
+            } catch {}
+            bleepMuted = video.muted; video.muted = true;
+        } else {
+            if ( osc ) { const o = osc, g = oscGain; g.gain.exponentialRampToValueAtTime( 0.0001, actx.currentTime + 0.01 ); o.stop( actx.currentTime + 0.02 ); osc = null; }
+            video.muted = bleepMuted;
+        }
+    }
+
+    function nextSegment( t ) {
+        if ( curSeg ) {
+            const nx = segments.find( ( g ) => g.order === curSeg.order + 1 );
+            if ( nx ) return nx;
+            return null;
+        }
+        let best = null;
+        for ( const g of segments ) if ( g.s > t && ( !best || g.s < best.s ) ) best = g;
+        return best || segments[ 0 ] || null;
+    }
+
     function paint( force ) {
         const t = video.currentTime;
-        if ( !video.paused && !video.seeking && !skipping ) {
-            for ( const r of ranges ) {
-                if ( t >= r.start - 0.12 && t < r.end ) { skipTo( r ); return; }
+        if ( !video.paused && !video.seeking && !skipping && segments.length ) {
+            const g = segAt( t );
+            if ( g ) {
+                curSeg = g;
+                if ( t >= g.e - 0.12 ) {
+                    const nx = nextSegment( t );
+                    if ( nx && nx.order === g.order + 1 && Math.abs( nx.s - g.e ) < 0.001 ) { /* contiguous */ }
+                    else { skipTo( nx ); return; }
+                }
+            } else {
+                const nx = nextSegment( t );
+                skipTo( nx ); return;
             }
+        } else if ( video.paused ) {
+            curSeg = segAt( t );
         }
+        if ( !video.paused ) {
+            const inBleep = bleepRanges().some( ( [ a, b ] ) => t >= a && t < b );
+            tone( inBleep );
+        } else if ( bleeping ) tone( false );
         $( "tcNow" ).textContent = tc( shown( t ) );
         if ( duration ) $( "stripHead" ).style.left = ( t / duration * 100 ) + "%";
         const i = wordAt( t );
@@ -507,18 +911,20 @@
         }
     }
 
-    function skipTo( r ) {
+    function skipTo( nx ) {
         skipping = true;
+        if ( bleeping ) tone( false );
         const wasMuted = video.muted;
         video.muted = true;
         $( "skip" ).classList.add( "is-on" );
-        const land = r.end >= duration - 0.05 ? duration : r.end;
+        const land = nx ? nx.s : duration;
         const done = () => {
             video.removeEventListener( "seeked", done );
             video.muted = wasMuted;
             skipping = false;
+            curSeg = nx;
             $( "skip" ).classList.remove( "is-on" );
-            if ( land >= duration ) video.pause();
+            if ( !nx ) video.pause();
             paint( true );
         };
         video.addEventListener( "seeked", done );
@@ -544,15 +950,15 @@
         if ( words.length && !video.paused ) paint( false );
         requestAnimationFrame( loop );
     } )();
-    video.addEventListener( "seeked", () => { if ( !skipping ) paint( true ); } );
-    video.addEventListener( "pause", () => paint( true ) );
+    video.addEventListener( "seeked", () => { if ( !skipping ) { curSeg = null; paint( true ); } } );
+    video.addEventListener( "pause", () => { tone( false ); paint( true ); } );
     video.addEventListener( "timeupdate", () => { if ( video.paused ) paint( false ); } );
 
     $( "timeMode" ).onclick = () => {
         outputTime = !outputTime;
         $( "timeMode" ).setAttribute( "aria-pressed", String( outputTime ) );
         relabel();
-        refreshCuts();
+        rebuildAll();
         paint( true );
     };
 
@@ -584,8 +990,9 @@
         if ( url ) URL.revokeObjectURL( url );
         file = f; url = URL.createObjectURL( f );
         docKey = [ f.name, f.size, f.lastModified ].join( "|" );
-        words = []; cut = []; undo = []; ranges = []; sel = null; env = null;
+        words = []; mark = []; seq = []; moved = []; undo = []; segments = []; pauses = []; sel = null; env = null; curSeg = null;
         resetDoc();
+        closeFind();
         main.classList.remove( "is-empty" );
         $( "stage" ).hidden = false;
         $( "fileName" ).textContent = f.name;
@@ -596,6 +1003,7 @@
             $( "fileMeta" ).textContent = `${ fmtBytes( f.size ) } · ${ video.videoWidth }×${ video.videoHeight } · ${ tc( duration, false ) }`;
             if ( await restore() ) {
                 renderAll();
+                rebuildAll();
                 setStatus( "Transcript restored from this device" );
                 $( "progress" ).hidden = true;
             } else {
@@ -609,9 +1017,9 @@
     }
 
     $( "file" ).addEventListener( "change", ( e ) => openFile( e.target.files[ 0 ] ) );
-    for ( const ev of [ "dragenter", "dragover" ] ) main.addEventListener( ev, ( e ) => { e.preventDefault(); main.classList.add( "is-drag" ); } );
-    for ( const ev of [ "dragleave", "drop" ] ) main.addEventListener( ev, ( e ) => { e.preventDefault(); main.classList.remove( "is-drag" ); } );
-    main.addEventListener( "drop", ( e ) => openFile( e.dataTransfer.files[ 0 ] ) );
+    for ( const ev of [ "dragenter", "dragover" ] ) main.addEventListener( ev, ( e ) => { if ( moving ) return; e.preventDefault(); main.classList.add( "is-drag" ); } );
+    for ( const ev of [ "dragleave", "drop" ] ) main.addEventListener( ev, ( e ) => { if ( moving ) return; e.preventDefault(); main.classList.remove( "is-drag" ); } );
+    main.addEventListener( "drop", ( e ) => { if ( !moving ) openFile( e.dataTransfer.files[ 0 ] ); } );
 
     /* ---------- transcription ---------- */
 
@@ -623,14 +1031,12 @@
 
     function transcribe() {
         transcribing = true;
-        cut = [];
         env = new Uint8Array( Math.ceil( duration * 100 ) + 100 ).fill( 255 );
         $( "progress" ).hidden = false;
         $( "progressFill" ).style.width = "0%";
         $( "progressText" ).textContent = "Starting…";
         $( "btnExport" ).disabled = true;
         transcript.innerHTML = `<p class="transcript-empty">Words will appear here as they're recognized. You can play the video meanwhile.</p>`;
-        let placeholder = true;
         worker = new Worker( "transcribe-worker.js", { type: "module" } );
         const model = chosenModel();
         worker.postMessage( { type: "run", file, model, device: "auto", duration } );
@@ -658,12 +1064,10 @@
                 env.set( m.env, at );
             }
             if ( m.type === "words" && m.words.length ) {
-                if ( placeholder ) { transcript.innerHTML = ""; placeholder = false; }
                 const start = words.length;
                 words.push( ...m.words );
-                for ( let i = start; i < words.length; i++ ) cut[ i ] = false;
-                appendWords( m.words, start );
-                refreshCuts();
+                appendStreaming( m.words, start );
+                rebuildAll();
             }
             if ( m.type === "needAudio" ) {
                 if ( duration > FALLBACK_MAX_SEC ) {
@@ -681,7 +1085,7 @@
                 $( "progress" ).hidden = true;
                 setStatus( `${ words.length } words · ${ m.model.split( "/" ).pop().replace( "_timestamped", "" ) } on ${ m.device } · nothing left your device` );
                 if ( !words.length ) transcript.innerHTML = `<p class="transcript-empty">No speech was recognized in this video.</p>`;
-                refreshCuts();
+                rebuildAll();
                 worker.terminate(); worker = null;
             }
             if ( m.type === "error" ) fail( m.message );
@@ -709,34 +1113,45 @@
         return out;
     }
 
+    /* ---------- menus ---------- */
+
+    function menu( btnId, popId ) {
+        const btn = $( btnId ), pop = $( popId );
+        btn.onclick = () => { const open = pop.hidden; closeMenus(); pop.hidden = !open; btn.setAttribute( "aria-expanded", String( open ) ); };
+    }
+    function closeMenus() {
+        for ( const [ b, p ] of [ [ "btnTranscript", "tmenuPop" ], [ "btnExport", "xmenuPop" ] ] ) { $( p ).hidden = true; $( b ).setAttribute( "aria-expanded", "false" ); }
+    }
+    menu( "btnTranscript", "tmenuPop" );
+    menu( "btnExport", "xmenuPop" );
+    document.addEventListener( "pointerdown", ( e ) => { if ( !e.target.closest( ".menu" ) ) closeMenus(); } );
+
     /* ---------- transcript export ---------- */
 
-    const tmenu = $( "tmenu" ), tmenuPop = $( "tmenuPop" );
-    $( "btnTranscript" ).onclick = () => {
-        const open = tmenuPop.hidden;
-        tmenuPop.hidden = !open;
-        $( "btnTranscript" ).setAttribute( "aria-expanded", String( open ) );
-    };
-    document.addEventListener( "pointerdown", ( e ) => {
-        if ( !tmenu.contains( e.target ) ) { tmenuPop.hidden = true; $( "btnTranscript" ).setAttribute( "aria-expanded", "false" ); }
-    } );
-    for ( const b of tmenuPop.querySelectorAll( "button" ) ) {
+    for ( const b of $( "tmenuPop" ).querySelectorAll( "button" ) ) {
         b.onclick = () => {
             const fmt = b.dataset.fmt;
             const keepCut = $( "tmenuKeep" ).checked;
             const text = fmt === "txt" ? plainText( keepCut ) : captions( fmt, keepCut );
             download( new Blob( [ text ], { type: fmt === "vtt" ? "text/vtt" : "text/plain" } ), `${ file.name.replace( /\.[^.]+$/, "" ) }${ keepCut ? "" : " (redlined)" }.${ fmt }` );
-            tmenuPop.hidden = true;
+            closeMenus();
         };
     }
 
     function exportWords( keepCut ) {
-        return words.map( ( w, i ) => ( { ...w, i } ) ).filter( ( w ) => keepCut || !cut[ w.i ] ).map( ( w ) => ( {
-            text: w.text,
-            start: keepCut ? w.start : outTime( w.start ),
-            end: keepCut ? w.end : outTime( w.end ),
-            i: w.i
-        } ) );
+        const order = keepCut ? words.map( ( _, i ) => i ) : seq;
+        const out = [];
+        for ( const i of order ) {
+            if ( !keepCut && mark[ i ] === CUT ) continue;
+            const w = words[ i ];
+            out.push( {
+                text: mark[ i ] === BLEEP && !keepCut ? "[bleep]" : w.text,
+                start: keepCut ? w.start : outTime( w.start ),
+                end: keepCut ? w.end : outTime( Math.min( w.end, segAt( w.start )?.e ?? w.end ) ),
+                i
+            } );
+        }
+        return out;
     }
 
     function plainText( keepCut ) {
@@ -747,7 +1162,7 @@
         for ( const w of ws ) {
             const gap = w.start - lastEnd;
             const prev = para[ para.length - 1 ];
-            if ( para.length && ( gap > 1.1 || ( prev && /[.?!]["')\]]?$/.test( prev ) && gap > 0.45 ) ) ) flush();
+            if ( para.length && ( gap > 1.1 || gap < -0.01 || ( prev && /[.?!]["')\]]?$/.test( prev ) && gap > 0.45 ) ) ) flush();
             para.push( w.text );
             lastEnd = w.end;
         }
@@ -755,15 +1170,14 @@
         return out.trim() + "\n";
     }
 
-    function captions( fmt, keepCut ) {
-        const ws = exportWords( keepCut );
+    function buildCues( ws, maxChars = 84, maxSec = 6 ) {
         const cues = [];
         let cue = null;
         for ( const w of ws ) {
             const text = cue ? cue.text + " " + w.text : w.text;
-            const tooLong = text.length > 84 || ( cue && w.end - cue.start > 6 );
-            const bigGap = cue && w.start - cue.end > 0.7;
-            const afterSentence = cue && /[.?!]["')\]]?$/.test( cue.last ) && text.length > 40;
+            const tooLong = text.length > maxChars || ( cue && w.end - cue.start > maxSec );
+            const bigGap = cue && ( w.start - cue.end > 0.7 || w.start < cue.end - 0.01 );
+            const afterSentence = cue && /[.?!]["')\]]?$/.test( cue.last ) && text.length > maxChars / 2;
             if ( !cue || tooLong || bigGap || afterSentence ) {
                 if ( cue ) cues.push( cue );
                 cue = { start: w.start, end: w.end, text: w.text, last: w.text };
@@ -772,19 +1186,28 @@
             }
         }
         if ( cue ) cues.push( cue );
+        for ( let k = 0; k < cues.length; k++ ) {
+            const limit = k + 1 < cues.length ? cues[ k + 1 ].start - 0.05 : Infinity;
+            cues[ k ].end = Math.min( Math.max( cues[ k ].end, cues[ k ].start + 0.8 ), Math.max( limit, cues[ k ].end ) );
+        }
+        return cues;
+    }
+
+    function wrapCue( t, width = 42 ) {
+        if ( t.length <= width ) return t;
+        const mid = t.lastIndexOf( " ", Math.ceil( t.length / 2 ) + 8 );
+        return mid > 0 ? t.slice( 0, mid ) + "\n" + t.slice( mid + 1 ) : t;
+    }
+
+    function captions( fmt, keepCut ) {
+        const cues = buildCues( exportWords( keepCut ) );
         const stamp = ( t ) => {
             const h = Math.floor( t / 3600 ), m = Math.floor( t / 60 ) % 60, s = Math.floor( t % 60 ), ms = Math.round( ( t % 1 ) * 1000 );
             return `${ pad( h ) }:${ pad( m ) }:${ pad( s ) }${ fmt === "vtt" ? "." : "," }${ pad( ms, 3 ) }`;
         };
-        const wrap = ( t ) => {
-            if ( t.length <= 42 ) return t;
-            const mid = t.lastIndexOf( " ", Math.ceil( t.length / 2 ) + 8 );
-            return mid > 0 ? t.slice( 0, mid ) + "\n" + t.slice( mid + 1 ) : t;
-        };
         let out = fmt === "vtt" ? "WEBVTT\n\n" : "";
         cues.forEach( ( c, k ) => {
-            const end = Math.max( c.end, c.start + 0.8 );
-            out += ( fmt === "srt" ? `${ k + 1 }\n` : "" ) + `${ stamp( c.start ) } --> ${ stamp( end ) }\n${ wrap( c.text ) }\n\n`;
+            out += ( fmt === "srt" ? `${ k + 1 }\n` : "" ) + `${ stamp( c.start ) } --> ${ stamp( c.end ) }\n${ wrapCue( c.text ) }\n\n`;
         } );
         return out;
     }
@@ -797,7 +1220,16 @@
         setTimeout( () => URL.revokeObjectURL( a.href ), 2000 );
     }
 
-    /* ---------- export ---------- */
+    /* ---------- settings ---------- */
+
+    $( "btnSettings" ).onclick = () => $( "settings" ).showModal();
+    $( "settingsDone" ).onclick = () => $( "settings" ).close();
+    $( "settings" ).addEventListener( "close", readSettings );
+    for ( const el of $( "settings" ).querySelectorAll( "input, select" ) ) el.addEventListener( "change", readSettings );
+    for ( const el of $( "settings" ).querySelectorAll( "input[type=number], select" ) ) el.addEventListener( "click", ( e ) => e.preventDefault() );
+    loadSettings();
+
+    /* ---------- video / audio export ---------- */
 
     const sheet = $( "exportSheet" );
 
@@ -812,30 +1244,35 @@
         if ( !sheet.open ) sheet.showModal();
     }
 
-    $( "btnExport" ).onclick = async () => {
-        const segments = keepSegments();
-        if ( !segments.length ) return;
+    for ( const b of $( "xmenuPop" ).querySelectorAll( "button" ) ) b.onclick = () => { closeMenus(); runExport( b.dataset.kind ); };
+
+    async function runExport( kind ) {
+        const segs = segments.slice().sort( ( a, b ) => a.order - b.order ).map( ( g ) => ( { s: g.s, e: g.e, moved: g.moved } ) );
+        if ( !segs.length ) return;
         video.pause();
+        const audioOnly = kind === "audio";
+        const ext = audioOnly ? "m4a" : "mp4";
         const base = file.name.replace( /\.[^.]+$/, "" );
-        const kept = segments.reduce( ( s, [ a, b ] ) => s + ( b - a ), 0 );
+        const kept = outLength();
         let handle = null;
         if ( window.showSaveFilePicker ) {
             try {
                 handle = await showSaveFilePicker( {
-                    suggestedName: `${ base } (redlined).mp4`,
-                    types: [ { description: "MP4 video", accept: { "video/mp4": [ ".mp4" ] } } ]
+                    suggestedName: `${ base } (redlined).${ ext }`,
+                    types: [ audioOnly ? { description: "M4A audio", accept: { "audio/mp4": [ ".m4a" ] } } : { description: "MP4 video", accept: { "video/mp4": [ ".mp4" ] } } ]
                 } );
             } catch ( e ) { if ( e.name === "AbortError" ) return; }
         }
-        if ( !handle ) {
+        if ( !handle && !audioOnly ) {
             const estimate = file.size * ( kept / duration ) * 1.3;
             if ( estimate > MEM_EXPORT_MAX ) {
                 showExportError( "Too large to export here", `This browser has to build the whole ${ fmtBytes( estimate ) } file in memory before saving it${ IOS ? ", and iOS will kill the page first" : "" }. Export on desktop Chrome or Edge, which stream straight to disk, or redline more of the video.` );
                 return;
             }
         }
-        $( "exportTitle" ).textContent = "Exporting";
-        $( "exportSub" ).textContent = `${ segments.length } segment${ segments.length > 1 ? "s" : "" } · ${ tc( kept, false ) } kept of ${ tc( duration, false ) }`;
+        const cues = settings.captions && !audioOnly ? buildCues( exportWords( false ), 64, 5 ).map( ( c ) => ( { start: c.start, end: c.end, text: wrapCue( c.text, 32 ) } ) ) : null;
+        $( "exportTitle" ).textContent = audioOnly ? "Exporting audio" : "Exporting";
+        $( "exportSub" ).textContent = `${ segs.length } segment${ segs.length > 1 ? "s" : "" } · ${ tc( kept, false ) } kept of ${ tc( duration, false ) }`;
         $( "exportFill" ).style.width = "0%";
         $( "exportText" ).textContent = "Opening file…";
         $( "exportCancel" ).hidden = false;
@@ -844,12 +1281,19 @@
         sheet.showModal();
 
         exporter = new Worker( "export-worker.js", { type: "module" } );
-        exporter.postMessage( { type: "run", file, segments, handle } );
+        exporter.postMessage( {
+            type: "run", file, handle, audioOnly,
+            segments: segs.map( ( g ) => [ g.s, g.e ] ),
+            bleeps: bleepRanges(),
+            captions: cues,
+            capSize: settings.capSize,
+            punch: settings.punch && !audioOnly ? settings.punchPct / 100 : 0
+        } );
         exporter.onmessage = ( ev ) => {
             const m = ev.data;
             if ( m.type === "info" ) {
-                const a = m.audio === "encode" ? `audio ${ m.audioCodec }, 8 ms fades` : m.audio === "copy" ? `${ m.audioCodec } copied` : "no audio";
-                $( "exportText" ).textContent = `${ m.width }×${ m.height } · ${ m.codec } @ ${ ( m.bitrate / 1e6 ).toFixed( 1 ) } Mb/s · ${ a }`;
+                const a = m.audio === "encode" ? `audio ${ m.audioCodec }, 8 ms fades${ m.bleeps ? `, ${ m.bleeps } bleep${ m.bleeps > 1 ? "s" : "" }` : "" }` : m.audio === "copy" ? `${ m.audioCodec } copied` : "no audio";
+                $( "exportText" ).textContent = audioOnly ? a : `${ m.width }×${ m.height } · ${ m.codec } @ ${ ( m.bitrate / 1e6 ).toFixed( 1 ) } Mb/s${ m.composite ? " · canvas" : "" } · ${ a }`;
             }
             if ( m.type === "progress" ) $( "exportFill" ).style.width = ( m.fraction * 100 ).toFixed( 1 ) + "%";
             if ( m.type === "done" ) {
@@ -857,11 +1301,11 @@
                 $( "exportTitle" ).textContent = "Exported";
                 $( "exportCancel" ).hidden = true;
                 if ( m.buffer ) {
-                    const blob = new Blob( [ m.buffer ], { type: "video/mp4" } );
+                    const blob = new Blob( [ m.buffer ], { type: audioOnly ? "audio/mp4" : "video/mp4" } );
                     const dl = $( "exportDownload" );
                     if ( dl.href ) URL.revokeObjectURL( dl.href );
                     dl.href = URL.createObjectURL( blob );
-                    dl.download = `${ base } (redlined).mp4`;
+                    dl.download = `${ base } (redlined).${ ext }`;
                     dl.hidden = false;
                     $( "exportText" ).textContent = fmtBytes( blob.size ) + " ready";
                 } else {
@@ -877,7 +1321,7 @@
             if ( m.type === "cancelled" ) { sheet.close(); exporter.terminate(); exporter = null; }
         };
         exporter.onerror = ( e ) => showExportError( "Export failed", e.message || "Worker error" );
-    };
+    }
 
     $( "exportCancel" ).onclick = () => { exporter?.postMessage( { type: "cancel" } ); $( "exportText" ).textContent = "Cancelling…"; };
     $( "exportDone" ).onclick = () => sheet.close();
@@ -900,13 +1344,17 @@
     } )();
 
     window.__redline = {
-        load( demoWords, demoCut, dur ) {
+        load( demoWords, demoMark, dur, demoSeq, demoMoved ) {
             worker?.terminate(); worker = null;
-            duration = dur; words = demoWords; cut = demoCut; transcribing = false; env = null;
+            duration = dur; words = demoWords; transcribing = false; env = null;
+            mark = demoMark.map( ( c ) => c === true ? CUT : +c || KEEP );
+            seq = demoSeq || words.map( ( _, i ) => i );
+            moved = demoMoved || words.map( () => false );
             main.classList.remove( "is-empty" ); $( "stage" ).hidden = false; $( "progress" ).hidden = true;
-            renderAll();
+            renderAll(); rebuildAll();
         },
         paint: ( t ) => { spans[ nowIndex ]?.classList.remove( "is-now" ); nowIndex = wordAt( t ); spans[ nowIndex ]?.classList.add( "is-now" ); $( "tcNow" ).textContent = tc( t ); $( "stripHead" ).style.left = ( t / duration * 100 ) + "%"; },
-        state: () => ( { words, cut, ranges, env } )
+        state: () => ( { words, mark, seq, moved, segments, pauses, env } ),
+        move: moveWords, setMark, sel: () => sel
     };
 } )();
