@@ -31,7 +31,7 @@
     let sel = null;
     let caret = -1, anchor = -1;
     let nowIndex = -1;
-    let worker = null, exporter = null;
+    let worker = null, exporter = null, runCounter = 0, skippedSec = 0;
     let userScrolledAt = 0;
     let transcribing = false;
     let env = null;
@@ -1014,13 +1014,14 @@
 
     function openFile( f ) {
         if ( !f || !/^video\//.test( f.type ) && !/\.(mp4|mov|m4v|webm)$/i.test( f.name ) ) return;
-        if ( worker ) { worker.postMessage( { type: "cancel" } ); worker.terminate(); worker = null; }
+        worker?.postMessage( { type: "cancel" } );
         if ( url ) URL.revokeObjectURL( url );
         file = f; url = URL.createObjectURL( f );
         docKey = [ f.name, f.size, f.lastModified ].join( "|" );
         words = []; mark = []; seq = []; moved = []; undo = []; segments = []; pauses = []; sel = null; env = null; curSeg = null;
         resetDoc();
         closeFind();
+        setStatus( "" );
         main.classList.remove( "is-empty" );
         $( "stage" ).hidden = false;
         $( "fileName" ).textContent = f.name;
@@ -1059,17 +1060,21 @@
 
     function transcribe() {
         transcribing = true;
+        skippedSec = 0;
+        const startedAt = performance.now();
         env = new Uint8Array( Math.ceil( duration * 100 ) + 100 ).fill( 255 );
         $( "progress" ).hidden = false;
         $( "progressFill" ).style.width = "0%";
         $( "progressText" ).textContent = "Starting…";
         $( "btnExport" ).disabled = true;
         transcript.innerHTML = `<p class="transcript-empty">Words will appear here as they're recognized. You can play the video meanwhile.</p>`;
-        worker = new Worker( "transcribe-worker.js", { type: "module" } );
+        worker ||= new Worker( "transcribe-worker.js", { type: "module" } );
         const model = chosenModel();
-        worker.postMessage( { type: "run", file, model, device: "auto", duration } );
+        const run = ++runCounter;
+        worker.postMessage( { type: "run", run, file, model, device: "auto", duration } );
         worker.onmessage = async ( ev ) => {
             const m = ev.data;
+            if ( m.run !== run ) return;
             if ( m.type === "status" ) { setStatus( m.text ); $( "progressText" ).textContent = m.text; }
             if ( m.type === "model" ) {
                 if ( m.phase === "download" && m.total ) {
@@ -1105,16 +1110,18 @@
                 try {
                     $( "progressText" ).textContent = "Decoding audio with Web Audio…";
                     const audio = await decodeWholeFile( file );
-                    worker.postMessage( { type: "run", audio, model, device: "auto", duration }, [ audio.buffer ] );
+                    worker.postMessage( { type: "run", run, audio, model, device: "auto", duration }, [ audio.buffer ] );
                 } catch ( e ) { fail( "Couldn't read this file's audio: " + e.message ); }
             }
+            if ( m.type === "stats" ) skippedSec = m.skipped || 0;
             if ( m.type === "done" ) {
                 transcribing = false;
                 $( "progress" ).hidden = true;
-                setStatus( `${ words.length } words · ${ m.model.split( "/" ).pop().replace( "_timestamped", "" ) } on ${ m.device } · nothing left your device` );
+                const secs = ( ( performance.now() - startedAt ) / 1000 ).toFixed( 0 );
+                const skip = skippedSec > 1 ? ` · ${ tc( skippedSec, false ) } of silence skipped` : "";
+                setStatus( `${ words.length } words in ${ secs }s · ${ m.model.split( "/" ).pop().replace( "_timestamped", "" ) } on ${ m.device }${ skip } · nothing left your device` );
                 if ( !words.length ) transcript.innerHTML = `<p class="transcript-empty">No speech was recognized in this video.</p>`;
                 rebuildAll();
-                worker.terminate(); worker = null;
             }
             if ( m.type === "error" ) fail( m.message );
         };

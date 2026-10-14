@@ -4,7 +4,13 @@ const RATE = 16000;
 const SLAB = 300;
 const LOOK = 4;
 const CHUNK = 30;
-const STRIDE = 5;
+const STRIDE = 4;
+const VOICE_DB = 14;
+const VOICE_PAD = 0.3;
+const VOICE_GAP = 0.6;
+const VOICE_MIN = 0.25;
+
+let runId = 0;
 
 env.allowLocalModels = false;
 env.useBrowserCache = true;
@@ -13,7 +19,7 @@ let asr = null;
 let loaded = { model: null, device: null };
 let cancelled = false;
 
-const post = ( type, data ) => self.postMessage( { type, ...data } );
+const post = ( type, data, id = runId ) => self.postMessage( { type, run: id, ...data } );
 
 async function pickDevice( want ) {
     if ( want === "wasm" ) return "wasm";
@@ -24,11 +30,19 @@ async function pickDevice( want ) {
     } catch { return "wasm"; }
 }
 
+let loading = null;
+
 async function load( model, device ) {
+    if ( loading ) await loading.catch( () => {} );
     if ( asr && loaded.model === model && loaded.device === device ) return;
+    loading = loadFresh( model, device );
+    try { await loading; } finally { loading = null; }
+}
+
+async function loadFresh( model, device ) {
     if ( asr ) { await asr.dispose(); asr = null; }
     const dtype = device === "webgpu"
-        ? { encoder_model: "fp32", decoder_model_merged: /small|medium/.test( model ) ? "q4" : "fp32" }
+        ? { encoder_model: "fp32", decoder_model_merged: /tiny/.test( model ) ? "fp32" : "q4" }
         : "q8";
     const files = new Map();
     asr = await pipeline( "automatic-speech-recognition", model, {
@@ -151,9 +165,52 @@ function quietest( a, from, to ) {
     return best;
 }
 
+/* ---------- silence skipping ---------- */
+
+function voicedRegions( env, seconds ) {
+    const sorted = Float64Array.from( env ).sort();
+    const floor = sorted[ Math.floor( sorted.length * 0.1 ) ] ?? 0;
+    const thresh = floor + VOICE_DB * 3;
+    const raw = [];
+    let s0 = -1;
+    for ( let i = 0; i <= env.length; i++ ) {
+        const on = i < env.length && env[ i ] > thresh;
+        if ( on && s0 < 0 ) s0 = i;
+        if ( !on && s0 >= 0 ) { raw.push( [ s0 / 100, i / 100 ] ); s0 = -1; }
+    }
+    const merged = [];
+    for ( const [ a, b ] of raw ) {
+        const pa = Math.max( 0, a - VOICE_PAD ), pb = Math.min( seconds, b + VOICE_PAD );
+        const last = merged[ merged.length - 1 ];
+        if ( last && pa - last[ 1 ] < VOICE_GAP ) last[ 1 ] = pb;
+        else merged.push( [ pa, pb ] );
+    }
+    return merged.filter( ( [ a, b ] ) => b - a >= VOICE_MIN );
+}
+
+function compact( audio, regions ) {
+    const total = regions.reduce( ( n, [ a, b ] ) => n + Math.round( ( b - a ) * RATE ), 0 );
+    const out = new Float32Array( total );
+    const map = [];
+    let pos = 0;
+    for ( const [ a, b ] of regions ) {
+        const i0 = Math.round( a * RATE ), i1 = Math.min( audio.length, Math.round( b * RATE ) );
+        out.set( audio.subarray( i0, i1 ), pos );
+        map.push( { at: pos / RATE, src: a, len: ( i1 - i0 ) / RATE } );
+        pos += i1 - i0;
+    }
+    return { audio: out.subarray( 0, pos ), map };
+}
+
+function unmap( t, map ) {
+    let r = map[ 0 ];
+    for ( const m of map ) { if ( m.at <= t ) r = m; else break; }
+    return r ? r.src + Math.min( t - r.at, r.len ) : t;
+}
+
 /* ---------- transcription ---------- */
 
-async function transcribeSlab( audio, offset, onProgress ) {
+async function transcribeSlab( audio, offset, onProgress, map, say = post ) {
     const seconds = audio.length / RATE;
     const windowN = CHUNK * RATE, strideN = STRIDE * RATE;
     const total = seconds <= CHUNK ? 1 : Math.ceil( ( audio.length - windowN ) / ( windowN - 2 * strideN ) ) + 1;
@@ -163,7 +220,7 @@ async function transcribeSlab( audio, offset, onProgress ) {
         skip_prompt: true,
         callback_function: ( text ) => {
             live = ( live + text ).slice( -80 );
-            if ( performance.now() - lastLive > 250 ) { lastLive = performance.now(); post( "live", { text: live } ); }
+            if ( performance.now() - lastLive > 250 ) { lastLive = performance.now(); say( "live", { text: live } ); }
         },
         on_finalize: () => { done++; onProgress( Math.min( done / total, 1 ) ); }
     } );
@@ -177,8 +234,10 @@ async function transcribeSlab( audio, offset, onProgress ) {
     for ( const c of out.chunks || [] ) {
         const text = c.text.trim();
         if ( !text ) continue;
-        const start = ( c.timestamp[ 0 ] ?? 0 ) + offset;
-        const end = ( c.timestamp[ 1 ] ?? c.timestamp[ 0 ] + 0.3 ) + offset;
+        let start = c.timestamp[ 0 ] ?? 0;
+        let end = c.timestamp[ 1 ] ?? start + 0.3;
+        if ( map ) { start = unmap( start, map ); end = unmap( end, map ); }
+        start += offset; end += offset;
         words.push( { text, start, end: Math.max( end, start + 0.05 ) } );
     }
     return words;
@@ -186,19 +245,22 @@ async function transcribeSlab( audio, offset, onProgress ) {
 
 async function run( { file, audio, model, device: wantDevice, duration } ) {
     cancelled = false;
+    const me = runId;
+    const dead = () => cancelled || me !== runId;
+    const say = ( type, data ) => { if ( !dead() ) post( type, data, me ); };
     try {
         const device = await pickDevice( wantDevice );
-        post( "status", { text: `Loading ${ model.split( "/" ).pop() } on ${ device }` } );
+        say( "status", { text: `Loading ${ model.split( "/" ).pop() } on ${ device }` } );
         try {
             await load( model, device );
         } catch ( e ) {
             if ( device !== "wasm" ) {
-                post( "status", { text: "WebGPU failed, falling back to WASM" } );
+                say( "status", { text: "WebGPU failed, falling back to WASM" } );
                 await load( model, "wasm" );
             } else throw e;
         }
-        if ( cancelled ) return;
-        post( "status", { text: "Reading audio" } );
+        if ( dead() ) return;
+        say( "status", { text: "Reading audio" } );
         let source;
         if ( audio ) {
             source = ( async function* () {
@@ -215,29 +277,63 @@ async function run( { file, audio, model, device: wantDevice, duration } ) {
                 const rest = source;
                 source = ( async function* () { yield first; yield* rest; } )();
             } catch ( e ) {
-                if ( /undecodable|no audio|decod/i.test( e.message ) ) { post( "needAudio", {} ); return; }
+                if ( /undecodable|no audio|decod/i.test( e.message ) ) { say( "needAudio", {} ); return; }
                 throw e;
             }
         }
-        let doneSec = 0;
-        for await ( const { audio: slab, offset } of slabs( source ) ) {
-            if ( cancelled ) return;
+        let doneSec = 0, skipped = 0;
+        const queue = [];
+        let producerDone = false, wake = null;
+        const notify = () => { if ( wake ) { wake(); wake = null; } };
+        ( async () => {
+            try {
+                for await ( const slab of slabs( source ) ) {
+                    if ( dead() ) break;
+                    queue.push( slab );
+                    notify();
+                    while ( queue.length >= 2 && !dead() ) await new Promise( ( r ) => { wake = r; } );
+                }
+            } catch ( e ) { queue.push( { error: e } ); }
+            producerDone = true;
+            notify();
+        } )();
+        while ( true ) {
+            if ( dead() ) return;
+            if ( !queue.length ) {
+                if ( producerDone ) break;
+                await new Promise( ( r ) => { wake = r; } );
+                continue;
+            }
+            const item = queue.shift();
+            notify();
+            if ( item.error ) throw item.error;
+            const { audio: slab, offset } = item;
             const slabSec = slab.length / RATE;
-            post( "envelope", { offset, env: envelope( slab ) } );
-            const words = await transcribeSlab( slab, offset, ( f ) => {
-                post( "progress", { fraction: Math.min( ( doneSec + f * slabSec ) / duration, 0.995 ), device: loaded.device, model: loaded.model } );
-            } );
+            const env = envelope( slab );
+            say( "envelope", { offset, env } );
+            const regions = voicedRegions( env, slabSec );
+            let input = slab, map = null;
+            const voiced = regions.reduce( ( n, [ a, b ] ) => n + ( b - a ), 0 );
+            if ( regions.length && slabSec - voiced >= 1 ) {
+                ( { audio: input, map } = compact( slab, regions ) );
+                skipped += slabSec - voiced;
+            }
+            const words = regions.length ? await transcribeSlab( input, offset, ( f ) => {
+                say( "progress", { fraction: Math.min( ( doneSec + f * slabSec ) / duration, 0.995 ), device: loaded.device, model: loaded.model } );
+            }, map, say ) : [];
+            if ( dead() ) return;
             doneSec += slabSec;
-            post( "words", { words } );
+            say( "words", { words } );
         }
-        post( "done", { device: loaded.device, model: loaded.model } );
+        say( "stats", { skipped } );
+        say( "done", { device: loaded.device, model: loaded.model } );
     } catch ( e ) {
-        post( "error", { message: e.message || String( e ) } );
+        if ( !dead() ) say( "error", { message: e.message || String( e ) } );
     }
 }
 
 self.onmessage = ( ev ) => {
     const m = ev.data;
-    if ( m.type === "run" ) run( m );
+    if ( m.type === "run" ) { runId = m.run ?? runId + 1; run( m ); }
     if ( m.type === "cancel" ) cancelled = true;
 };
