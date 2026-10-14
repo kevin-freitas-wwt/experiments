@@ -7,6 +7,7 @@ locally, or visit the live site at
 
 ## Projects
 
+- **[Redline](https://kevin-freitas-wwt.github.io/experiments/Redline/)** — edit video by striking words out of its transcript: Whisper (word-timestamped) runs on-device via WebGPU or WASM, words highlight and autoscroll with playback, click a word to seek, redline a selection to skip it, and export a frame-accurate cut with WebCodecs at source resolution and audio copied losslessly. Nothing is uploaded
 - **[Vantage](https://kevin-freitas-wwt.github.io/experiments/Vantage/)** — client telemetry three ways in WebGPU: orbit a 250,000-point request cloud, watch traffic arc between 40 data centers on a globe with true limb occlusion, and read utilization as a 4,096-bar terrain. One synthetic dataset, single instanced draw calls, no build step
 - **[Triptych](https://kevin-freitas-wwt.github.io/experiments/Triptych/)** — three WebGPU studies in one canvas: a raymarched Mandelbulb observatory, suminagashi ink marbling on a real Navier–Stokes solver, and a Gray–Scott reaction-diffusion culture. One GPU context, three switchable worlds, each with its own design, no build step
 - **[Triangulate](https://kevin-freitas-wwt.github.io/experiments/Triangulate/)** — crowd triangulation: sight a target through your phone's camera and each shot casts a compass-bearing ray on a map; rays from different spots least-squares into a lat/lon/altitude fix with an error radius. Hand-plot mode for desktop, photos stored locally per ray
