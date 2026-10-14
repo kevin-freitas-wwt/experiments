@@ -13,7 +13,8 @@
     const KEEP = 0, CUT = 1, BLEEP = 2;
     const SNAP = 0.35;
     const PAD = 0.04;
-    const BLEEP_PAD = 0.03;
+    const BLEEP_PAD = 0.14;
+    const BLEEP_INTRUDE = 0.05;
     const FALLBACK_MAX_SEC = 2 * 3600;
     const MEM_EXPORT_MAX = 1.5e9;
 
@@ -370,13 +371,7 @@
         flush( duration );
         for ( const [ a, b ] of pauses ) html += `<div class="strip-cut is-pause" style="left:${ pct( a ) };width:${ w( a, b ) }"></div>`;
         for ( const g of segments ) if ( g.moved ) html += `<div class="strip-cut is-moved" style="left:${ pct( g.s ) };width:${ w( g.s, g.e ) }"></div>`;
-        for ( let i = 0; i < words.length; i++ ) {
-            if ( mark[ i ] !== BLEEP ) continue;
-            let j = i;
-            while ( j + 1 < words.length && mark[ j + 1 ] === BLEEP ) j++;
-            html += `<div class="strip-cut is-bleep" style="left:${ pct( words[ i ].start - BLEEP_PAD ) };width:${ w( words[ i ].start - BLEEP_PAD, words[ j ].end + BLEEP_PAD ) }"></div>`;
-            i = j;
-        }
+        for ( const [ a, b ] of bleepRanges() ) html += `<div class="strip-cut is-bleep" style="left:${ pct( a ) };width:${ w( a, b ) }"></div>`;
         $( "stripCuts" ).innerHTML = html;
     }
 
@@ -396,7 +391,11 @@
             if ( mark[ i ] !== BLEEP ) continue;
             let j = i;
             while ( j + 1 < words.length && mark[ j + 1 ] === BLEEP ) j++;
-            out.push( [ Math.max( 0, words[ i ].start - BLEEP_PAD ), words[ j ].end + BLEEP_PAD ] );
+            const prevEnd = i > 0 ? words[ i - 1 ].end : 0;
+            const nextStart = j < words.length - 1 ? words[ j + 1 ].start : duration;
+            const start = Math.max( 0, Math.min( words[ i ].start - BLEEP_INTRUDE, Math.max( prevEnd, words[ i ].start - BLEEP_PAD ) ) );
+            const end = Math.min( duration || Infinity, Math.max( words[ j ].end + BLEEP_INTRUDE, Math.min( nextStart, words[ j ].end + BLEEP_PAD ) ) );
+            out.push( [ start, end ] );
             i = j;
         }
         return out;
