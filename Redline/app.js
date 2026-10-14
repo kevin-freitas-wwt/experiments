@@ -1062,6 +1062,19 @@
         transcribing = true;
         skippedSec = 0;
         const startedAt = performance.now();
+        let etaFrom = 0, etaSmooth = 0;
+        const estimate = ( f ) => {
+            if ( !etaFrom ) { etaFrom = performance.now(); return ""; }
+            const elapsed = ( performance.now() - etaFrom ) / 1000;
+            if ( f >= 0.99 ) return "finishing";
+            if ( elapsed < 8 || f < 0.05 ) return "";
+            const raw = elapsed * ( 1 - f ) / f;
+            etaSmooth = etaSmooth ? etaSmooth * 0.7 + raw * 0.3 : raw;
+            const r = Math.max( 1, etaSmooth );
+            if ( r < 60 ) return `${ Math.ceil( r / 5 ) * 5 }s`;
+            if ( r < 3600 ) return `~${ Math.ceil( r / 60 ) }m`;
+            return `~${ Math.floor( r / 3600 ) }h ${ Math.ceil( ( r % 3600 ) / 60 ) }m`;
+        };
         env = new Uint8Array( Math.ceil( duration * 100 ) + 100 ).fill( 255 );
         $( "progress" ).hidden = false;
         $( "progressFill" ).style.width = "0%";
@@ -1085,7 +1098,8 @@
             }
             if ( m.type === "progress" ) {
                 $( "progressFill" ).style.width = ( m.fraction * 100 ).toFixed( 1 ) + "%";
-                setStatus( `Transcribing · ${ Math.round( m.fraction * 100 ) }% · ${ m.model.split( "/" ).pop().replace( "_timestamped", "" ) } on ${ m.device }` );
+                const eta = estimate( m.fraction );
+                setStatus( `Transcribing · ${ Math.round( m.fraction * 100 ) }%${ eta === "finishing" ? " · finishing" : eta ? ` · ${ eta } remaining` : "" } · ${ m.model.split( "/" ).pop().replace( "_timestamped", "" ) } on ${ m.device }` );
             }
             if ( m.type === "live" ) $( "progressText" ).textContent = "… " + m.text.trim();
             if ( m.type === "envelope" ) {

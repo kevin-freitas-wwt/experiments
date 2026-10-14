@@ -214,15 +214,20 @@ async function transcribeSlab( audio, offset, onProgress, map, say = post ) {
     const seconds = audio.length / RATE;
     const windowN = CHUNK * RATE, strideN = STRIDE * RATE;
     const total = seconds <= CHUNK ? 1 : Math.ceil( ( audio.length - windowN ) / ( windowN - 2 * strideN ) ) + 1;
-    let done = 0;
+    let done = 0, tokens = 0;
     let live = "", lastLive = 0;
+    const expect = Math.min( seconds, CHUNK ) * 3.6;
     const streamer = new WhisperTextStreamer( asr.tokenizer, {
         skip_prompt: true,
+        token_callback_function: () => {
+            tokens++;
+            if ( tokens % 8 === 0 ) onProgress( Math.min( ( done + Math.min( 0.95, tokens / expect ) ) / total, 1 ) );
+        },
         callback_function: ( text ) => {
             live = ( live + text ).slice( -80 );
             if ( performance.now() - lastLive > 250 ) { lastLive = performance.now(); say( "live", { text: live } ); }
         },
-        on_finalize: () => { done++; onProgress( Math.min( done / total, 1 ) ); }
+        on_finalize: () => { done++; tokens = 0; onProgress( Math.min( done / total, 1 ) ); }
     } );
     const out = await asr( audio, {
         return_timestamps: "word",
@@ -282,6 +287,7 @@ async function run( { file, audio, model, device: wantDevice, duration } ) {
             }
         }
         let doneSec = 0, skipped = 0;
+        say( "progress", { fraction: 0, device: loaded.device, model: loaded.model } );
         const queue = [];
         let producerDone = false, wake = null;
         const notify = () => { if ( wake ) { wake(); wake = null; } };
