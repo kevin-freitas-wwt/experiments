@@ -64,7 +64,7 @@
             const mid = ( lo + hi ) >> 1;
             if ( words[ mid ].start <= t ) { best = mid; lo = mid + 1; } else hi = mid - 1;
         }
-        if ( best >= 0 && t > words[ best ].end + 0.35 ) return -1;
+        if ( best >= 0 && t > words[ best ].end + 1.5 ) return -1;
         return best;
     }
 
@@ -240,6 +240,16 @@
         return best;
     }
 
+    function quietPoint( t0, t1 ) {
+        if ( t1 - t0 < 0.02 ) return ( t0 + t1 ) / 2;
+        let best = ( t0 + t1 ) / 2, bestE = Infinity;
+        for ( let t = t0 + 0.01; t < t1; t += 0.01 ) {
+            const e = energyAt( t );
+            if ( e < bestE ) { bestE = e; best = t; }
+        }
+        return best;
+    }
+
     function pauseCuts( a, b ) {
         if ( !settings.pauses || !env ) return [];
         const out = [];
@@ -281,13 +291,25 @@
             blocks.push( { a: i, b: seq[ j ], moved: !!moved[ i ] } );
             k = j + 1;
         }
-        let out = 0, order = 0;
         for ( const bl of blocks ) {
             const prevEnd = bl.a > 0 ? words[ bl.a - 1 ].end : 0;
             const nextStart = bl.b < n - 1 ? words[ bl.b + 1 ].start : duration;
-            let s = bl.a === 0 && mark[ 0 ] !== CUT ? 0 : Math.max( prevEnd, Math.min( words[ bl.a ].start, snapEdge( words[ bl.a ].start - PAD, -1, prevEnd ) ) );
-            let e = bl.b === n - 1 ? duration : Math.min( nextStart, Math.max( words[ bl.b ].end, snapEdge( words[ bl.b ].end + PAD, 1, nextStart ) ) );
-            if ( bl.a === 0 && mark[ 0 ] !== CUT && !bl.moved ) s = 0;
+            bl.s = bl.a === 0 ? 0 : Math.max( prevEnd, Math.min( words[ bl.a ].start, snapEdge( words[ bl.a ].start - PAD, -1, prevEnd ) ) );
+            bl.e = bl.b === n - 1 ? duration : Math.min( nextStart, Math.max( words[ bl.b ].end, snapEdge( words[ bl.b ].end + PAD, 1, nextStart ) ) );
+        }
+        const bySrc = blocks.slice().sort( ( x, y ) => x.a - y.a );
+        for ( let k = 1; k < bySrc.length; k++ ) {
+            const prev = bySrc[ k - 1 ], cur = bySrc[ k ];
+            if ( cur.a === prev.b + 1 ) {
+                const q = quietPoint( words[ prev.b ].end, words[ cur.a ].start );
+                prev.e = q; cur.s = q;
+            } else if ( cur.s < prev.e ) {
+                cur.s = prev.e;
+            }
+        }
+        let out = 0, order = 0;
+        for ( const bl of blocks ) {
+            const s = bl.s, e = bl.e;
             const pieces = [];
             let cur = s;
             for ( const [ ps, pe ] of pauseCuts( bl.a, bl.b ) ) {
@@ -952,6 +974,13 @@
     } )();
     video.addEventListener( "seeked", () => { if ( !skipping ) { curSeg = null; paint( true ); } } );
     video.addEventListener( "pause", () => { tone( false ); paint( true ); } );
+    video.addEventListener( "play", () => {
+        if ( !segments.length ) return;
+        const first = segments.find( ( g ) => g.order === 0 );
+        const t = video.currentTime;
+        const atStart = t < 0.05 || t >= duration - 0.05;
+        if ( atStart && first && !( t >= first.s && t < first.e ) ) { curSeg = first; video.currentTime = first.s; }
+    } );
     video.addEventListener( "timeupdate", () => { if ( video.paused ) paint( false ); } );
 
     $( "timeMode" ).onclick = () => {
