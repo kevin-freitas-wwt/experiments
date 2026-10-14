@@ -68,14 +68,20 @@
 
         <section class="stage" id="stage" hidden>
             <div class="player">
-                <video id="video" playsinline controls preload="metadata"></video>
+                <div class="frame">
+                    <video id="video" playsinline controls preload="metadata"></video>
+                    <div class="skip" id="skip" aria-hidden="true"><span>skip</span></div>
+                </div>
                 <div class="strip" id="strip" role="slider" aria-label="Timeline" tabindex="0">
                     <div class="strip-cuts" id="stripCuts"></div>
                     <div class="strip-head" id="stripHead"></div>
                 </div>
                 <div class="readout">
                     <span class="tc" id="tcNow">00:00.00</span>
-                    <span class="readout-right"><span id="tcLen"></span><span class="readout-cut" id="tcCut"></span></span>
+                    <span class="readout-right">
+                        <span id="tcLen"></span><span class="readout-cut" id="tcCut"></span>
+                        <button class="seg" id="timeMode" title="Show timecodes as source or output (rippled) time" aria-pressed="false"><span>source</span><span>output</span></button>
+                    </span>
                 </div>
                 <div class="filecard">
                     <span class="filecard-name" id="fileName"></span>
@@ -92,8 +98,20 @@
                     <button class="btn btn-icon" id="btnUndo" disabled title="Undo (⌘Z)">
                         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4L2.5 7.5 6 11" /><path d="M3 7.5h6a4 4 0 010 8H8" /></svg>
                     </button>
+                    <button class="btn" id="btnFillers" disabled title="Strike every um, uh, you know, stutter and repeated phrase">Fillers</button>
                     <span class="tools-gap"></span>
                     <span class="tools-note" id="toolsNote"></span>
+                    <div class="menu" id="tmenu">
+                        <button class="btn" id="btnTranscript" disabled aria-haspopup="true" aria-expanded="false">Transcript
+                            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
+                        </button>
+                        <div class="menu-pop" id="tmenuPop" hidden>
+                            <button data-fmt="srt">SubRip .srt</button>
+                            <button data-fmt="vtt">WebVTT .vtt</button>
+                            <button data-fmt="txt">Plain text .txt</button>
+                            <label><input type="checkbox" id="tmenuKeep"> include struck words</label>
+                        </div>
+                    </div>
                     <button class="btn btn-primary" id="btnExport" disabled>Export video</button>
                 </div>
                 <div class="progress" id="progress" hidden>

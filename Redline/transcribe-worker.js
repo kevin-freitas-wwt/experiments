@@ -103,33 +103,41 @@ function resampleTail( buf, ratio, phase ) {
 }
 
 async function* slabs( source ) {
-    let pending = [];
-    let pendingLen = 0;
+    const cap = ( SLAB + LOOK ) * RATE;
+    let buf = new Float32Array( cap );
+    let len = 0;
     let offset = 0;
-    const flush = ( upTo ) => {
-        const all = new Float32Array( pendingLen );
-        let p = 0;
-        for ( const c of pending ) { all.set( c, p ); p += c.length; }
-        const slab = all.subarray( 0, upTo );
-        const rest = all.slice( upTo );
-        pending = rest.length ? [ rest ] : [];
-        pendingLen = rest.length;
-        const r = { audio: slab, offset };
-        offset += upTo / RATE;
-        return r;
-    };
     for await ( const c of source ) {
-        pending.push( c ); pendingLen += c.length;
-        while ( pendingLen >= ( SLAB + LOOK ) * RATE ) {
-            const all = new Float32Array( pendingLen );
-            let p = 0;
-            for ( const x of pending ) { all.set( x, p ); p += x.length; }
-            pending = [ all ]; pendingLen = all.length;
-            const cut = quietest( all, ( SLAB - LOOK ) * RATE, ( SLAB + LOOK ) * RATE );
-            yield flush( cut );
+        let pos = 0;
+        while ( pos < c.length ) {
+            const take = Math.min( c.length - pos, cap - len );
+            buf.set( c.subarray( pos, pos + take ), len );
+            len += take; pos += take;
+            if ( len === cap ) {
+                const cut = quietest( buf, ( SLAB - LOOK ) * RATE, cap );
+                yield { audio: buf.slice( 0, cut ), offset };
+                offset += cut / RATE;
+                buf.copyWithin( 0, cut, len );
+                len -= cut;
+            }
         }
     }
-    if ( pendingLen > RATE * 0.5 ) yield flush( pendingLen );
+    if ( len > RATE * 0.5 ) yield { audio: buf.slice( 0, len ), offset };
+    buf = null;
+}
+
+function envelope( a ) {
+    const hop = RATE / 100;
+    const n = Math.floor( a.length / hop );
+    const out = new Uint8Array( n );
+    for ( let i = 0; i < n; i++ ) {
+        let e = 0;
+        const base = i * hop;
+        for ( let k = 0; k < hop; k++ ) e += a[ base + k ] * a[ base + k ];
+        const db = 10 * Math.log10( e / hop + 1e-10 );
+        out[ i ] = Math.max( 0, Math.min( 255, Math.round( ( db + 80 ) * 3 ) ) );
+    }
+    return out;
 }
 
 function quietest( a, from, to ) {
@@ -193,7 +201,11 @@ async function run( { file, audio, model, device: wantDevice, duration } ) {
         post( "status", { text: "Reading audio" } );
         let source;
         if ( audio ) {
-            source = ( async function* () { yield audio; } )();
+            source = ( async function* () {
+                const step = RATE * 60;
+                for ( let i = 0; i < audio.length; i += step ) yield audio.subarray( i, i + step );
+                audio = null;
+            } )();
         } else {
             try {
                 source = audioChunks( file );
@@ -211,6 +223,7 @@ async function run( { file, audio, model, device: wantDevice, duration } ) {
         for await ( const { audio: slab, offset } of slabs( source ) ) {
             if ( cancelled ) return;
             const slabSec = slab.length / RATE;
+            post( "envelope", { offset, env: envelope( slab ) } );
             const words = await transcribeSlab( slab, offset, ( f ) => {
                 post( "progress", { fraction: Math.min( ( doneSec + f * slabSec ) / duration, 0.995 ), device: loaded.device, model: loaded.model } );
             } );

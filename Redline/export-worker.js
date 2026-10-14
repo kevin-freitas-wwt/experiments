@@ -40,16 +40,19 @@ async function run( { file, segments, handle } ) {
         const vSource = new mb.VideoSampleSource( { codec, bitrate, keyFrameInterval: 2 } );
         output.addVideoTrack( vSource, { rotation: vTrack.rotation } );
 
-        let aMode = "none", aSource = null, aCodec = null;
+        let aMode = "none", aSource = null, aCodec = null, outCodec = null;
         if ( aTrack && await aTrack.canDecode() ) {
             aCodec = aTrack.codec;
-            const canCopy = aCodec && format.getSupportedAudioCodecs().includes( aCodec );
-            if ( canCopy ) {
+            const rate = aTrack.sampleRate, ch = aTrack.numberOfChannels;
+            for ( const c of [ "aac", "opus" ] ) {
+                if ( await mb.canEncodeAudio( c, { numberOfChannels: ch, sampleRate: rate } ) ) { outCodec = c; break; }
+            }
+            if ( outCodec ) {
+                aMode = "encode";
+                aSource = new mb.AudioSampleSource( { codec: outCodec, bitrate: Math.min( 256e3, Math.max( 128e3, ( await aTrack.getAverageBitrate() ) || 160e3 ) ) } );
+            } else if ( format.getSupportedAudioCodecs().includes( aCodec ) ) {
                 aMode = "copy";
                 aSource = new mb.EncodedAudioPacketSource( aCodec );
-            } else if ( await mb.canEncodeAudio( "aac" ) ) {
-                aMode = "encode";
-                aSource = new mb.AudioSampleSource( { codec: "aac", bitrate: 192e3 } );
             }
             if ( aSource ) output.addAudioTrack( aSource );
         }
@@ -57,7 +60,8 @@ async function run( { file, segments, handle } ) {
         await output.start();
 
         const total = segments.reduce( ( s, [ a, b ] ) => s + ( b - a ), 0 );
-        post( "info", { codec, audio: aMode, audioCodec: aCodec, bitrate, width: vTrack.displayWidth, height: vTrack.displayHeight } );
+        const srcDuration = await input.computeDuration();
+        post( "info", { codec, audio: aMode, audioCodec: aMode === "encode" ? outCodec : aCodec, bitrate, width: vTrack.displayWidth, height: vTrack.displayHeight } );
 
         const vSink = new mb.VideoSampleSink( vTrack );
         const aPackets = aMode === "copy" ? new mb.EncodedPacketSink( aTrack ) : null;
@@ -66,7 +70,8 @@ async function run( { file, segments, handle } ) {
 
         let outT = 0;
         let lastA = -Infinity;
-        for ( const [ s, e ] of segments ) {
+        for ( let si = 0; si < segments.length; si++ ) {
+            const [ s, e ] = segments[ si ];
             const shift = outT - s;
             let first = true;
             for await ( const sample of vSink.samples( s, e ) ) {
@@ -93,12 +98,13 @@ async function run( { file, segments, handle } ) {
                     lastA = t + p.duration;
                 }
             } else if ( aSink ) {
+                const fadeIn = si > 0 || s > 0.001;
+                const fadeOut = si < segments.length - 1 || e < srcDuration - 0.001;
                 for await ( const a of aSink.samples( s, e ) ) {
                     if ( cancelled ) { a.close(); throw new Error( "cancelled" ); }
-                    if ( a.timestamp < s - 1e-4 || a.timestamp + a.duration > e + 1e-4 ) { a.close(); continue; }
-                    a.setTimestamp( a.timestamp + shift );
-                    await aSource.add( a );
+                    const trimmed = trimAudio( a, s, e, shift, fadeIn, fadeOut );
                     a.close();
+                    if ( trimmed ) { await aSource.add( trimmed ); trimmed.close(); }
                 }
             }
             outT += e - s;
@@ -110,6 +116,38 @@ async function run( { file, segments, handle } ) {
         if ( output ) await output.cancel().catch( () => {} );
         post( e.message === "cancelled" ? "cancelled" : "error", { message: e.message || String( e ) } );
     }
+}
+
+const FADE = 0.008;
+
+function trimAudio( a, s, e, shift, fadeIn, fadeOut ) {
+    const rate = a.sampleRate, ch = a.numberOfChannels, n = a.numberOfFrames;
+    const t0 = a.timestamp, t1 = t0 + n / rate;
+    if ( t1 <= s || t0 >= e ) return null;
+    const from = Math.max( 0, Math.round( ( s - t0 ) * rate ) );
+    const to = Math.min( n, Math.round( ( e - t0 ) * rate ) );
+    if ( to <= from ) return null;
+    const len = to - from;
+    const data = new Float32Array( len * ch );
+    const plane = new Float32Array( n );
+    for ( let c = 0; c < ch; c++ ) {
+        a.copyTo( plane, { format: "f32-planar", planeIndex: c } );
+        data.set( plane.subarray( from, to ), c * len );
+    }
+    const fadeN = Math.round( FADE * rate );
+    const segStart = Math.round( ( t0 - s ) * rate ) + from;
+    const segEnd = Math.round( ( e - s ) * rate );
+    for ( let i = 0; i < len; i++ ) {
+        const pos = segStart + i;
+        let g = 1;
+        if ( fadeIn && pos < fadeN ) g *= pos / fadeN;
+        if ( fadeOut && segEnd - pos <= fadeN ) g *= Math.max( 0, segEnd - pos - 1 ) / fadeN;
+        if ( g !== 1 ) for ( let c = 0; c < ch; c++ ) data[ c * len + i ] *= g;
+    }
+    return new mb.AudioSample( {
+        data, format: "f32-planar", numberOfChannels: ch, numberOfFrames: len, sampleRate: rate,
+        timestamp: Math.max( t0, s ) + shift
+    } );
 }
 
 self.onmessage = ( ev ) => {
