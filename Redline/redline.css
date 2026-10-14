@@ -592,6 +592,12 @@ video {
 
 .w.is-moved + .w.is-moved { box-shadow: -0.3em 0 0 var( --blue-wash ); }
 
+.w.is-moved.is-now, .w.is-bleep.is-now, .w.is-cut.is-now {
+    background: var( --marker );
+    box-shadow: 0 0 0 0.12em var( --marker );
+    color: var( --ink );
+}
+
 .w.is-match { outline: 1.5px solid var( --ink ); outline-offset: 1px; }
 
 .para.is-moved::before {
