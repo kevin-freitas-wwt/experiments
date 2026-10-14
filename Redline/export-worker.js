@@ -146,22 +146,31 @@ async function run( { file, segments, handle, audioOnly, bleeps = [], captions =
     }
 }
 
+const CAP_HI = "#ffd84d";
+
 function drawCaption( ctx, cues, t, W, H, font ) {
     const cue = cues.find( ( c ) => t >= c.start && t < c.end );
     if ( !cue ) return;
-    const lines = cue.text.split( "\n" );
     ctx.font = `600 ${ font }px -apple-system, "Helvetica Neue", Arial, sans-serif`;
-    ctx.textAlign = "center";
+    ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
-    const lh = font * 1.25, padX = font * 0.5, padY = font * 0.28;
+    const lh = font * 1.25, padX = font * 0.5, padY = font * 0.28, space = ctx.measureText( " " ).width;
     const bottom = H - H * 0.06;
-    for ( let k = lines.length - 1, y = bottom; k >= 0; k--, y -= lh ) {
-        const tw = ctx.measureText( lines[ k ] ).width;
+    let active = null;
+    for ( const line of cue.lines ) for ( const w of line ) if ( w.start <= t ) active = w;
+    for ( let k = cue.lines.length - 1, y = bottom; k >= 0; k--, y -= lh ) {
+        const line = cue.lines[ k ];
+        const widths = line.map( ( w ) => ctx.measureText( w.text ).width );
+        const tw = widths.reduce( ( a, b ) => a + b, 0 ) + space * ( line.length - 1 );
+        let x = W / 2 - tw / 2;
         ctx.fillStyle = "rgba( 0, 0, 0, 0.62 )";
-        roundRect( ctx, W / 2 - tw / 2 - padX, y - font - padY * 0.6, tw + padX * 2, lh + padY * 0.2, font * 0.22 );
+        roundRect( ctx, x - padX, y - font - padY * 0.6, tw + padX * 2, lh + padY * 0.2, font * 0.22 );
         ctx.fill();
-        ctx.fillStyle = "#fff";
-        ctx.fillText( lines[ k ], W / 2, y );
+        line.forEach( ( w, i ) => {
+            ctx.fillStyle = w === active ? CAP_HI : "#fff";
+            ctx.fillText( w.text, x, y );
+            x += widths[ i ] + space;
+        } );
     }
 }
 

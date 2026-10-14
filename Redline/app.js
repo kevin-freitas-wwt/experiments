@@ -1180,9 +1180,9 @@
             const afterSentence = cue && /[.?!]["')\]]?$/.test( cue.last ) && text.length > maxChars / 2;
             if ( !cue || tooLong || bigGap || afterSentence ) {
                 if ( cue ) cues.push( cue );
-                cue = { start: w.start, end: w.end, text: w.text, last: w.text };
+                cue = { start: w.start, end: w.end, text: w.text, last: w.text, words: [ w ] };
             } else {
-                cue.text = text; cue.end = w.end; cue.last = w.text;
+                cue.text = text; cue.end = w.end; cue.last = w.text; cue.words.push( w );
             }
         }
         if ( cue ) cues.push( cue );
@@ -1197,6 +1197,19 @@
         if ( t.length <= width ) return t;
         const mid = t.lastIndexOf( " ", Math.ceil( t.length / 2 ) + 8 );
         return mid > 0 ? t.slice( 0, mid ) + "\n" + t.slice( mid + 1 ) : t;
+    }
+
+    function wrapWords( ws, width ) {
+        const items = ws.map( ( w ) => ( { text: w.text, start: w.start, end: w.end } ) );
+        const total = items.reduce( ( n, w ) => n + w.text.length + 1, -1 );
+        if ( total <= width ) return [ items ];
+        let best = 1, bestDiff = Infinity, run = 0;
+        for ( let k = 0; k < items.length - 1; k++ ) {
+            run += items[ k ].text.length + 1;
+            const diff = Math.abs( run - total / 2 );
+            if ( diff < bestDiff ) { bestDiff = diff; best = k + 1; }
+        }
+        return [ items.slice( 0, best ), items.slice( best ) ];
     }
 
     function captions( fmt, keepCut ) {
@@ -1270,7 +1283,7 @@
                 return;
             }
         }
-        const cues = settings.captions && !audioOnly ? buildCues( exportWords( false ), 64, 5 ).map( ( c ) => ( { start: c.start, end: c.end, text: wrapCue( c.text, 32 ) } ) ) : null;
+        const cues = settings.captions && !audioOnly ? buildCues( exportWords( false ), 64, 5 ).map( ( c ) => ( { start: c.start, end: c.end, lines: wrapWords( c.words, 32 ) } ) ) : null;
         $( "exportTitle" ).textContent = audioOnly ? "Exporting audio" : "Exporting";
         $( "exportSub" ).textContent = `${ segs.length } segment${ segs.length > 1 ? "s" : "" } · ${ tc( kept, false ) } kept of ${ tc( duration, false ) }`;
         $( "exportFill" ).style.width = "0%";
