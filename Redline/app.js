@@ -295,8 +295,8 @@
         for ( const bl of blocks ) {
             const prevEnd = bl.a > 0 ? words[ bl.a - 1 ].end : 0;
             const nextStart = bl.b < n - 1 ? words[ bl.b + 1 ].start : duration;
-            bl.s = bl.a === 0 ? 0 : Math.max( prevEnd, Math.min( words[ bl.a ].start, snapEdge( words[ bl.a ].start - PAD, -1, prevEnd ) ) );
-            bl.e = bl.b === n - 1 ? duration : Math.min( nextStart, Math.max( words[ bl.b ].end, snapEdge( words[ bl.b ].end + PAD, 1, nextStart ) ) );
+            bl.s = bl.a === 0 && !bl.moved ? 0 : Math.max( prevEnd, Math.min( words[ bl.a ].start, snapEdge( words[ bl.a ].start - PAD, -1, prevEnd ) ) );
+            bl.e = bl.b === n - 1 && !bl.moved ? duration : Math.min( nextStart, Math.max( words[ bl.b ].end, snapEdge( words[ bl.b ].end + PAD, 1, nextStart ) ) );
         }
         const bySrc = blocks.slice().sort( ( x, y ) => x.a - y.a );
         for ( let k = 1; k < bySrc.length; k++ ) {
@@ -338,9 +338,8 @@
         if ( moves ) bits.push( `${ moves } moved` );
         if ( removed > 0.05 ) bits.push( `${ removed.toFixed( 1 ) }s removed` );
         $( "toolsNote" ).textContent = bits.join( " · " );
-        const edited = cuts || bleeps || moves || pauses.length;
         $( "btnUndo" ).disabled = !undo.length;
-        $( "btnExport" ).disabled = transcribing || !words.length || !edited;
+        $( "btnExport" ).disabled = transcribing || !words.length;
         for ( const id of [ "btnFillers", "btnTranscript", "btnFind" ] ) $( id ).disabled = transcribing || !words.length;
         if ( outputTime ) relabel();
         decorate();
@@ -461,7 +460,7 @@
         seq = [ ...rest.slice( 0, pos ), ...ids, ...rest.slice( pos ) ];
         renderAll();
         afterEdit( ids[ 0 ] );
-        selectWords( seq.indexOf( ids[ 0 ] ), seq.indexOf( ids[ ids.length - 1 ] ) );
+        spans[ ids[ 0 ] ]?.scrollIntoView( { block: "nearest", behavior: "smooth" } );
     }
 
     function afterEdit( focusIndex ) {
@@ -664,7 +663,8 @@
         if ( !rect.width && !rect.height ) return hideFloat();
         float.hidden = false;
         const top = rect.top - 10;
-        const flip = top < 60;
+        const toolsBottom = $( "tools" ).getBoundingClientRect().bottom;
+        const flip = top - 44 < Math.max( 60, toolsBottom + 6 );
         float.style.left = Math.min( Math.max( rect.left + rect.width / 2, 130 ), innerWidth - 130 ) + "px";
         float.style.top = ( flip ? rect.bottom + 10 : top ) + "px";
         float.style.transform = flip ? "translate( -50%, 0 )" : "translate( -50%, -100% )";
@@ -705,9 +705,24 @@
         insert.hidden = true;
     }
 
-    function insertionAt( x, y ) {
+    function nearestWord( x, y ) {
         const el = document.elementFromPoint( x, y );
-        const w = el?.closest?.( ".w" );
+        const direct = el?.closest?.( ".w" );
+        if ( direct ) return direct;
+        const para = el?.closest?.( ".para" ) || ( transcript.contains( el ) ? transcript : null );
+        if ( !para ) return null;
+        let best = null, bestD = Infinity;
+        for ( const w of para.querySelectorAll( ".w" ) ) {
+            const r = w.getBoundingClientRect();
+            if ( y < r.top - 4 || y > r.bottom + 4 ) continue;
+            const d = x < r.left ? r.left - x : x > r.right ? x - r.right : 0;
+            if ( d < bestD ) { bestD = d; best = w; }
+        }
+        return best;
+    }
+
+    function insertionAt( x, y ) {
+        const w = nearestWord( x, y );
         if ( !w ) return null;
         const r = w.getBoundingClientRect();
         const i = +w.dataset.i;
@@ -799,6 +814,7 @@
         if ( !words.length ) return;
         if ( e.key === "Escape" ) {
             if ( moving ) { endMove(); return; }
+            if ( !$( "find" ).hidden ) { closeFind(); return; }
             window.getSelection()?.removeAllRanges();
             if ( caret >= 0 ) spans[ seq[ caret ] ]?.classList.remove( "is-caret" );
             caret = anchor = -1; hideFloat();
@@ -1013,7 +1029,11 @@
     /* ---------- loading a file ---------- */
 
     function openFile( f ) {
-        if ( !f || !/^video\//.test( f.type ) && !/\.(mp4|mov|m4v|webm)$/i.test( f.name ) ) return;
+        if ( !f ) return;
+        if ( !/^video\//.test( f.type ) && !/\.(mp4|mov|m4v|webm)$/i.test( f.name ) ) {
+            setStatus( `"${ f.name }" isn't a video file` );
+            return;
+        }
         worker?.postMessage( { type: "cancel" } );
         if ( url ) URL.revokeObjectURL( url );
         file = f; url = URL.createObjectURL( f );
@@ -1205,8 +1225,9 @@
     function fail( msg ) {
         transcribing = false;
         tabBusy( "" );
-        $( "progressText" ).textContent = "Failed: " + msg;
+        $( "progress" ).hidden = true;
         setStatus( "Transcription failed" );
+        transcript.innerHTML = `<p class="transcript-empty">${ msg.replace( /</g, "&lt;" ) }</p>`;
         console.error( msg );
     }
 
@@ -1349,7 +1370,6 @@
     $( "settingsDone" ).onclick = () => $( "settings" ).close();
     $( "settings" ).addEventListener( "close", readSettings );
     for ( const el of $( "settings" ).querySelectorAll( "input, select" ) ) el.addEventListener( "change", readSettings );
-    for ( const el of $( "settings" ).querySelectorAll( "input[type=number], select" ) ) el.addEventListener( "click", ( e ) => e.preventDefault() );
     loadSettings();
 
     /* ---------- video / audio export ---------- */

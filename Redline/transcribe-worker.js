@@ -282,7 +282,8 @@ async function run( { file, audio, model, device: wantDevice, duration } ) {
                 const rest = source;
                 source = ( async function* () { yield first; yield* rest; } )();
             } catch ( e ) {
-                if ( /undecodable|no audio|decod/i.test( e.message ) ) { say( "needAudio", {} ); return; }
+                if ( /no audio track/i.test( e.message ) ) throw e;
+                if ( /undecodable|decod/i.test( e.message ) ) { say( "needAudio", {} ); return; }
                 throw e;
             }
         }
