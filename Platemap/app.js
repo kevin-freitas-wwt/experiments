@@ -81,16 +81,16 @@ function heatLayer( id, source, layer, weight, zoom ) {
         layout: { visibility: "none" },
         paint: {
             "heatmap-color": heatColor(),
-            "heatmap-intensity": [ "interpolate", [ "linear" ], [ "zoom" ], 0, 1.3, 8, 1.8, 11, 2.2, 12, 0.8, 16, 1.6 ],
-            "heatmap-opacity": 0.85,
-            "heatmap-radius": [ "interpolate", [ "linear" ], [ "zoom" ], 0, 10, 4, 16, 8, 20, 11, 24, 12, 18, 16, 30 ],
+            "heatmap-intensity": [ "interpolate", [ "linear" ], [ "zoom" ], 0, 1.6, 5, 2, 8, 2.8, 11, 3, 12, 1, 16, 1.8 ],
+            "heatmap-opacity": 0.9,
+            "heatmap-radius": [ "interpolate", [ "linear" ], [ "zoom" ], 0, 14, 4, 22, 8, 30, 11, 34, 12, 22, 16, 36 ],
             "heatmap-weight": weight,
         },
     };
 }
 
 function heatWeight( c ) {
-    return [ "interpolate", [ "linear" ], [ "sqrt", c ], 0, 0, 1, 0.03, 3.2, 0.1, 10, 0.3, 45, 0.7, 140, 1 ];
+    return [ "interpolate", [ "linear" ], [ "sqrt", c ], 0, 0, 1, 0.06, 3.2, 0.18, 10, 0.45, 45, 0.85, 140, 1 ];
 }
 
 function pointFilter() {
@@ -142,8 +142,8 @@ async function decorate() {
         },
     } );
     map.addLayer( heatLayer( "heat-clusters", "heat", "heat", heatWeight( c ), { maxzoom: POINT_ZOOM } ) );
-    map.addLayer( heatLayer( "heat-zip", "overview", "zippoints", 0.12, { maxzoom: POINT_ZOOM } ) );
-    for ( const h of HALVES ) map.addLayer( heatLayer( "heat-" + h, "points-" + h, "points", 0.12, { minzoom: POINT_ZOOM } ) );
+    map.addLayer( heatLayer( "heat-zip", "overview", "zippoints", 0.15, { maxzoom: POINT_ZOOM } ) );
+    for ( const h of HALVES ) map.addLayer( heatLayer( "heat-" + h, "points-" + h, "points", 0.15, { minzoom: POINT_ZOOM } ) );
     for ( const h of HALVES ) map.addLayer( {
         id: "points-" + h, type: "circle", source: "points-" + h, "source-layer": "points", minzoom: POINT_ZOOM,
         filter: pointFilter(),
