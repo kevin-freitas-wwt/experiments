@@ -60,7 +60,7 @@ Two rules keep sections connectable. Noise fades to zero within `1.3` units of a
 }
 ```
 
-Cells are in grid units (world position is `cell * CELL`). `spawn` may be fractional; `yaw` is radians, `0` faces north. `ground` adds a flat plane at `y = 0`; `labels` hangs a type/blurb sprite in front of each cell unless that cell sets `label: false`. `view` is the draw distance in cells (default 5): cells further than that from the player are hidden, and unless `fog` is given the fog density is set so the cut-off is already invisible.
+Cells are in grid units (world position is `cell * CELL`). `spawn` may be fractional; `yaw` is radians, `0` faces north. `ground` adds a flat plane at `y = 0`; `labels` hangs a type/blurb sprite in front of each cell unless that cell sets `label: false`. `ambient` scales the hemisphere fill light (default 0.6, cave-dark; the gallery uses 9 so every exhibit is lit). `view` is the draw distance in cells (default 5): cells further than that from the player are hidden, and unless `fog` is given the fog density is set so the cut-off is already invisible.
 
 A cell with `"flare": true` gets a dropped road flare: a short red stick placed at a seeded random spot on that cell's floor (found by raycasting down, so it sits on cave rock too), a flickering red point light at its tip, and a column of soft white smoke (a 32-point particle system with a small custom shader). Each flare is one real light, so use them in handfuls, not everywhere.
 

@@ -3,7 +3,7 @@
     "blurb": "The whole kit on a 4\u00d73 grid with one-cell aisles, each section's vertical partner stacked above or sunk below wherever it opens up or down. Rock faces inward, so look straight through from the aisle or walk in.",
     "ground": true,
     "labels": true,
-    "fog": 0.03,
+    "fog": 0.018,
     "spawn": {
         "x": 3,
         "y": 0,
@@ -132,5 +132,6 @@
             "label": false
         }
     ],
-    "view": 8
+    "view": 8,
+    "ambient": 9
 }

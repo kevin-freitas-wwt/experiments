@@ -39,7 +39,8 @@ scene.add( camera );
 
 // --- Light --------------------------------------------------------------------
 
-scene.add( new THREE.HemisphereLight( 0x4a5668, 0x1a1512, 1.4 ) );
+// `ambient` in the level JSON scales the fill: ~0.6 for a cave, 8+ to see everything.
+scene.add( new THREE.HemisphereLight( 0xf4f1ea, 0x8c7f70, level.ambient ?? 0.6 ) );
 
 const lamp = new THREE.SpotLight( 0xffe3b4, 220, 70, 0.7, 0.7, 2 );
 lamp.position.set( 0.2, -0.3, 0 );
