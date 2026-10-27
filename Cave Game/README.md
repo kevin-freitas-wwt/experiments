@@ -37,6 +37,8 @@ Levels: `?level=gallery` (default, the whole kit laid out) or `?level=sample` (a
 | `well` | n s down | corridor with a floor hole |
 | `cap` | n s up | corridor with a ceiling hole |
 
+Each type also exists as a `cave-` variant (`cave-corridor`, `cave-ramp`, and so on) with the same openings. Cave panels are subdivided (`0.4` unit segments), pushed into the room by two octaves of value noise, and flat-shaded so the facets read as rock. Displacement fades to zero within `0.9` units of every panel edge, so cube boundaries and doorways stay exactly where the flat kit puts them and cave sections connect to flat ones. Each cave cell is also dressed with stalagmites, rubble and stalactites, seeded from its grid position, kept near the walls and out of door lanes, and under knee height on the floor so they never block movement.
+
 `n` is `-z`, `e` is `+x`. `rot` is quarter turns clockwise seen from above (0 to 3); wall openings rotate, `up`/`down` do not. `rotatedOpenings( type, rot )` gives the world-facing set.
 
 ## Level JSON (`levels/*.json`)
@@ -70,8 +72,9 @@ Raycast collision against the section meshes: two horizontal rays at knee and ch
 | --- | --- |
 | `src/sections.js` | Cube constants, the kit table, and the section builders |
 | `src/level.js` | JSON loading, placing cells, connectivity check, labels, ground |
-| `src/materials.js` | Canvas-generated rock colour and bump maps |
+| `src/materials.js` | Canvas-generated rock colour and bump maps, smooth and flat-shaded sets |
+| `src/noise.js` | Seeded RNG (random number generator) and 2D value noise |
 | `src/main.js` | Renderer, headlamp, pointer-lock controls, collision, HUD (heads-up display) |
 | `src/style.css` | Entry sheet, survey log, crosshair |
-| `levels/gallery.json` | Every section in a row, vertical partners stacked |
-| `levels/sample.json` | Small connected loop using rotation and a ramp |
+| `levels/gallery.json` | Flat kit in the front row, cave variants staggered behind, vertical partners stacked |
+| `levels/sample.json` | Small connected loop of cave sections using rotation and a ramp |

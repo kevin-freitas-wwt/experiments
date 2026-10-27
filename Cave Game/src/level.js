@@ -19,20 +19,20 @@ export async function loadLevel( name ) {
 
 function label( text, sub ) {
     const canvas = document.createElement( "canvas" );
-    canvas.width = 512;
+    canvas.width = 640;
     canvas.height = 160;
     const ctx = canvas.getContext( "2d" );
     ctx.fillStyle = "#e8e2d4";
     ctx.textAlign = "center";
     ctx.font = "500 64px Menlo, Consolas, monospace";
-    ctx.fillText( text, 256, 70 );
+    ctx.fillText( text, 320, 70 );
     ctx.fillStyle = "#f2a93b";
-    ctx.font = "32px Menlo, Consolas, monospace";
-    ctx.fillText( sub, 256, 125 );
+    ctx.font = "26px Menlo, Consolas, monospace";
+    ctx.fillText( sub, 320, 122 );
     const tex = new THREE.CanvasTexture( canvas );
     tex.colorSpace = THREE.SRGBColorSpace;
     const sprite = new THREE.Sprite( new THREE.SpriteMaterial( { map: tex, transparent: true } ) );
-    sprite.scale.set( 5.2, 1.6, 1 );
+    sprite.scale.set( 6.4, 1.6, 1 );
     return sprite;
 }
 
@@ -51,7 +51,7 @@ export function buildLevel( level ) {
     }
 
     for ( const c of cells.values() ) {
-        const section = buildSection( c.type );
+        const section = buildSection( c.type, ( c.x * 73856093 ^ c.y * 19349663 ^ c.z * 83492791 ) >>> 0 );
         section.rotation.y = -c.rot * Math.PI / 2;
         section.position.set( c.x * CELL, c.y * CELL, c.z * CELL );
         group.add( section );

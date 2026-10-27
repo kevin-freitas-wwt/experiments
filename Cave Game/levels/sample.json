@@ -1,6 +1,6 @@
 {
     "name": "sample",
-    "blurb": "A small connected loop that uses rotation and a stair to change level. Spawn faces south.",
+    "blurb": "A small connected loop of cave sections that uses rotation and a ramp to change level. Spawn faces south.",
     "ground": false,
     "labels": false,
     "fog": 0.05,
@@ -15,112 +15,112 @@
             "x": 0,
             "y": 0,
             "z": 0,
-            "type": "end",
+            "type": "cave-end",
             "rot": 2
         },
         {
             "x": 0,
             "y": 0,
             "z": 1,
-            "type": "corridor",
+            "type": "cave-corridor",
             "rot": 0
         },
         {
             "x": 0,
             "y": 0,
             "z": 2,
-            "type": "corner",
+            "type": "cave-corner",
             "rot": 0
         },
         {
             "x": 1,
             "y": 0,
             "z": 2,
-            "type": "tee",
+            "type": "cave-tee",
             "rot": 1
         },
         {
             "x": 2,
             "y": 0,
             "z": 2,
-            "type": "ramp",
+            "type": "cave-ramp",
             "rot": 1
         },
         {
             "x": 2,
             "y": 1,
             "z": 2,
-            "type": "well",
+            "type": "cave-well",
             "rot": 1
         },
         {
             "x": 1,
             "y": 1,
             "z": 2,
-            "type": "corridor",
+            "type": "cave-corridor",
             "rot": 1
         },
         {
             "x": 0,
             "y": 1,
             "z": 2,
-            "type": "end",
+            "type": "cave-end",
             "rot": 1
         },
         {
             "x": 3,
             "y": 1,
             "z": 2,
-            "type": "pit",
+            "type": "cave-pit",
             "rot": 3
         },
         {
             "x": 3,
             "y": 0,
             "z": 2,
-            "type": "cap",
+            "type": "cave-cap",
             "rot": 0
         },
         {
             "x": 3,
             "y": 0,
             "z": 1,
-            "type": "end",
+            "type": "cave-end",
             "rot": 2
         },
         {
             "x": 3,
             "y": 0,
             "z": 3,
-            "type": "corridor",
+            "type": "cave-corridor",
             "rot": 0
         },
         {
             "x": 3,
             "y": 0,
             "z": 4,
-            "type": "corner",
+            "type": "cave-corner",
             "rot": 3
         },
         {
             "x": 2,
             "y": 0,
             "z": 4,
-            "type": "corridor",
+            "type": "cave-corridor",
             "rot": 1
         },
         {
             "x": 1,
             "y": 0,
             "z": 4,
-            "type": "corner",
+            "type": "cave-corner",
             "rot": 0
         },
         {
             "x": 1,
             "y": 0,
             "z": 3,
-            "type": "corridor",
+            "type": "cave-corridor",
             "rot": 0
         }
     ]

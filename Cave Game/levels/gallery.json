@@ -1,6 +1,6 @@
 {
     "name": "gallery",
-    "blurb": "Every section in the kit on one row, with its vertical partner stacked above or sunk below wherever it opens up or down. Walls face inward, so look straight through from outside or walk in.",
+    "blurb": "Front row: the flat kit, one section per plinth. Back row, staggered into the gaps: the same ten openings as eroded cave variants. Vertical partners stack above or sink below wherever a section opens up or down.",
     "ground": true,
     "labels": true,
     "fog": 0.012,
@@ -126,6 +126,124 @@
             "y": 1,
             "z": 0,
             "type": "pit",
+            "rot": 0,
+            "label": false
+        },
+        {
+            "x": 1,
+            "y": 0,
+            "z": -3,
+            "type": "cave-corridor",
+            "rot": 0
+        },
+        {
+            "x": 3,
+            "y": 0,
+            "z": -3,
+            "type": "cave-corner",
+            "rot": 0
+        },
+        {
+            "x": 5,
+            "y": 0,
+            "z": -3,
+            "type": "cave-tee",
+            "rot": 0
+        },
+        {
+            "x": 7,
+            "y": 0,
+            "z": -3,
+            "type": "cave-cross",
+            "rot": 0
+        },
+        {
+            "x": 9,
+            "y": 0,
+            "z": -3,
+            "type": "cave-end",
+            "rot": 0
+        },
+        {
+            "x": 11,
+            "y": 0,
+            "z": -3,
+            "type": "cave-ramp",
+            "rot": 0
+        },
+        {
+            "x": 11,
+            "y": 1,
+            "z": -3,
+            "type": "cave-well",
+            "rot": 0,
+            "label": false
+        },
+        {
+            "x": 13,
+            "y": 0,
+            "z": -3,
+            "type": "cave-shaft",
+            "rot": 0
+        },
+        {
+            "x": 13,
+            "y": -1,
+            "z": -3,
+            "type": "cave-cap",
+            "rot": 0,
+            "label": false
+        },
+        {
+            "x": 13,
+            "y": 1,
+            "z": -3,
+            "type": "cave-well",
+            "rot": 0,
+            "label": false
+        },
+        {
+            "x": 15,
+            "y": 0,
+            "z": -3,
+            "type": "cave-pit",
+            "rot": 0
+        },
+        {
+            "x": 15,
+            "y": -1,
+            "z": -3,
+            "type": "cave-cap",
+            "rot": 0,
+            "label": false
+        },
+        {
+            "x": 17,
+            "y": 0,
+            "z": -3,
+            "type": "cave-well",
+            "rot": 0
+        },
+        {
+            "x": 17,
+            "y": -1,
+            "z": -3,
+            "type": "cave-cap",
+            "rot": 0,
+            "label": false
+        },
+        {
+            "x": 19,
+            "y": 0,
+            "z": -3,
+            "type": "cave-cap",
+            "rot": 0
+        },
+        {
+            "x": 19,
+            "y": 1,
+            "z": -3,
+            "type": "cave-pit",
             "rot": 0,
             "label": false
         }

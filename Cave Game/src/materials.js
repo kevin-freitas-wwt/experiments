@@ -64,13 +64,14 @@ function texture( canvas ) {
     return tex;
 }
 
-function rock( seed, tint, roughness ) {
+function rock( seed, tint, roughness, flat = false ) {
     const base = rockCanvas( seed );
     const bump = new THREE.CanvasTexture( base );
     bump.wrapS = bump.wrapT = THREE.RepeatWrapping;
     return new THREE.MeshStandardMaterial( {
         bumpMap: bump,
-        bumpScale: 0.6,
+        bumpScale: flat ? 0.3 : 0.6,
+        flatShading: flat,
         map: texture( tinted( base, tint ) ),
         metalness: 0,
         roughness
@@ -78,6 +79,9 @@ function rock( seed, tint, roughness ) {
 }
 
 export const materials = {
+    cave_ceiling: rock( 0x2b9f, "#4e5663", 0.97, true ),
+    cave_floor: rock( 0x61d3, "#6a675f", 0.92, true ),
+    cave_wall: rock( 0xc4e1, "#5a6170", 0.95, true ),
     ceiling: rock( 0x7a11, "#5a6270", 0.95 ),
     floor: rock( 0x3c21, "#6b6a66", 0.9 ),
     ground: new THREE.MeshStandardMaterial( {

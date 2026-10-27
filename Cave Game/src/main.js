@@ -56,6 +56,9 @@ scene.add( built.group );
 built.warnings.forEach( ( w ) => console.warn( w ) );
 
 for ( const c of built.cells.values() ) {
+    if ( level.labels && c.label === false ) {
+        continue;
+    }
     const glow = new THREE.PointLight( 0xf2a93b, 40, CELL * 1.8, 2 );
     glow.position.set( c.x * CELL, c.y * CELL + CELL * 0.62, c.z * CELL );
     scene.add( glow );
