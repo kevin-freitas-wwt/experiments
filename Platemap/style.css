@@ -250,6 +250,35 @@ h1 {
     position: fixed;
     z-index: 2;
 }
+.legend--heat .legend__dot {
+    background: linear-gradient( 90deg, var( --accent-soft ), var( --accent ), #f2b705 );
+    border-radius: 3px;
+    width: 28px;
+}
+.heat {
+    align-items: center;
+    background: var( --paper );
+    border: 1px solid var( --hair );
+    border-radius: 999px;
+    color: var( --fg );
+    cursor: pointer;
+    display: flex;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    gap: 6px;
+    padding: 6px 12px 6px 8px;
+    position: fixed;
+    right: 56px;
+    top: 10px;
+    z-index: 2;
+}
+.heat:hover { border-color: var( --accent ); }
+.heat[aria-pressed="true"] {
+    background: var( --accent );
+    border-color: var( --accent );
+    color: #fff;
+}
 .legend__dot {
     background: var( --accent );
     border-radius: 50%;
@@ -321,4 +350,9 @@ h1 {
     .search, .suggest li, .scope, .cuisines li, .colophon { padding-left: 16px; padding-right: 16px; }
     .colophon { display: none; }
     .legend { left: 12px; }
+    .heat {
+        bottom: 54px;
+        right: 12px;
+        top: auto;
+    }
 }

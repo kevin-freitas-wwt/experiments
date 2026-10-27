@@ -7,7 +7,7 @@ const POINT_ZOOM = 12;
 const HALVES = [ "w", "e" ];
 const US = [ [ -125.5, 24 ], [ -66.5, 49.5 ] ];
 
-const state = { g: null, zip: null };
+const state = { g: null, zip: null, heat: false };
 const initialHash = location.hash;
 let data = null;
 let index = [];
@@ -68,6 +68,31 @@ function clusterPaint( c ) {
     };
 }
 
+function heatColor() {
+    const a = accent();
+    return [ "interpolate", [ "linear" ], [ "heatmap-density" ],
+        0, "rgba(0,0,0,0)", 0.15, dark.matches ? "rgba(224,112,124,0.25)" : "rgba(122,31,43,0.18)",
+        0.4, a, 0.7, dark.matches ? "#ff9f6e" : "#c9532e", 1, dark.matches ? "#ffe9b0" : "#f2b705" ];
+}
+
+function heatLayer( id, source, layer, weight, zoom ) {
+    return {
+        id, type: "heatmap", source, "source-layer": layer, ...zoom,
+        layout: { visibility: "none" },
+        paint: {
+            "heatmap-color": heatColor(),
+            "heatmap-intensity": [ "interpolate", [ "linear" ], [ "zoom" ], 0, 1.3, 8, 1.8, 11, 2.2, 12, 0.8, 16, 1.6 ],
+            "heatmap-opacity": 0.85,
+            "heatmap-radius": [ "interpolate", [ "linear" ], [ "zoom" ], 0, 10, 4, 16, 8, 20, 11, 24, 12, 18, 16, 30 ],
+            "heatmap-weight": weight,
+        },
+    };
+}
+
+function heatWeight( c ) {
+    return [ "interpolate", [ "linear" ], [ "sqrt", c ], 0, 0, 1, 0.03, 3.2, 0.1, 10, 0.3, 45, 0.7, 140, 1 ];
+}
+
 function pointFilter() {
     const f = [ "all" ];
     if ( state.g != null ) f.push( [ "==", [ "get", "g" ], state.g ] );
@@ -78,8 +103,9 @@ function pointFilter() {
 async function decorate() {
     const c = countExpr();
     const cp = clusterPaint( c );
-    const [ overview, ...halves ] = await Promise.all( [ tileUrl( "overview" ), ...HALVES.map( ( h ) => tileUrl( "points_" + h ) ) ] );
+    const [ overview, heat, ...halves ] = await Promise.all( [ tileUrl( "overview" ), tileUrl( "heat" ), ...HALVES.map( ( h ) => tileUrl( "points_" + h ) ) ] );
     map.addSource( "overview", { type: "vector", url: overview } );
+    map.addSource( "heat", { type: "vector", url: heat } );
     HALVES.forEach( ( h, i ) => map.addSource( "points-" + h, { type: "vector", url: halves[ i ] } ) );
 
     map.addLayer( {
@@ -115,6 +141,9 @@ async function decorate() {
             "circle-stroke-width": 1,
         },
     } );
+    map.addLayer( heatLayer( "heat-clusters", "heat", "heat", heatWeight( c ), { maxzoom: POINT_ZOOM } ) );
+    map.addLayer( heatLayer( "heat-zip", "overview", "zippoints", 0.12, { maxzoom: POINT_ZOOM } ) );
+    for ( const h of HALVES ) map.addLayer( heatLayer( "heat-" + h, "points-" + h, "points", 0.12, { minzoom: POINT_ZOOM } ) );
     for ( const h of HALVES ) map.addLayer( {
         id: "points-" + h, type: "circle", source: "points-" + h, "source-layer": "points", minzoom: POINT_ZOOM,
         filter: pointFilter(),
@@ -133,6 +162,8 @@ function applyState() {
     const c = countExpr();
     const cp = clusterPaint( c );
     const zipMode = !!state.zip;
+    const heat = state.heat;
+    const show = ( id, on ) => map.setLayoutProperty( id, "visibility", on ? "visible" : "none" );
     map.setFilter( "clusters", [ ">", c, 0 ] );
     map.setFilter( "cluster-labels", [ ">=", c, 2 ] );
     map.setPaintProperty( "clusters", "circle-radius", cp.radius );
@@ -140,18 +171,31 @@ function applyState() {
     map.setPaintProperty( "clusters", "circle-stroke-width", cp.stroke );
     map.setLayoutProperty( "cluster-labels", "text-field", labelExpr( c ) );
     map.setLayoutProperty( "cluster-labels", "text-size", cp.text );
-    map.setLayoutProperty( "clusters", "visibility", zipMode ? "none" : "visible" );
-    map.setLayoutProperty( "cluster-labels", "visibility", zipMode ? "none" : "visible" );
-    map.setLayoutProperty( "zippoints", "visibility", zipMode ? "visible" : "none" );
+    show( "clusters", !zipMode && !heat );
+    show( "cluster-labels", !zipMode && !heat );
+    show( "zippoints", zipMode && !heat );
+    show( "heat-clusters", !zipMode && heat );
+    show( "heat-zip", zipMode && heat );
     map.setFilter( "zippoints", pointFilter() );
-    for ( const h of HALVES ) map.setFilter( "points-" + h, pointFilter() );
+    map.setFilter( "heat-clusters", [ ">", c, 0 ] );
+    map.setFilter( "heat-zip", pointFilter() );
+    map.setPaintProperty( "heat-clusters", "heatmap-weight", heatWeight( c ) );
+    for ( const h of HALVES ) {
+        map.setFilter( "points-" + h, pointFilter() );
+        map.setFilter( "heat-" + h, pointFilter() );
+        show( "points-" + h, !heat );
+        show( "heat-" + h, heat );
+    }
+    document.getElementById( "heat" ).setAttribute( "aria-pressed", heat );
+    document.getElementById( "legend" ).classList.toggle( "legend--heat", heat );
     updateLegend();
 }
 
 function updateLegend() {
     const z = map.getZoom();
     const el = document.getElementById( "legendText" );
-    if ( state.zip ) el.textContent = `Each dot is one restaurant in ${ state.zip }`;
+    if ( state.heat ) el.textContent = state.zip ? `Density of restaurants in ${ state.zip }` : "Density of restaurants";
+    else if ( state.zip ) el.textContent = `Each dot is one restaurant in ${ state.zip }`;
     else if ( z >= POINT_ZOOM ) el.textContent = "Each dot is one restaurant";
     else el.textContent = "Circles are counts. Zoom in for individual restaurants";
 }
@@ -302,6 +346,7 @@ function readHash() {
     state.g = g != null && data.groups[ g ] ? Number( g ) : null;
     const zip = h.get( "zip" );
     state.zip = zip && data.zips[ zip ] ? zip : null;
+    state.heat = h.get( "view" ) === "heat";
     if ( state.zip ) input.value = state.zip;
 }
 
@@ -309,6 +354,7 @@ function writeHash() {
     const h = new URLSearchParams( location.hash.slice( 1 ) );
     state.g == null ? h.delete( "g" ) : h.set( "g", state.g );
     state.zip ? h.set( "zip", state.zip ) : h.delete( "zip" );
+    state.heat ? h.set( "view", "heat" ) : h.delete( "view" );
     history.replaceState( null, "", "#" + h.toString() );
 }
 
@@ -320,6 +366,11 @@ function sync() {
 }
 
 if ( matchMedia( "( max-width: 760px )" ).matches ) document.getElementById( "toggle" ).setAttribute( "aria-expanded", "false" );
+document.getElementById( "heat" ).addEventListener( "click", () => {
+    state.heat = !state.heat;
+    sync();
+} );
+
 document.getElementById( "toggle" ).addEventListener( "click", ( e ) => {
     const b = e.currentTarget;
     b.setAttribute( "aria-expanded", b.getAttribute( "aria-expanded" ) !== "true" );

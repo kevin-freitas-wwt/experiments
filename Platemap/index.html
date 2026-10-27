@@ -65,6 +65,15 @@
 
     <main class="map" id="map" role="region" aria-label="Map of restaurants"></main>
 
+    <button class="heat" id="heat" type="button" aria-pressed="false" title="Toggle heatmap">
+        <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+            <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <circle cx="10" cy="10" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <circle cx="10" cy="10" r="1.4" fill="currentColor"/>
+        </svg>
+        <span>Heatmap</span>
+    </button>
+
     <div class="legend" id="legend">
         <span class="legend__dot"></span>
         <span id="legendText">Zoom in for individual restaurants</span>

@@ -17,9 +17,11 @@ PY
 ACC=$( for i in $( seq 0 25 ); do printf -- "--accumulate-attribute=c$i:sum "; done )
 tippecanoe -q -P -o data/clusters.mbtiles -l clusters -Z0 -z11 -r1 --cluster-distance=64 $ACC --force data/clusters.geojsonl
 tippecanoe -q -P -o data/zippoints.mbtiles -l zippoints -Z9 -z9 -r1 --no-feature-limit --no-tile-size-limit -y z -y g --force data/points.geojsonl
+tippecanoe -q -P -o data/heat.mbtiles -l heat -Z0 -z11 -r1 --cluster-distance=10 $ACC --no-tile-size-limit --force data/clusters.geojsonl
 tile-join -q -o data/overview.pmtiles --force --no-tile-size-limit data/clusters.mbtiles data/zippoints.mbtiles
+tile-join -q -o data/heat.pmtiles --force --no-tile-size-limit data/heat.mbtiles
 for h in w e; do
     tippecanoe -q -P -o data/points_$h.mbtiles -l points -Z12 -z12 -r1 --no-feature-limit --no-tile-size-limit --force data/points_$h.geojsonl
     tile-join -q -o data/points_$h.pmtiles --force --no-tile-size-limit data/points_$h.mbtiles
 done
-echo "copy data/overview.pmtiles data/points_{w,e}.pmtiles data/zips.json into Platemap/data/"
+echo "copy data/overview.pmtiles data/heat.pmtiles data/points_{w,e}.pmtiles data/zips.json into Platemap/data/"
