@@ -7,10 +7,10 @@ Not listed on the experiments index.
 ## Running
 
 ```bash
-python3 -m http.server 5173
+python3 "Cave Game/serve.py" 8765     # from the experiments folder
 ```
 
-Open http://localhost:5173 (ES modules need `http://`, not `file://`). Three.js loads from jsDelivr via an importmap; there is no build step.
+Open http://localhost:8765/Cave%20Game/ (ES modules need `http://`, not `file://`). Three.js loads from jsDelivr via an importmap; there is no build step. `serve.py` is a plain static server that sends `Cache-Control: no-store`; with `python3 -m http.server` Chrome will happily keep stale modules across reloads and you end up hard-refreshing after every edit.
 
 Levels: `?level=gallery` (default, the whole kit laid out) or `?level=sample` (a small connected loop with a ramp). `?pose=x,y,z,yaw,pitch` frames a still with the overlay hidden.
 
