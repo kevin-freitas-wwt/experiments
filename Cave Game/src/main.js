@@ -9,8 +9,8 @@ const STEP = 0.7;
 const GRAVITY = 22;
 const WALK = 5.2;
 const RUN = 9.5;
-const JUMP = 7.5;
-const LIFT = 6;
+const LIFT = 3.2;
+const LIFT_ACCEL = 4;
 const SINK = 2.2;
 const ACCEL = 10.5;
 const LEVELS = [ "gallery", "sample" ];
@@ -108,14 +108,13 @@ for ( const name of LEVELS ) {
 document.getElementById( "blurb" ).textContent = level.blurb ?? "";
 document.getElementById( "log-level" ).textContent = level.name;
 
-const move = { forward: false, backward: false, left: false, right: false, run: false, jump: false, lift: false };
+const move = { forward: false, backward: false, left: false, right: false, run: false, lift: false };
 const KEYS = {
     KeyE: "forward", ArrowUp: "forward",
     KeyD: "backward", ArrowDown: "backward",
     KeyS: "left", ArrowLeft: "left",
     KeyF: "right", ArrowRight: "right",
     ShiftLeft: "run", ShiftRight: "run",
-    Space: "jump",
     KeyA: "lift"
 };
 document.addEventListener( "keydown", ( e ) => { if ( KEYS[ e.code ] ) move[ KEYS[ e.code ] ] = true; } );
@@ -161,11 +160,9 @@ function settle( delta ) {
 
     if ( move.lift ) {
         flying = true;
-        vy = LIFT;
+        vy = Math.min( vy + LIFT_ACCEL * delta, LIFT );
     } else if ( flying ) {
         vy = Math.max( vy - GRAVITY * delta, -SINK );
-    } else if ( grounded && move.jump ) {
-        vy = JUMP;
     } else if ( !grounded ) {
         vy -= GRAVITY * delta;
     }

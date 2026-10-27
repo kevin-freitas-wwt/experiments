@@ -16,7 +16,7 @@ Levels: `?level=gallery` (default, the whole kit laid out) or `?level=sample` (a
 
 ## Controls
 
-`E S D F` or arrows to move, `Shift` to run, `Space` to jump, hold `A` to lift off like a helicopter (release and you sink gently until you touch down), mouse to look, `Esc` to release.
+`E S D F` or arrows to move, `Shift` to run, hold `A` to lift off like a helicopter (it spools up over about a second, and when released you sink gently until you touch down), mouse to look, `Esc` to release.
 
 ## The cube
 
@@ -66,7 +66,7 @@ On load, every opening is checked against its neighbour. A face that opens into 
 
 ## Movement (`src/main.js`)
 
-Raycast collision against the section meshes: two horizontal rays at knee and chest height block walls, a downward ray from step height finds the floor and follows ramps up and down, an upward ray stops you at ceilings, and gravity takes over at holes. Jumping needs ground under you; lifting with `A` does not and cancels gravity while held. Because faces are inward-only, collision also only works from inside a cube; walking into a cube from outside passes through its wall. Fall below `y = -40` and you respawn.
+Raycast collision against the section meshes: two horizontal rays at knee and chest height block walls, a downward ray from step height finds the floor and follows ramps up and down, an upward ray stops you at ceilings, and gravity takes over at holes. Lifting with `A` cancels gravity while held and ramps up to 3.2 m/s. Because faces are inward-only, collision also only works from inside a cube; walking into a cube from outside passes through its wall. Fall below `y = -40` and you respawn.
 
 ## Files
 
