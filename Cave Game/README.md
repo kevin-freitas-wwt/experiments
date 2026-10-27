@@ -37,7 +37,9 @@ Levels: `?level=gallery` (default, the whole kit laid out) or `?level=sample` (a
 | `well` | n s down | corridor with a floor hole |
 | `cap` | n s up | corridor with a ceiling hole |
 
-Each type also exists as a `cave-` variant (`cave-corridor`, `cave-ramp`, and so on) with the same openings. Cave panels are subdivided (`0.4` unit segments), pushed into the room by two octaves of value noise, and flat-shaded so the facets read as rock. Displacement fades to zero within `0.9` units of every panel edge, so cube boundaries and doorways stay exactly where the flat kit puts them and cave sections connect to flat ones. Each cave cell is also dressed with stalagmites, rubble and stalactites, seeded from its grid position, kept near the walls and out of door lanes, and under knee height on the floor so they never block movement.
+Each type also exists as a `cave-` variant (`cave-corridor`, `cave-ramp`, and so on) with the same openings but none of the box. A cave section is carved, not assembled: `src/caves.js` writes a signed distance field (negative is air) made of an elliptical tube from every wall opening to the centre, a round shaft from every floor or ceiling opening, a sphere chamber wherever three or more meet, three octaves of value noise that pinch and swell the passage, and small spheres and capsules added back as rubble and stalactites. The `cave-ramp` carves its slope as solid rock instead of using the slab. Marching cubes (Three.js's `MarchingCubes` addon, 40³ samples per cell) turns the field into one flat-shaded, inward-facing mesh.
+
+Two rules keep cave sections connectable. Noise fades to zero within `1.3` units of any open face, so a tube mouth at the cell boundary is always the same fixed ellipse (`3.2` wide, floor to `3.4`) or circle (radius `1.3`) and lines up with the neighbour's. A `0.15` shell of rock is forced along every closed face, pierced only by the exact mouth shape, so air never leaks out of the cube. Cave and flat sections can be placed next to each other and are passable, but their mouths are different shapes, so the join looks rough and a flat wall offers no collision from the cave side.
 
 `n` is `-z`, `e` is `+x`. `rot` is quarter turns clockwise seen from above (0 to 3); wall openings rotate, `up`/`down` do not. `rotatedOpenings( type, rot )` gives the world-facing set.
 
@@ -73,7 +75,8 @@ Raycast collision against the section meshes: two horizontal rays at knee and ch
 | `src/sections.js` | Cube constants, the kit table, and the section builders |
 | `src/level.js` | JSON loading, placing cells, connectivity check, labels, ground |
 | `src/materials.js` | Canvas-generated rock colour and bump maps, smooth and flat-shaded sets |
-| `src/noise.js` | Seeded RNG (random number generator) and 2D value noise |
+| `src/noise.js` | Seeded RNG (random number generator) and 3D value noise |
+| `src/caves.js` | Signed distance field and marching-cubes mesh for `cave-` sections |
 | `src/main.js` | Renderer, headlamp, pointer-lock controls, collision, HUD (heads-up display) |
 | `src/style.css` | Entry sheet, survey log, crosshair |
 | `levels/gallery.json` | Flat kit in the front row, cave variants staggered behind, vertical partners stacked |

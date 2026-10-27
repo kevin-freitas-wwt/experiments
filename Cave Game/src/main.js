@@ -51,8 +51,10 @@ camera.add( lamp, lamp.target );
 
 // --- World --------------------------------------------------------------------
 
+const t0 = performance.now();
 const built = buildLevel( level );
 scene.add( built.group );
+console.info( `${ level.name }: ${ built.cells.size } cells built in ${ Math.round( performance.now() - t0 ) } ms` );
 built.warnings.forEach( ( w ) => console.warn( w ) );
 
 for ( const c of built.cells.values() ) {
