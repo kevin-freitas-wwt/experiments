@@ -3,7 +3,7 @@ import { MarchingCubes } from "three/addons/objects/MarchingCubes.js";
 import { materials } from "./materials.js";
 import { noise3 } from "./noise.js";
 
-// Cave sections are carved, not assembled. Each one is a signed distance field
+// Sections are carved, not assembled. Each one is a signed distance field
 // (negative = air) made of tubes running from every opening to the centre,
 // a chamber where three or more meet, and noise that pinches and swells the
 // passage. Marching cubes turns the field into one inward-facing mesh.
@@ -73,8 +73,6 @@ function carve( open, rand ) {
     const horizontal = faces.filter( ( f ) => !DIR[ f ][ 1 ] );
     const vertical = faces.filter( ( f ) => DIR[ f ][ 1 ] );
     const chamber = faces.length >= 3 || ( vertical.length && horizontal.length );
-    const ramp = faces.length === 2 && open.has( "s" ) && open.has( "up" );
-    const rampRun = HALF + VMOUTH - 0.1;
     const seed = rand() * 100;
     const tall = open.has( "up" );
     const hub = { y: tall ? 2.7 : CHAMBER.y, r: tall ? 2.35 : CHAMBER.r };
@@ -137,11 +135,6 @@ function carve( open, rand ) {
             air = Math.max( air, -capsule( px, py, pz, s[ 0 ], 5.6, s[ 1 ], s[ 0 ], s[ 3 ], s[ 1 ], s[ 2 ] ) );
         }
 
-        // Ramp: solid rock under a plane from the south sill up to the ceiling mouth.
-        if ( ramp && Math.abs( px ) < VMOUTH ) {
-            air = Math.max( air, Math.min( CELL * ( HALF - pz ) / rampRun - py, VMOUTH - Math.abs( px ) ) );
-        }
-
         // Shell: rock along every closed face, pierced only by the exact mouth.
         for ( const f of [ "n", "e", "s", "w" ] ) {
             const d = DIR[ f ];
@@ -171,7 +164,7 @@ const offset = -HALF + scale * ( 1 - delta );
 
 export function buildCave( group, open, ctx ) {
     if ( !mc ) {
-        mc = new MarchingCubes( RES, materials.cave_wall, true, false, 40000 );
+        mc = new MarchingCubes( RES, materials.rock, true, false, 40000 );
         mc.isolation = 0;
     }
     const field = carve( open, ctx.rand );
@@ -204,6 +197,6 @@ export function buildCave( group, open, ctx ) {
     }
     geo.setAttribute( "uv", new THREE.BufferAttribute( uv, 2 ) );
 
-    const mesh = new THREE.Mesh( geo, materials.cave_wall );
+    const mesh = new THREE.Mesh( geo, materials.rock );
     group.add( mesh );
 }
