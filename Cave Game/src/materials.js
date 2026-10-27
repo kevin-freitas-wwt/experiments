@@ -81,7 +81,7 @@ function rock( seed, tint, roughness, flat = false ) {
 export const materials = {
     cave_ceiling: rock( 0x2b9f, "#4e5663", 0.97, true ),
     cave_floor: rock( 0x61d3, "#6a675f", 0.92, true ),
-    cave_wall: rock( 0xc4e1, "#5a6170", 0.95, true ),
+    cave_wall: rock( 0xc4e1, "#5a6170", 0.95 ),
     ceiling: rock( 0x7a11, "#5a6270", 0.95 ),
     floor: rock( 0x3c21, "#6b6a66", 0.9 ),
     ground: new THREE.MeshStandardMaterial( {
