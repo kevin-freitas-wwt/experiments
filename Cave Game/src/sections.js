@@ -13,8 +13,7 @@ export const FACES = [ "n", "e", "s", "w" ];
 export const OPPOSITE = { n: "s", e: "w", s: "n", w: "e", up: "down", down: "up" };
 
 const HALF = CELL / 2;
-const STEP_RISE = 0.6;
-const STEP_RUN = 0.42;
+const RAMP_T = 0.3;
 
 // Openings are listed for rotation 0. "rot" in a level is quarter turns
 // clockwise seen from above; walls rotate, up/down stay put.
@@ -24,7 +23,7 @@ export const KIT = {
     tee: { open: [ "n", "s", "e" ], blurb: "corridor, one side open" },
     cross: { open: [ "n", "e", "s", "w" ], blurb: "corridor, both sides open" },
     end: { open: [ "n" ], blurb: "dead end" },
-    stair: { open: [ "s", "up" ], blurb: "steps up through the ceiling", build: buildStair },
+    ramp: { open: [ "s", "up" ], blurb: "ramp up through the ceiling", build: buildRamp },
     shaft: { open: [ "up", "down" ], blurb: "vertical pass-through" },
     pit: { open: [ "n", "down" ], blurb: "dead end over a drop" },
     well: { open: [ "n", "s", "down" ], blurb: "corridor with a floor hole" },
@@ -93,15 +92,16 @@ function buildSlab( y, hole, up, material ) {
     return group;
 }
 
-function buildStair( group ) {
-    const count = Math.ceil( CELL / STEP_RISE );
-    const geo = new THREE.BoxGeometry( HOLE, STEP_RISE, STEP_RUN );
-    for ( let i = 0; i < count; i++ ) {
-        const step = new THREE.Mesh( geo, materials.step );
-        step.position.set( 0, STEP_RISE * ( i + 0.5 ), HALF - STEP_RUN * ( i + 0.5 ) );
-        step.castShadow = step.receiveShadow = true;
-        group.add( step );
-    }
+// Slab from the south doorsill up to the far edge of the ceiling hole.
+function buildRamp( group ) {
+    const run = HALF + HOLE / 2;
+    const length = Math.hypot( run, CELL );
+    const angle = Math.atan2( CELL, run );
+    const ramp = new THREE.Mesh( new THREE.BoxGeometry( HOLE, RAMP_T, length ), materials.step );
+    ramp.rotation.x = angle;
+    ramp.position.set( 0, CELL / 2 - RAMP_T / 2 * Math.cos( angle ), HALF - run / 2 - RAMP_T / 2 * Math.sin( angle ) );
+    ramp.castShadow = ramp.receiveShadow = true;
+    group.add( ramp );
 }
 
 // Builds a section at rotation 0 in local space. Faces point inward only, so

@@ -12,11 +12,11 @@ python3 -m http.server 5173
 
 Open http://localhost:5173 (ES modules need `http://`, not `file://`). Three.js loads from jsDelivr via an importmap; there is no build step.
 
-Levels: `?level=gallery` (default, the whole kit laid out) or `?level=sample` (a small connected loop with a stair). `?pose=x,y,z,yaw,pitch` frames a still with the overlay hidden.
+Levels: `?level=gallery` (default, the whole kit laid out) or `?level=sample` (a small connected loop with a ramp). `?pose=x,y,z,yaw,pitch` frames a still with the overlay hidden.
 
 ## Controls
 
-`E S D F` or arrows to move, mouse to look, `Esc` to release.
+`E S D F` or arrows to move, `Shift` to run, `Space` to jump, hold `A` to lift off like a helicopter (release and you sink gently until you touch down), mouse to look, `Esc` to release.
 
 ## The cube
 
@@ -31,7 +31,7 @@ Levels: `?level=gallery` (default, the whole kit laid out) or `?level=sample` (a
 | `tee` | n s e | corridor, one side open |
 | `cross` | n e s w | corridor, both sides open |
 | `end` | n | dead end |
-| `stair` | s up | steps from the south door up through the ceiling hole |
+| `ramp` | s up | slab from the south doorsill up through the ceiling hole (about 55°) |
 | `shaft` | up down | vertical pass-through (fall only; no climbing yet) |
 | `pit` | n down | dead end over a drop |
 | `well` | n s down | corridor with a floor hole |
@@ -62,7 +62,7 @@ On load, every opening is checked against its neighbour. A face that opens into 
 
 ## Movement (`src/main.js`)
 
-Raycast collision against the section meshes: two horizontal rays at knee and chest height block walls while letting the 0.6 step rise pass, and a downward ray from step height finds the floor, snaps up stairs, and lets you fall through holes with simple gravity. Because faces are inward-only, collision also only works from inside a cube; walking into a cube from outside passes through its wall. Fall below `y = -40` and you respawn.
+Raycast collision against the section meshes: two horizontal rays at knee and chest height block walls, a downward ray from step height finds the floor and follows ramps up and down, an upward ray stops you at ceilings, and gravity takes over at holes. Jumping needs ground under you; lifting with `A` does not and cancels gravity while held. Because faces are inward-only, collision also only works from inside a cube; walking into a cube from outside passes through its wall. Fall below `y = -40` and you respawn.
 
 ## Files
 
@@ -74,4 +74,4 @@ Raycast collision against the section meshes: two horizontal rays at knee and ch
 | `src/main.js` | Renderer, headlamp, pointer-lock controls, collision, HUD (heads-up display) |
 | `src/style.css` | Entry sheet, survey log, crosshair |
 | `levels/gallery.json` | Every section in a row, vertical partners stacked |
-| `levels/sample.json` | Small connected loop using rotation and a stair |
+| `levels/sample.json` | Small connected loop using rotation and a ramp |

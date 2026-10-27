@@ -7,7 +7,12 @@ const EYE = 1.7;
 const RADIUS = 0.45;
 const STEP = 0.7;
 const GRAVITY = 22;
-const WALK = 42;
+const WALK = 5.2;
+const RUN = 9.5;
+const JUMP = 7.5;
+const LIFT = 6;
+const SINK = 2.2;
+const ACCEL = 10.5;
 const LEVELS = [ "gallery", "sample" ];
 
 const params = new URLSearchParams( location.search );
@@ -60,6 +65,8 @@ for ( const c of built.cells.values() ) {
 
 const feet = new THREE.Vector3( level.spawn.x * CELL, level.spawn.y * CELL, level.spawn.z * CELL );
 let vy = 0;
+let grounded = false;
+let flying = false;
 
 const controls = new PointerLockControls( camera, renderer.domElement );
 camera.position.set( feet.x, feet.y + EYE, feet.z );
@@ -96,12 +103,15 @@ for ( const name of LEVELS ) {
 document.getElementById( "blurb" ).textContent = level.blurb ?? "";
 document.getElementById( "log-level" ).textContent = level.name;
 
-const move = { forward: false, backward: false, left: false, right: false };
+const move = { forward: false, backward: false, left: false, right: false, run: false, jump: false, lift: false };
 const KEYS = {
     KeyE: "forward", ArrowUp: "forward",
     KeyD: "backward", ArrowDown: "backward",
     KeyS: "left", ArrowLeft: "left",
-    KeyF: "right", ArrowRight: "right"
+    KeyF: "right", ArrowRight: "right",
+    ShiftLeft: "run", ShiftRight: "run",
+    Space: "jump",
+    KeyA: "lift"
 };
 document.addEventListener( "keydown", ( e ) => { if ( KEYS[ e.code ] ) move[ KEYS[ e.code ] ] = true; } );
 document.addEventListener( "keyup", ( e ) => { if ( KEYS[ e.code ] ) move[ KEYS[ e.code ] ] = false; } );
@@ -112,6 +122,7 @@ const ray = new THREE.Raycaster();
 const origin = new THREE.Vector3();
 const dir = new THREE.Vector3();
 const DOWN = new THREE.Vector3( 0, -1, 0 );
+const UP = new THREE.Vector3( 0, 1, 0 );
 
 function blocked( dx, dz ) {
     const len = Math.hypot( dx, dz );
@@ -143,16 +154,40 @@ function settle( delta ) {
     const hit = ray.intersectObjects( built.colliders, false )[ 0 ];
     const floor = hit ? hit.point.y : -Infinity;
 
-    if ( floor >= feet.y - 0.02 && vy <= 0 ) {
+    if ( move.lift ) {
+        flying = true;
+        vy = LIFT;
+    } else if ( flying ) {
+        vy = Math.max( vy - GRAVITY * delta, -SINK );
+    } else if ( grounded && move.jump ) {
+        vy = JUMP;
+    } else if ( !grounded ) {
+        vy -= GRAVITY * delta;
+    }
+
+    if ( vy <= 0 && floor >= feet.y - 0.35 ) {
         feet.y = floor;
         vy = 0;
+        grounded = true;
+        flying = false;
         return;
     }
-    vy -= GRAVITY * delta;
+
+    grounded = false;
+    if ( vy > 0 ) {
+        origin.set( feet.x, feet.y + EYE, feet.z );
+        ray.set( origin, UP );
+        ray.far = vy * delta + 0.15;
+        if ( ray.intersectObjects( built.colliders, false ).length ) {
+            vy = 0;
+        }
+    }
     feet.y += vy * delta;
     if ( feet.y < floor ) {
         feet.y = floor;
         vy = 0;
+        grounded = true;
+        flying = false;
     }
     if ( feet.y < -40 ) {
         feet.set( level.spawn.x * CELL, level.spawn.y * CELL, level.spawn.z * CELL );
@@ -211,8 +246,10 @@ function animate() {
             wish.normalize();
         }
 
-        velocity.x += ( wish.x * 5.2 - velocity.x ) * Math.min( 1, WALK * delta * 0.25 );
-        velocity.z += ( wish.z * 5.2 - velocity.z ) * Math.min( 1, WALK * delta * 0.25 );
+        const speed = move.run ? RUN : WALK;
+        const blend = Math.min( 1, ACCEL * delta );
+        velocity.x += ( wish.x * speed - velocity.x ) * blend;
+        velocity.z += ( wish.z * speed - velocity.z ) * blend;
 
         slide( velocity.x * delta, velocity.z * delta );
         settle( delta );
