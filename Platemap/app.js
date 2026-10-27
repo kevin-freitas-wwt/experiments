@@ -1,5 +1,5 @@
 import * as maplibregl from "https://cdn.jsdelivr.net/npm/maplibre-gl@6.16.0/dist/maplibre-gl.mjs";
-import { Protocol } from "https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm";
+import { PMTiles, Protocol } from "https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm";
 
 const BASE = new URL( ".", import.meta.url ).href;
 const STYLES = { light: "https://tiles.openfreemap.org/styles/positron", dark: "https://tiles.openfreemap.org/styles/dark" };
@@ -12,7 +12,25 @@ const initialHash = location.hash;
 let data = null;
 let index = [];
 
-maplibregl.addProtocol( "pmtiles", new Protocol().tile );
+const protocol = new Protocol();
+maplibregl.addProtocol( "pmtiles", protocol.tile );
+
+/* Servers without HTTP range support (python -m http.server, some static hosts) can't
+   byte-serve PMTiles, so fall back to loading each archive whole into memory. */
+class MemorySource {
+    constructor( key, buf ) { this.key = key; this.buf = buf; }
+    getKey() { return this.key; }
+    async getBytes( offset, length ) { return { data: this.buf.slice( offset, offset + length ) }; }
+}
+const ranges = fetch( `${ BASE }data/overview.pmtiles`, { headers: { Range: "bytes=0-15" } } )
+    .then( ( r ) => r.status === 206 ).catch( () => false );
+async function tileUrl( name ) {
+    const url = `${ BASE }data/${ name }.pmtiles`;
+    if ( await ranges ) return `pmtiles://${ url }`;
+    const buf = await fetch( url ).then( ( r ) => r.arrayBuffer() );
+    protocol.add( new PMTiles( new MemorySource( url, buf ) ) );
+    return `pmtiles://${ url }`;
+}
 
 const dark = matchMedia( "( prefers-color-scheme: dark )" );
 const map = new maplibregl.Map( {
@@ -57,11 +75,12 @@ function pointFilter() {
     return f;
 }
 
-function decorate() {
+async function decorate() {
     const c = countExpr();
     const cp = clusterPaint( c );
-    map.addSource( "overview", { type: "vector", url: `pmtiles://${ BASE }data/overview.pmtiles` } );
-    for ( const h of HALVES ) map.addSource( "points-" + h, { type: "vector", url: `pmtiles://${ BASE }data/points_${ h }.pmtiles` } );
+    const [ overview, ...halves ] = await Promise.all( [ tileUrl( "overview" ), ...HALVES.map( ( h ) => tileUrl( "points_" + h ) ) ] );
+    map.addSource( "overview", { type: "vector", url: overview } );
+    HALVES.forEach( ( h, i ) => map.addSource( "points-" + h, { type: "vector", url: halves[ i ] } ) );
 
     map.addLayer( {
         id: "clusters", type: "circle", source: "overview", "source-layer": "clusters", maxzoom: POINT_ZOOM,
