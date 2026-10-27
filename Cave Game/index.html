@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cave Game</title>
+    <meta name="description" content="First-person cave kit: JSON levels built from cube-sized section primitives.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="experiments by Kevin">
+    <meta property="og:title" content="Cave Game">
+    <meta property="og:description" content="First-person cave kit: JSON levels built from cube-sized section primitives.">
+    <meta property="og:url" content="https://kevin-freitas-wwt.github.io/experiments/Cave%20Game/">
+    <meta property="og:image" content="https://kevin-freitas-wwt.github.io/experiments/Cave%20Game/thumb.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Cave Game">
+    <meta name="twitter:description" content="First-person cave kit: JSON levels built from cube-sized section primitives.">
+    <meta name="twitter:image" content="https://kevin-freitas-wwt.github.io/experiments/Cave%20Game/thumb.png">
+    <link rel="stylesheet" href="./src/style.css" />
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div id="crosshair" aria-hidden="true"></div>
+
+    <aside id="log" aria-live="polite">
+        <div class="row"><span class="k">level</span><span id="log-level">&ndash;</span></div>
+        <div class="row"><span class="k">cell</span><span id="log-cell">&ndash;</span></div>
+        <div class="row"><span class="k">section</span><span id="log-section">&ndash;</span></div>
+        <div class="row"><span class="k">faces</span><span id="log-faces">&ndash;</span></div>
+    </aside>
+
+    <div id="overlay">
+        <div class="sheet">
+            <p class="eyebrow">survey // level kit</p>
+            <h1>Cave Game</h1>
+            <p id="blurb">Every section fits one cube. Levels are JSON grids of section type + rotation. This level lays the whole kit out so you can walk around and through each piece.</p>
+            <dl class="controls">
+                <dt><kbd>E</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd></dt><dd>move (or arrows)</dd>
+                <dt>mouse</dt><dd>look</dd>
+                <dt><kbd>Esc</kbd></dt><dd>release</dd>
+            </dl>
+            <nav id="levels"></nav>
+            <button id="enter">Descend</button>
+        </div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html>

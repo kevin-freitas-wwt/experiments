@@ -1,0 +1,127 @@
+{
+    "name": "sample",
+    "blurb": "A small connected loop that uses rotation and a stair to change level. Spawn faces south.",
+    "ground": false,
+    "labels": false,
+    "fog": 0.05,
+    "spawn": {
+        "x": 0,
+        "y": 0,
+        "z": 0,
+        "yaw": 3.14159
+    },
+    "cells": [
+        {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "type": "end",
+            "rot": 2
+        },
+        {
+            "x": 0,
+            "y": 0,
+            "z": 1,
+            "type": "corridor",
+            "rot": 0
+        },
+        {
+            "x": 0,
+            "y": 0,
+            "z": 2,
+            "type": "corner",
+            "rot": 0
+        },
+        {
+            "x": 1,
+            "y": 0,
+            "z": 2,
+            "type": "tee",
+            "rot": 1
+        },
+        {
+            "x": 2,
+            "y": 0,
+            "z": 2,
+            "type": "stair",
+            "rot": 1
+        },
+        {
+            "x": 2,
+            "y": 1,
+            "z": 2,
+            "type": "well",
+            "rot": 1
+        },
+        {
+            "x": 1,
+            "y": 1,
+            "z": 2,
+            "type": "corridor",
+            "rot": 1
+        },
+        {
+            "x": 0,
+            "y": 1,
+            "z": 2,
+            "type": "end",
+            "rot": 1
+        },
+        {
+            "x": 3,
+            "y": 1,
+            "z": 2,
+            "type": "pit",
+            "rot": 3
+        },
+        {
+            "x": 3,
+            "y": 0,
+            "z": 2,
+            "type": "cap",
+            "rot": 0
+        },
+        {
+            "x": 3,
+            "y": 0,
+            "z": 1,
+            "type": "end",
+            "rot": 2
+        },
+        {
+            "x": 3,
+            "y": 0,
+            "z": 3,
+            "type": "corridor",
+            "rot": 0
+        },
+        {
+            "x": 3,
+            "y": 0,
+            "z": 4,
+            "type": "corner",
+            "rot": 3
+        },
+        {
+            "x": 2,
+            "y": 0,
+            "z": 4,
+            "type": "corridor",
+            "rot": 1
+        },
+        {
+            "x": 1,
+            "y": 0,
+            "z": 4,
+            "type": "corner",
+            "rot": 0
+        },
+        {
+            "x": 1,
+            "y": 0,
+            "z": 3,
+            "type": "corridor",
+            "rot": 0
+        }
+    ]
+}

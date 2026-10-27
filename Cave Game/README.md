@@ -1,0 +1,77 @@
+# Cave Game
+
+First-person cave kit. Levels are JSON (JavaScript Object Notation) grids; every section primitive fits the same bounding cube, so any two sections that both open onto a shared face line up automatically.
+
+Not listed on the experiments index.
+
+## Running
+
+```bash
+python3 -m http.server 5173
+```
+
+Open http://localhost:5173 (ES modules need `http://`, not `file://`). Three.js loads from jsDelivr via an importmap; there is no build step.
+
+Levels: `?level=gallery` (default, the whole kit laid out) or `?level=sample` (a small connected loop with a stair). `?pose=x,y,z,yaw,pitch` frames a still with the overlay hidden.
+
+## Controls
+
+`E S D F` or arrows to move, mouse to look, `Esc` to release.
+
+## The cube
+
+`CELL = 6` units. Floor at local `y = 0`, ceiling at `y = 6`, walls at `±3`. Openings are fixed: wall doorways are `2.4` wide by `3.6` tall, centred; floor and ceiling holes are `2.4` squares, centred. All geometry faces inward only, so from outside a cube you look straight through into it, which is what makes the gallery readable without a cutaway mode.
+
+## Section kit (`src/sections.js`)
+
+| Type | Openings (rot 0) | Notes |
+| --- | --- | --- |
+| `corridor` | n s | |
+| `corner` | n e | |
+| `tee` | n s e | corridor, one side open |
+| `cross` | n e s w | corridor, both sides open |
+| `end` | n | dead end |
+| `stair` | s up | steps from the south door up through the ceiling hole |
+| `shaft` | up down | vertical pass-through (fall only; no climbing yet) |
+| `pit` | n down | dead end over a drop |
+| `well` | n s down | corridor with a floor hole |
+| `cap` | n s up | corridor with a ceiling hole |
+
+`n` is `-z`, `e` is `+x`. `rot` is quarter turns clockwise seen from above (0 to 3); wall openings rotate, `up`/`down` do not. `rotatedOpenings( type, rot )` gives the world-facing set.
+
+## Level JSON (`levels/*.json`)
+
+```json
+{
+    "name": "sample",
+    "blurb": "Shown on the entry sheet.",
+    "ground": false,
+    "labels": false,
+    "fog": 0.05,
+    "spawn": { "x": 0, "y": 0, "z": 0, "yaw": 3.14159 },
+    "cells": [
+        { "x": 0, "y": 0, "z": 0, "type": "end", "rot": 2 },
+        { "x": 0, "y": 0, "z": 1, "type": "corridor", "rot": 0, "label": false }
+    ]
+}
+```
+
+Cells are in grid units (world position is `cell * CELL`). `spawn` may be fractional; `yaw` is radians, `0` faces north. `ground` adds a flat plane at `y = 0`; `labels` hangs a type/blurb sprite in front of each cell unless that cell sets `label: false`.
+
+On load, every opening is checked against its neighbour. A face that opens into a closed face logs a `console.warn` naming both cells.
+
+## Movement (`src/main.js`)
+
+Raycast collision against the section meshes: two horizontal rays at knee and chest height block walls while letting the 0.6 step rise pass, and a downward ray from step height finds the floor, snaps up stairs, and lets you fall through holes with simple gravity. Because faces are inward-only, collision also only works from inside a cube; walking into a cube from outside passes through its wall. Fall below `y = -40` and you respawn.
+
+## Files
+
+| File | Purpose |
+| --- | --- |
+| `src/sections.js` | Cube constants, the kit table, and the section builders |
+| `src/level.js` | JSON loading, placing cells, connectivity check, labels, ground |
+| `src/materials.js` | Canvas-generated rock colour and bump maps |
+| `src/main.js` | Renderer, headlamp, pointer-lock controls, collision, HUD (heads-up display) |
+| `src/style.css` | Entry sheet, survey log, crosshair |
+| `levels/gallery.json` | Every section in a row, vertical partners stacked |
+| `levels/sample.json` | Small connected loop using rotation and a stair |
