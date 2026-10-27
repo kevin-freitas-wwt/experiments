@@ -1,13 +1,13 @@
 {
     "name": "gallery",
-    "blurb": "Every section in the kit on one row, with its vertical partner stacked above or sunk below wherever it opens up or down. Rock faces inward, so look straight through from outside or walk in.",
+    "blurb": "The whole kit on a 4\u00d73 grid with one-cell aisles, each section's vertical partner stacked above or sunk below wherever it opens up or down. Rock faces inward, so look straight through from the aisle or walk in.",
     "ground": true,
     "labels": true,
-    "fog": 0.02,
+    "fog": 0.03,
     "spawn": {
-        "x": 9,
+        "x": 3,
         "y": 0,
-        "z": 3,
+        "z": 2.5,
         "yaw": 0
     },
     "cells": [
@@ -41,96 +41,96 @@
             "flare": true
         },
         {
-            "x": 8,
+            "x": 0,
             "y": 0,
-            "z": 0,
+            "z": -2,
             "type": "end",
             "rot": 0,
             "flare": true
         },
         {
-            "x": 10,
+            "x": 2,
             "y": 0,
-            "z": 0,
+            "z": -2,
             "type": "chimney",
             "rot": 0
         },
         {
-            "x": 10,
+            "x": 2,
             "y": 1,
-            "z": 0,
+            "z": -2,
             "type": "well",
             "rot": 0,
             "label": false
         },
         {
-            "x": 12,
+            "x": 4,
             "y": 0,
-            "z": 0,
+            "z": -2,
             "type": "shaft",
             "rot": 0
         },
         {
-            "x": 12,
+            "x": 4,
             "y": -1,
-            "z": 0,
+            "z": -2,
             "type": "cap",
             "rot": 0,
             "label": false
         },
         {
-            "x": 12,
+            "x": 4,
             "y": 1,
-            "z": 0,
+            "z": -2,
             "type": "well",
             "rot": 0,
             "label": false
         },
         {
-            "x": 14,
+            "x": 6,
             "y": 0,
-            "z": 0,
+            "z": -2,
             "type": "pit",
             "rot": 0
         },
         {
-            "x": 14,
+            "x": 6,
             "y": -1,
-            "z": 0,
+            "z": -2,
             "type": "cap",
             "rot": 0,
             "label": false
         },
         {
-            "x": 16,
+            "x": 0,
             "y": 0,
-            "z": 0,
+            "z": -4,
             "type": "well",
             "rot": 0
         },
         {
-            "x": 16,
+            "x": 0,
             "y": -1,
-            "z": 0,
+            "z": -4,
             "type": "cap",
             "rot": 0,
             "label": false
         },
         {
-            "x": 18,
+            "x": 2,
             "y": 0,
-            "z": 0,
+            "z": -4,
             "type": "cap",
             "rot": 0
         },
         {
-            "x": 18,
+            "x": 2,
             "y": 1,
-            "z": 0,
+            "z": -4,
             "type": "pit",
             "rot": 0,
             "label": false
         }
     ],
-    "view": 14
+    "view": 8
 }

@@ -86,5 +86,5 @@ No shadow maps. Pixel ratio is capped at 1.5. The only lights are the headlamp, 
 | `src/flare.js` | Dropped flare: stick, flickering light, smoke particles |
 | `src/main.js` | Renderer, headlamp, pointer-lock controls, collision, HUD (heads-up display) |
 | `src/style.css` | Entry sheet, survey log, crosshair |
-| `levels/gallery.json` | Every section in a row, vertical partners stacked |
+| `levels/gallery.json` | Every section on a 4×3 grid with aisles, vertical partners stacked |
 | `levels/sample.json` | Small connected loop using rotation and a chimney |
