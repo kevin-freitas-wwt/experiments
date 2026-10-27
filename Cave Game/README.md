@@ -39,7 +39,7 @@ Levels: `?level=gallery` (default, the whole kit laid out) or `?level=sample` (a
 
 `n` is `-z`, `e` is `+x`. `rot` is quarter turns clockwise seen from above (0 to 3); wall openings rotate, `up`/`down` do not. `rotatedOpenings( type, rot )` gives the world-facing set.
 
-A section is carved, not assembled: `src/caves.js` writes a signed distance field (negative is air) made of an elliptical tube from every wall opening to the centre, a round shaft from every floor or ceiling opening, a sphere chamber wherever three or more meet, three octaves of value noise that pinch and swell the passage, and small spheres and capsules added back as rubble and stalactites. Marching cubes (Three.js's `MarchingCubes` addon, 30³ samples per cell) turns the field into one inward-facing mesh, shaded smoothly with the field gradient as its normals.
+A section is carved, not assembled: `src/caves.js` writes a signed distance field (negative is air) made of an elliptical tube from every wall opening to the centre, a round shaft from every floor or ceiling opening, a sphere chamber wherever three or more meet, three octaves of value noise that pinch and swell the passage, and small spheres and capsules added back as rubble and stalactites. Marching cubes (Three.js's `MarchingCubes` addon, 30³ samples per cell) turns the field into one inward-facing mesh, shaded smoothly with the field gradient as its normals. The rock texture is triplanar: colour and bump are projected along each world axis (one tile per 3 units) and blended by the surface normal, so walls, floor and ceiling all read at the same density with no stretching.
 
 Two rules keep sections connectable. Noise fades to zero within `1.3` units of any open face, so a tube mouth at the cell boundary is always the same fixed ellipse (`3.2` wide, floor to `3.4`) or circle (radius `1.3`) and lines up with the neighbour's. A `0.15` shell of rock is forced along every closed face, pierced only by the exact mouth shape, so air never leaks out of the cube.
 
@@ -80,7 +80,7 @@ No shadow maps. Pixel ratio is capped at 1.5. The only lights are the headlamp, 
 | --- | --- |
 | `src/sections.js` | Cube constants, the kit table, rotation helper |
 | `src/level.js` | JSON loading, placing cells, connectivity check, labels, ground |
-| `src/materials.js` | Canvas-generated rock colour and bump map |
+| `src/materials.js` | Tileable canvas rock, triplanar-projected colour and bump (`onBeforeCompile`) |
 | `src/noise.js` | Seeded RNG (random number generator) and 3D value noise |
 | `src/caves.js` | Signed distance field and marching-cubes mesh for every section |
 | `src/flare.js` | Dropped flare: stick, flickering light, smoke particles |

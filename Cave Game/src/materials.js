@@ -8,8 +8,8 @@ function seeded( seed ) {
     };
 }
 
-// Mottled rock: grain plus layered soft blotches. Returns a tileable-enough
-// grayscale canvas used as both the color base and the bump map.
+// Mottled rock: grain plus layered soft blotches, wrapped so it tiles. Used as
+// both the colour base and the bump map.
 function rockCanvas( seed, size = 512 ) {
     const rand = seeded( seed );
     const canvas = document.createElement( "canvas" );
@@ -26,11 +26,21 @@ function rockCanvas( seed, size = 512 ) {
             const x = rand() * size;
             const y = rand() * size;
             const r = radius * ( 0.4 + rand() );
-            const g = ctx.createRadialGradient( x, y, 0, x, y, r );
-            g.addColorStop( 0, `rgba(${ v },${ v },${ v },${ 0.5 - pass * 0.1 })` );
-            g.addColorStop( 1, `rgba(${ v },${ v },${ v },0)` );
-            ctx.fillStyle = g;
-            ctx.fillRect( x - r, y - r, r * 2, r * 2 );
+            // Repeat blotches that cross an edge on the far side so the tile wraps.
+            for ( const ox of [ 0, -size, size ] ) {
+                for ( const oy of [ 0, -size, size ] ) {
+                    const bx = x + ox;
+                    const by = y + oy;
+                    if ( bx + r < 0 || bx - r > size || by + r < 0 || by - r > size ) {
+                        continue;
+                    }
+                    const g = ctx.createRadialGradient( bx, by, 0, bx, by, r );
+                    g.addColorStop( 0, `rgba(${ v },${ v },${ v },${ 0.5 - pass * 0.1 })` );
+                    g.addColorStop( 1, `rgba(${ v },${ v },${ v },0)` );
+                    ctx.fillStyle = g;
+                    ctx.fillRect( bx - r, by - r, r * 2, r * 2 );
+                }
+            }
         }
     }
 
@@ -64,17 +74,73 @@ function texture( canvas ) {
     return tex;
 }
 
+// Triplanar rock: colour and bump are projected along each world axis and
+// blended by the surface normal, so no face of a carved cell is stretched.
+const TILE = 3;
+
 function rock( seed, tint, roughness ) {
     const base = rockCanvas( seed );
     const bump = new THREE.CanvasTexture( base );
     bump.wrapS = bump.wrapT = THREE.RepeatWrapping;
-    return new THREE.MeshStandardMaterial( {
+    const material = new THREE.MeshStandardMaterial( {
         bumpMap: bump,
         bumpScale: 0.6,
         map: texture( tinted( base, tint ) ),
         metalness: 0,
         roughness
     } );
+
+    material.onBeforeCompile = ( shader ) => {
+        shader.uniforms.uTile = { value: 1 / TILE };
+
+        shader.vertexShader = shader.vertexShader
+            .replace( "#include <common>", `#include <common>
+                varying vec3 vTriPos;
+                varying vec3 vTriNormal;` )
+            .replace( "#include <project_vertex>", `#include <project_vertex>
+                vTriPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
+                vTriNormal = normalize( mat3( modelMatrix ) * objectNormal );` );
+
+        shader.fragmentShader = shader.fragmentShader
+            .replace( "#include <common>", `#include <common>
+                uniform float uTile;
+                varying vec3 vTriPos;
+                varying vec3 vTriNormal;
+                vec3 triWeights() {
+                    vec3 w = pow( abs( vTriNormal ), vec3( 4.0 ) );
+                    return w / ( w.x + w.y + w.z );
+                }
+                vec4 triSample( sampler2D tex, vec3 p ) {
+                    vec3 w = triWeights();
+                    return texture2D( tex, p.yz * uTile ) * w.x
+                        + texture2D( tex, p.xz * uTile ) * w.y
+                        + texture2D( tex, p.xy * uTile ) * w.z;
+                }` )
+            .replace( "#include <map_fragment>", `
+                diffuseColor *= triSample( map, vTriPos );` )
+            .replace( "#include <bumpmap_pars_fragment>", `
+                uniform sampler2D bumpMap;
+                uniform float bumpScale;
+                vec2 dHdxy_fwd() {
+                    vec3 dx = dFdx( vTriPos );
+                    vec3 dy = dFdy( vTriPos );
+                    float h = triSample( bumpMap, vTriPos ).x;
+                    float hx = triSample( bumpMap, vTriPos + dx ).x;
+                    float hy = triSample( bumpMap, vTriPos + dy ).x;
+                    return vec2( hx - h, hy - h ) * bumpScale;
+                }
+                vec3 perturbNormalArb( vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection ) {
+                    vec3 vSigmaX = normalize( dFdx( surf_pos.xyz ) );
+                    vec3 vSigmaY = normalize( dFdy( surf_pos.xyz ) );
+                    vec3 vN = surf_norm;
+                    vec3 R1 = cross( vSigmaY, vN );
+                    vec3 R2 = cross( vN, vSigmaX );
+                    float fDet = dot( vSigmaX, R1 ) * faceDirection;
+                    vec3 vGrad = sign( fDet ) * ( dHdxy.x * R1 + dHdxy.y * R2 );
+                    return normalize( abs( fDet ) * surf_norm - vGrad );
+                }` );
+    };
+    return material;
 }
 
 export const materials = {
