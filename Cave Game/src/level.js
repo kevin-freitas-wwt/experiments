@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { CELL, KIT, OPPOSITE, buildSection, rotatedOpenings } from "./sections.js";
 import { materials } from "./materials.js";
+import { buildFlare } from "./flare.js";
 
 const DELTA = {
     n: [ 0, 0, -1 ], e: [ 1, 0, 0 ], s: [ 0, 0, 1 ], w: [ -1, 0, 0 ],
@@ -37,10 +38,11 @@ function label( text, sub ) {
 }
 
 // Instantiates a level: returns the group to add to the scene, the ground, a
-// cell lookup (each cell carries its group and meshes), and connection warnings.
+// cell lookup (each cell carries its group and meshes), flares, and warnings.
 export function buildLevel( level ) {
     const group = new THREE.Group();
     const cells = new Map();
+    const flares = [];
     let ground = null;
     const warnings = [];
 
@@ -70,6 +72,10 @@ export function buildLevel( level ) {
             c.group.add( tag );
         }
 
+        if ( c.flare ) {
+            flares.push( buildFlare( c, group ) );
+        }
+
         for ( const face of c.faces ) {
             const [ dx, dy, dz ] = DELTA[ face ];
             const other = cells.get( key( c.x + dx, c.y + dy, c.z + dz ) );
@@ -87,7 +93,7 @@ export function buildLevel( level ) {
         group.add( ground );
     }
 
-    return { group, ground, cells, warnings };
+    return { group, ground, cells, flares, warnings };
 }
 
 export function cellAt( position ) {

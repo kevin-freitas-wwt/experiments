@@ -16,7 +16,8 @@
             "y": 0,
             "z": 0,
             "type": "corridor",
-            "rot": 0
+            "rot": 0,
+            "flare": true
         },
         {
             "x": 2,
@@ -37,7 +38,8 @@
             "y": 0,
             "z": 0,
             "type": "cross",
-            "rot": 0
+            "rot": 0,
+            "flare": true
         },
         {
             "x": 8,
@@ -155,14 +157,16 @@
             "y": 0,
             "z": -3,
             "type": "cave-cross",
-            "rot": 0
+            "rot": 0,
+            "flare": true
         },
         {
             "x": 9,
             "y": 0,
             "z": -3,
             "type": "cave-end",
-            "rot": 0
+            "rot": 0,
+            "flare": true
         },
         {
             "x": 11,

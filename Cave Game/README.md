@@ -62,6 +62,8 @@ Two rules keep cave sections connectable. Noise fades to zero within `1.3` units
 
 Cells are in grid units (world position is `cell * CELL`). `spawn` may be fractional; `yaw` is radians, `0` faces north. `ground` adds a flat plane at `y = 0`; `labels` hangs a type/blurb sprite in front of each cell unless that cell sets `label: false`. `view` is the draw distance in cells (default 5): cells further than that from the player are hidden, and unless `fog` is given the fog density is set so the cut-off is already invisible.
 
+A cell with `"flare": true` gets a dropped road flare: a short red stick placed at a seeded random spot on that cell's floor (found by raycasting down, so it sits on cave rock too), a flickering red point light at its tip, and a column of soft white smoke (a 32-point particle system with a small custom shader). Each flare is one real light, so use them in handfuls, not everywhere.
+
 On load, every opening is checked against its neighbour. A face that opens into a closed face logs a `console.warn` naming both cells.
 
 ## Movement (`src/main.js`)
@@ -70,7 +72,7 @@ Raycast collision against the section meshes: two horizontal rays at knee and ch
 
 ## Performance
 
-No shadow maps. Pixel ratio is capped at 1.5. The only lights are the headlamp and a dim hemisphere fill. Collision rays only test the meshes of the 3×3×3 block of cells around the player. Cave fields are sampled at 30³, which keeps a cave cell at roughly 3–6k triangles; the console reports build time and the triangle count in view.
+No shadow maps. Pixel ratio is capped at 1.5. The only lights are the headlamp, a dim hemisphere fill, and one point light per flare. Collision rays only test the meshes of the 3×3×3 block of cells around the player. Cave fields are sampled at 30³, which keeps a cave cell at roughly 3–6k triangles; the console reports build time and the triangle count in view.
 
 ## Files
 
@@ -81,6 +83,7 @@ No shadow maps. Pixel ratio is capped at 1.5. The only lights are the headlamp a
 | `src/materials.js` | Canvas-generated rock colour and bump maps, smooth and flat-shaded sets |
 | `src/noise.js` | Seeded RNG (random number generator) and 3D value noise |
 | `src/caves.js` | Signed distance field and marching-cubes mesh for `cave-` sections |
+| `src/flare.js` | Dropped flare: stick, flickering light, smoke particles |
 | `src/main.js` | Renderer, headlamp, pointer-lock controls, collision, HUD (heads-up display) |
 | `src/style.css` | Entry sheet, survey log, crosshair |
 | `levels/gallery.json` | Flat kit in the front row, cave variants staggered behind, vertical partners stacked |

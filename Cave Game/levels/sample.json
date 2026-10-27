@@ -36,7 +36,8 @@
             "y": 0,
             "z": 2,
             "type": "cave-tee",
-            "rot": 1
+            "rot": 1,
+            "flare": true
         },
         {
             "x": 2,
@@ -64,7 +65,8 @@
             "y": 1,
             "z": 2,
             "type": "cave-end",
-            "rot": 1
+            "rot": 1,
+            "flare": true
         },
         {
             "x": 3,
@@ -92,7 +94,8 @@
             "y": 0,
             "z": 3,
             "type": "cave-corridor",
-            "rot": 0
+            "rot": 0,
+            "flare": true
         },
         {
             "x": 3,

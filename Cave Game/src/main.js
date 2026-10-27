@@ -246,6 +246,10 @@ const right = new THREE.Vector3();
 function animate() {
     timer.update();
     const delta = Math.min( timer.getDelta(), 0.05 );
+    const elapsed = timer.getElapsed();
+    for ( const flare of built.flares ) {
+        flare.update( delta, elapsed );
+    }
 
     if ( controls.isLocked ) {
         camera.getWorldDirection( forward );
