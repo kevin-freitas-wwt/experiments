@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platemap</title>
+    <meta name="description" content="1.4 million US restaurants on one map, filtered by cuisine and ZIP code.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="experiments by Kevin">
+    <meta property="og:title" content="Platemap">
+    <meta property="og:description" content="1.4 million US restaurants on one map, filtered by cuisine and ZIP code.">
+    <meta property="og:url" content="https://kevin-freitas-wwt.github.io/experiments/Platemap/">
+    <meta property="og:image" content="https://kevin-freitas-wwt.github.io/experiments/Platemap/og.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Platemap">
+    <meta name="twitter:description" content="1.4 million US restaurants on one map, filtered by cuisine and ZIP code.">
+    <meta name="twitter:image" content="https://kevin-freitas-wwt.github.io/experiments/Platemap/og.png">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,50&family=Inter:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.16.0/dist/maplibre-gl.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <aside class="rail" id="rail">
+        <header class="masthead">
+            <svg class="mark" viewBox="0 0 48 48" aria-hidden="true">
+                <circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="24" cy="24" r="13" fill="none" stroke="currentColor" stroke-width="1"/>
+                <path d="M11 6v11M14 6v11M8 6v11M11 17v25" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M38 6c-3 0-5 5-5 11s2 6 2 6v19M38 6v36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <div>
+                <h1>Platemap</h1>
+                <p class="dek"><span id="total">1.4M</span> US restaurants by cuisine and ZIP</p>
+            </div>
+            <button class="toggle" id="toggle" aria-expanded="true" aria-controls="menu" aria-label="Toggle menu">
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M3 5l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </button>
+        </header>
+
+        <div class="menu" id="menu">
+            <label class="search">
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                <input id="zip" type="search" inputmode="numeric" autocomplete="off" placeholder="ZIP code or city" aria-label="ZIP code or city">
+            </label>
+            <ul class="suggest" id="suggest" role="listbox" hidden></ul>
+
+            <div class="scope" id="scope" hidden>
+                <div>
+                    <strong id="scopeZip"></strong>
+                    <span id="scopePlace"></span>
+                </div>
+                <button id="clearZip" type="button">Clear</button>
+            </div>
+
+            <ol class="cuisines" id="cuisines"></ol>
+
+            <footer class="colophon">
+                <p>Places from <a href="https://opensource.foursquare.com/os-places/" target="_blank" rel="noopener">Foursquare OS Places</a> (Jan 2025 release, Apache 2.0). Counts include listings Foursquare has not marked closed, so treat them as upper bounds. Basemap by <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> and <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>.</p>
+            </footer>
+        </div>
+    </aside>
+
+    <main class="map" id="map" role="region" aria-label="Map of restaurants"></main>
+
+    <div class="legend" id="legend">
+        <span class="legend__dot"></span>
+        <span id="legendText">Zoom in for individual restaurants</span>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
