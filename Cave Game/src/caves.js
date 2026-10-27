@@ -15,7 +15,7 @@ import { noise3 } from "./noise.js";
 
 const CELL = 6;
 const HALF = CELL / 2;
-const RES = 40;
+const RES = 30;
 const SHELL = 0.15;
 const HUB_Y = 1.5;
 const MOUTH = { half: 1.6, down: 1.5, up: 1.9 };   // horizontal mouth: ellipse about HUB_Y
@@ -171,7 +171,7 @@ const offset = -HALF + scale * ( 1 - delta );
 
 export function buildCave( group, open, ctx ) {
     if ( !mc ) {
-        mc = new MarchingCubes( RES, materials.cave_wall, true, false, 60000 );
+        mc = new MarchingCubes( RES, materials.cave_wall, true, false, 40000 );
         mc.isolation = 0;
     }
     const field = carve( open, ctx.rand );
@@ -205,6 +205,5 @@ export function buildCave( group, open, ctx ) {
     geo.setAttribute( "uv", new THREE.BufferAttribute( uv, 2 ) );
 
     const mesh = new THREE.Mesh( geo, materials.cave_wall );
-    mesh.receiveShadow = true;
     group.add( mesh );
 }

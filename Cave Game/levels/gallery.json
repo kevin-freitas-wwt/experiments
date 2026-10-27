@@ -3,7 +3,7 @@
     "blurb": "Front row: the flat kit, one section per plinth. Back row, staggered into the gaps: the same ten openings as eroded cave variants. Vertical partners stack above or sink below wherever a section opens up or down.",
     "ground": true,
     "labels": true,
-    "fog": 0.012,
+    "fog": 0.02,
     "spawn": {
         "x": 9,
         "y": 0,
@@ -247,5 +247,6 @@
             "rot": 0,
             "label": false
         }
-    ]
+    ],
+    "view": 14
 }

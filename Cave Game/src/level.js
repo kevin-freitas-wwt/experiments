@@ -36,12 +36,12 @@ function label( text, sub ) {
     return sprite;
 }
 
-// Instantiates a level: returns the group to add to the scene, the collidable
-// meshes, a cell lookup for the HUD, and any connection warnings.
+// Instantiates a level: returns the group to add to the scene, the ground, a
+// cell lookup (each cell carries its group and meshes), and connection warnings.
 export function buildLevel( level ) {
     const group = new THREE.Group();
-    const colliders = [];
     const cells = new Map();
+    let ground = null;
     const warnings = [];
 
     for ( const c of level.cells ) {
@@ -53,18 +53,21 @@ export function buildLevel( level ) {
     for ( const c of cells.values() ) {
         const section = buildSection( c.type, ( c.x * 73856093 ^ c.y * 19349663 ^ c.z * 83492791 ) >>> 0 );
         section.rotation.y = -c.rot * Math.PI / 2;
-        section.position.set( c.x * CELL, c.y * CELL, c.z * CELL );
-        group.add( section );
+        c.group = new THREE.Group();
+        c.group.position.set( c.x * CELL, c.y * CELL, c.z * CELL );
+        c.group.add( section );
+        group.add( c.group );
+        c.meshes = [];
         section.traverse( ( o ) => {
             if ( o.isMesh ) {
-                colliders.push( o );
+                c.meshes.push( o );
             }
         } );
 
         if ( c.label !== false && level.labels ) {
             const tag = label( c.type, KIT[ c.type ].blurb );
-            tag.position.set( c.x * CELL, c.y * CELL + CELL - 1.2, c.z * CELL + CELL / 2 + 0.4 );
-            group.add( tag );
+            tag.position.set( 0, CELL - 1.2, CELL / 2 + 0.4 );
+            c.group.add( tag );
         }
 
         for ( const face of c.faces ) {
@@ -78,15 +81,13 @@ export function buildLevel( level ) {
 
     if ( level.ground ) {
         const span = CELL * 40;
-        const ground = new THREE.Mesh( new THREE.PlaneGeometry( span, span ), materials.ground );
+        ground = new THREE.Mesh( new THREE.PlaneGeometry( span, span ), materials.ground );
         ground.rotation.x = -Math.PI / 2;
         ground.position.y = -0.02;
-        ground.receiveShadow = true;
         group.add( ground );
-        colliders.push( ground );
     }
 
-    return { group, colliders, cells, warnings };
+    return { group, ground, cells, warnings };
 }
 
 export function cellAt( position ) {

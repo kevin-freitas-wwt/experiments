@@ -3,7 +3,6 @@
     "blurb": "A small connected loop of cave sections that uses rotation and a ramp to change level. Spawn faces south.",
     "ground": false,
     "labels": false,
-    "fog": 0.05,
     "spawn": {
         "x": 0,
         "y": 0,
@@ -123,5 +122,6 @@
             "type": "cave-corridor",
             "rot": 0
         }
-    ]
+    ],
+    "view": 5
 }

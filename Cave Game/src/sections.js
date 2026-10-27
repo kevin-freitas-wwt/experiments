@@ -52,7 +52,6 @@ function panel( w, h, kind ) {
         uv.setXY( i, uv.getX( i ) * w / CELL, uv.getY( i ) * h / CELL );
     }
     const mesh = new THREE.Mesh( geo, materials[ kind ] );
-    mesh.receiveShadow = true;
     return mesh;
 }
 
@@ -108,7 +107,6 @@ function buildRamp( group ) {
     const ramp = new THREE.Mesh( new THREE.BoxGeometry( HOLE, RAMP_T, length ), materials.step );
     ramp.rotation.x = angle;
     ramp.position.set( 0, CELL / 2 - RAMP_T / 2 * Math.cos( angle ), HALF - run / 2 - RAMP_T / 2 * Math.sin( angle ) );
-    ramp.castShadow = ramp.receiveShadow = true;
     group.add( ramp );
 }
 

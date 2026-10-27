@@ -23,18 +23,18 @@ const level = await loadLevel( levelName );
 
 const renderer = new THREE.WebGLRenderer( { antialias: true } );
 renderer.setSize( window.innerWidth, window.innerHeight );
-renderer.setPixelRatio( Math.min( window.devicePixelRatio, 2 ) );
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.setPixelRatio( Math.min( window.devicePixelRatio, 1.5 ) );
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.25;
 document.body.appendChild( renderer.domElement );
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color( 0x0b0e14 );
-scene.fog = new THREE.FogExp2( 0x0b0e14, level.fog ?? 0.028 );
+// `view` is the draw distance in cells; fog is tuned so nothing pops at the edge.
+const VIEW = level.view ?? 5;
+scene.fog = new THREE.FogExp2( 0x0b0e14, level.fog ?? 2.2 / ( VIEW * CELL ) );
 
-const camera = new THREE.PerspectiveCamera( 72, window.innerWidth / window.innerHeight, 0.1, 300 );
+const camera = new THREE.PerspectiveCamera( 72, window.innerWidth / window.innerHeight, 0.1, ( VIEW + 1 ) * CELL * 1.8 );
 scene.add( camera );
 
 // --- Light --------------------------------------------------------------------
@@ -44,10 +44,18 @@ scene.add( new THREE.HemisphereLight( 0x4a5668, 0x1a1512, 1.4 ) );
 const lamp = new THREE.SpotLight( 0xffe3b4, 220, 70, 0.7, 0.7, 2 );
 lamp.position.set( 0.2, -0.3, 0 );
 lamp.target.position.set( 0, -0.4, -4 );
-lamp.castShadow = true;
-lamp.shadow.mapSize.set( 1024, 1024 );
-lamp.shadow.bias = -0.002;
 camera.add( lamp, lamp.target );
+
+// A fixed pool of cell glows, moved each frame to the nearest cells, so the
+// shader's light count never changes however big the level is.
+const GLOWS = 6;
+const glows = [];
+for ( let i = 0; i < GLOWS; i++ ) {
+    const glow = new THREE.PointLight( 0xf2a93b, 40, CELL * 1.8, 2 );
+    glow.visible = false;
+    scene.add( glow );
+    glows.push( glow );
+}
 
 // --- World --------------------------------------------------------------------
 
@@ -57,13 +65,37 @@ scene.add( built.group );
 console.info( `${ level.name }: ${ built.cells.size } cells built in ${ Math.round( performance.now() - t0 ) } ms` );
 built.warnings.forEach( ( w ) => console.warn( w ) );
 
-for ( const c of built.cells.values() ) {
-    if ( level.labels && c.label === false ) {
-        continue;
+const cellList = [ ...built.cells.values() ];
+let lastCull = "";
+
+// Hide cells beyond VIEW, light the nearest few, and collide only with the
+// 3×3×3 block around the player.
+let colliders = [];
+function cull( c ) {
+    const k = key( c.x, c.y, c.z );
+    if ( k === lastCull ) {
+        return;
     }
-    const glow = new THREE.PointLight( 0xf2a93b, 40, CELL * 1.8, 2 );
-    glow.position.set( c.x * CELL, c.y * CELL + CELL * 0.62, c.z * CELL );
-    scene.add( glow );
+    lastCull = k;
+    colliders = built.ground ? [ built.ground ] : [];
+    for ( const cell of cellList ) {
+        const dx = Math.abs( cell.x - c.x );
+        const dy = Math.abs( cell.y - c.y );
+        const dz = Math.abs( cell.z - c.z );
+        cell.group.visible = Math.max( dx, dy, dz ) <= VIEW;
+        if ( dx <= 1 && dy <= 1 && dz <= 1 ) {
+            colliders.push( ...cell.meshes );
+        }
+    }
+    cellList
+        .map( ( cell ) => ( { cell, d: ( cell.x - c.x ) ** 2 + ( cell.y - c.y ) ** 2 + ( cell.z - c.z ) ** 2 } ) )
+        .sort( ( a, b ) => a.d - b.d )
+        .forEach( ( { cell }, i ) => {
+            if ( i < GLOWS ) {
+                glows[ i ].visible = true;
+                glows[ i ].position.set( cell.x * CELL, cell.y * CELL + CELL * 0.62, cell.z * CELL );
+            }
+        } );
 }
 
 // --- Player -------------------------------------------------------------------
@@ -135,7 +167,7 @@ function blocked( dx, dz ) {
     for ( const h of [ 1.3, 1.65 ] ) {
         origin.set( feet.x, feet.y + h, feet.z );
         ray.set( origin, dir );
-        if ( ray.intersectObjects( built.colliders, false ).length ) {
+        if ( ray.intersectObjects( colliders, false ).length ) {
             return true;
         }
     }
@@ -155,7 +187,7 @@ function settle( delta ) {
     origin.set( feet.x, feet.y + STEP, feet.z );
     ray.set( origin, DOWN );
     ray.far = 80;
-    const hit = ray.intersectObjects( built.colliders, false )[ 0 ];
+    const hit = ray.intersectObjects( colliders, false )[ 0 ];
     const floor = hit ? hit.point.y : -Infinity;
 
     if ( move.lift ) {
@@ -180,7 +212,7 @@ function settle( delta ) {
         origin.set( feet.x, feet.y + EYE, feet.z );
         ray.set( origin, UP );
         ray.far = vy * delta + 0.15;
-        if ( ray.intersectObjects( built.colliders, false ).length ) {
+        if ( ray.intersectObjects( colliders, false ).length ) {
             vy = 0;
         }
     }
@@ -206,6 +238,7 @@ let lastKey = "";
 
 function updateLog() {
     const c = cellAt( feet );
+    cull( c );
     const k = key( c.x, c.y, c.z );
     if ( k === lastKey ) {
         return;
@@ -264,3 +297,4 @@ function animate() {
 
 updateLog();
 renderer.setAnimationLoop( animate );
+setTimeout( () => console.info( `${ renderer.info.render.triangles } triangles, ${ renderer.info.render.calls } draw calls in view` ), 1500 );

@@ -37,7 +37,7 @@ Levels: `?level=gallery` (default, the whole kit laid out) or `?level=sample` (a
 | `well` | n s down | corridor with a floor hole |
 | `cap` | n s up | corridor with a ceiling hole |
 
-Each type also exists as a `cave-` variant (`cave-corridor`, `cave-ramp`, and so on) with the same openings but none of the box. A cave section is carved, not assembled: `src/caves.js` writes a signed distance field (negative is air) made of an elliptical tube from every wall opening to the centre, a round shaft from every floor or ceiling opening, a sphere chamber wherever three or more meet, three octaves of value noise that pinch and swell the passage, and small spheres and capsules added back as rubble and stalactites. The `cave-ramp` carves its slope as solid rock instead of using the slab. Marching cubes (Three.js's `MarchingCubes` addon, 40³ samples per cell) turns the field into one flat-shaded, inward-facing mesh.
+Each type also exists as a `cave-` variant (`cave-corridor`, `cave-ramp`, and so on) with the same openings but none of the box. A cave section is carved, not assembled: `src/caves.js` writes a signed distance field (negative is air) made of an elliptical tube from every wall opening to the centre, a round shaft from every floor or ceiling opening, a sphere chamber wherever three or more meet, three octaves of value noise that pinch and swell the passage, and small spheres and capsules added back as rubble and stalactites. The `cave-ramp` carves its slope as solid rock instead of using the slab. Marching cubes (Three.js's `MarchingCubes` addon, 30³ samples per cell) turns the field into one flat-shaded, inward-facing mesh.
 
 Two rules keep cave sections connectable. Noise fades to zero within `1.3` units of any open face, so a tube mouth at the cell boundary is always the same fixed ellipse (`3.2` wide, floor to `3.4`) or circle (radius `1.3`) and lines up with the neighbour's. A `0.15` shell of rock is forced along every closed face, pierced only by the exact mouth shape, so air never leaks out of the cube. Cave and flat sections can be placed next to each other and are passable, but their mouths are different shapes, so the join looks rough and a flat wall offers no collision from the cave side.
 
@@ -60,13 +60,17 @@ Two rules keep cave sections connectable. Noise fades to zero within `1.3` units
 }
 ```
 
-Cells are in grid units (world position is `cell * CELL`). `spawn` may be fractional; `yaw` is radians, `0` faces north. `ground` adds a flat plane at `y = 0`; `labels` hangs a type/blurb sprite in front of each cell unless that cell sets `label: false`.
+Cells are in grid units (world position is `cell * CELL`). `spawn` may be fractional; `yaw` is radians, `0` faces north. `ground` adds a flat plane at `y = 0`; `labels` hangs a type/blurb sprite in front of each cell unless that cell sets `label: false`. `view` is the draw distance in cells (default 5): cells further than that from the player are hidden, and unless `fog` is given the fog density is set so the cut-off is already invisible.
 
 On load, every opening is checked against its neighbour. A face that opens into a closed face logs a `console.warn` naming both cells.
 
 ## Movement (`src/main.js`)
 
 Raycast collision against the section meshes: two horizontal rays at knee and chest height block walls, a downward ray from step height finds the floor and follows ramps up and down, an upward ray stops you at ceilings, and gravity takes over at holes. Lifting with `A` cancels gravity while held and ramps up to 3.2 m/s. Because faces are inward-only, collision also only works from inside a cube; walking into a cube from outside passes through its wall. Fall below `y = -40` and you respawn.
+
+## Performance
+
+No shadow maps. Pixel ratio is capped at 1.5. Six point lights form a fixed pool that is moved to the nearest cells every frame, so the shader's light count never changes however large the level. Collision rays only test the meshes of the 3×3×3 block of cells around the player. Cave fields are sampled at 30³, which keeps a cave cell at roughly 3–6k triangles; the console reports build time and the triangle count in view.
 
 ## Files
 
