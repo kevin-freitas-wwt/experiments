@@ -46,17 +46,6 @@ lamp.position.set( 0.2, -0.3, 0 );
 lamp.target.position.set( 0, -0.4, -4 );
 camera.add( lamp, lamp.target );
 
-// A fixed pool of cell glows, moved each frame to the nearest cells, so the
-// shader's light count never changes however big the level is.
-const GLOWS = 6;
-const glows = [];
-for ( let i = 0; i < GLOWS; i++ ) {
-    const glow = new THREE.PointLight( 0xf2a93b, 40, CELL * 1.8, 2 );
-    glow.visible = false;
-    scene.add( glow );
-    glows.push( glow );
-}
-
 // --- World --------------------------------------------------------------------
 
 const t0 = performance.now();
@@ -68,8 +57,7 @@ built.warnings.forEach( ( w ) => console.warn( w ) );
 const cellList = [ ...built.cells.values() ];
 let lastCull = "";
 
-// Hide cells beyond VIEW, light the nearest few, and collide only with the
-// 3×3×3 block around the player.
+// Hide cells beyond VIEW and collide only with the 3×3×3 block around the player.
 let colliders = [];
 function cull( c ) {
     const k = key( c.x, c.y, c.z );
@@ -87,15 +75,6 @@ function cull( c ) {
             colliders.push( ...cell.meshes );
         }
     }
-    cellList
-        .map( ( cell ) => ( { cell, d: ( cell.x - c.x ) ** 2 + ( cell.y - c.y ) ** 2 + ( cell.z - c.z ) ** 2 } ) )
-        .sort( ( a, b ) => a.d - b.d )
-        .forEach( ( { cell }, i ) => {
-            if ( i < GLOWS ) {
-                glows[ i ].visible = true;
-                glows[ i ].position.set( cell.x * CELL, cell.y * CELL + CELL * 0.62, cell.z * CELL );
-            }
-        } );
 }
 
 // --- Player -------------------------------------------------------------------

@@ -70,7 +70,7 @@ Raycast collision against the section meshes: two horizontal rays at knee and ch
 
 ## Performance
 
-No shadow maps. Pixel ratio is capped at 1.5. Six point lights form a fixed pool that is moved to the nearest cells every frame, so the shader's light count never changes however large the level. Collision rays only test the meshes of the 3×3×3 block of cells around the player. Cave fields are sampled at 30³, which keeps a cave cell at roughly 3–6k triangles; the console reports build time and the triangle count in view.
+No shadow maps. Pixel ratio is capped at 1.5. The only lights are the headlamp and a dim hemisphere fill. Collision rays only test the meshes of the 3×3×3 block of cells around the player. Cave fields are sampled at 30³, which keeps a cave cell at roughly 3–6k triangles; the console reports build time and the triangle count in view.
 
 ## Files
 
