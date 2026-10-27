@@ -1,6 +1,7 @@
 import * as THREE from "three";
-import { CELL, KIT, OPPOSITE, buildSection, rotatedOpenings } from "./sections.js";
-import { materials } from "./materials.js";
+import { CELL, KIT, LIQUID_DEFAULT, OPPOSITE, buildSection, rotatedOpenings } from "./sections.js";
+import { buildLiquid } from "./caves.js";
+import { liquidMaterial, materials } from "./materials.js";
 import { buildFlare } from "./flare.js";
 
 const DELTA = {
@@ -38,11 +39,13 @@ function label( text, sub ) {
 }
 
 // Instantiates a level: returns the group to add to the scene, the ground, a
-// cell lookup (each cell carries its group and meshes), flares, and warnings.
+// cell lookup (each cell carries its group and meshes), flares, liquid
+// materials to animate, and warnings.
 export function buildLevel( level ) {
     const group = new THREE.Group();
     const cells = new Map();
     const flares = [];
+    const liquids = [];
     let ground = null;
     const warnings = [];
 
@@ -53,7 +56,7 @@ export function buildLevel( level ) {
     }
 
     for ( const c of cells.values() ) {
-        const section = buildSection( c.type, ( c.x * 73856093 ^ c.y * 19349663 ^ c.z * 83492791 ) >>> 0 );
+        const { group: section, field, basin } = buildSection( c.type, ( c.x * 73856093 ^ c.y * 19349663 ^ c.z * 83492791 ) >>> 0 );
         section.rotation.y = -c.rot * Math.PI / 2;
         c.group = new THREE.Group();
         c.group.position.set( c.x * CELL, c.y * CELL, c.z * CELL );
@@ -70,6 +73,18 @@ export function buildLevel( level ) {
             const tag = label( c.type, KIT[ c.type ].blurb );
             tag.position.set( 0, CELL - 1.2, CELL / 2 + 0.4 );
             c.group.add( tag );
+        }
+
+        if ( basin ) {
+            c.liquid = c.liquid || LIQUID_DEFAULT;
+            const material = liquidMaterial( c.liquid );
+            section.add( buildLiquid( field, material ) );
+            liquids.push( material );
+            const glow = new THREE.PointLight( c.liquid, 90, CELL * 2.2, 2 );
+            glow.position.set( c.x * CELL, c.y * CELL + 1.6, c.z * CELL );
+            group.add( glow );
+        } else {
+            delete c.liquid;
         }
 
         if ( c.flare ) {
@@ -93,7 +108,7 @@ export function buildLevel( level ) {
         group.add( ground );
     }
 
-    return { group, ground, cells, flares, warnings };
+    return { group, ground, cells, flares, liquids, warnings };
 }
 
 export function cellAt( position ) {

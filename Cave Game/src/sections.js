@@ -22,8 +22,12 @@ export const KIT = {
     shaft: { open: [ "up", "down" ], blurb: "vertical pass-through" },
     pit: { open: [ "n", "down" ], blurb: "dead end over a drop" },
     well: { open: [ "n", "s", "down" ], blurb: "passage with a floor hole" },
-    cap: { open: [ "n", "s", "up" ], blurb: "passage with a ceiling hole" }
+    cap: { open: [ "n", "s", "up" ], blurb: "passage with a ceiling hole" },
+    pool: { open: [ "n", "s" ], blurb: "liquid held by a sill at each mouth", basin: "pool" },
+    channel: { open: [ "n", "s" ], blurb: "liquid runs face to face, chains with itself", basin: "channel" }
 };
+
+export const LIQUID_DEFAULT = "#ff5a1a";
 
 export function rotatedOpenings( type, rot ) {
     return KIT[ type ].open.map( ( f ) => {
@@ -33,13 +37,13 @@ export function rotatedOpenings( type, rot ) {
 }
 
 // Builds a section at rotation 0 in local space. `seed` keeps its erosion
-// stable between loads.
+// stable between loads. Returns the group and the field it was carved from.
 export function buildSection( type, seed = 1 ) {
     const def = KIT[ type ];
     if ( !def ) {
         throw new Error( `Unknown section type: ${ type }` );
     }
     const group = new THREE.Group();
-    buildCave( group, new Set( def.open ), { rand: seeded( seed ) } );
-    return group;
+    const field = buildCave( group, new Set( def.open ), { rand: seeded( seed ) }, def.basin );
+    return { group, field, basin: def.basin };
 }

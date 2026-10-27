@@ -36,6 +36,8 @@ Levels: `?level=gallery` (default, the whole kit laid out) or `?level=sample` (a
 | `pit` | n down | dead end over a drop |
 | `well` | n s down | passage with a floor hole |
 | `cap` | n s up | passage with a ceiling hole |
+| `pool` | n s | wide low chamber of liquid, held in by a rock sill just inside each mouth |
+| `channel` | n s | liquid runs face to face; chain channels to make a river, and cap the ends with pools |
 
 `n` is `-z`, `e` is `+x`. `rot` is quarter turns clockwise seen from above (0 to 3); wall openings rotate, `up`/`down` do not. `rotatedOpenings( type, rot )` gives the world-facing set.
 
@@ -62,17 +64,19 @@ Two rules keep sections connectable. Noise fades to zero within `1.3` units of a
 
 Cells are in grid units (world position is `cell * CELL`). `spawn` may be fractional; `yaw` is radians, `0` faces north. `ground` adds a flat plane at `y = 0`; `labels` hangs a type/blurb sprite in front of each cell unless that cell sets `label: false`. `ambient` scales the hemisphere fill light (default 0.6, cave-dark; the gallery uses 9 so every exhibit is lit). `view` is the draw distance in cells (default 5): cells further than that from the player are hidden, and unless `fog` is given the fog density is set so the cut-off is already invisible.
 
+`pool` and `channel` cells are filled with a glowing liquid at `y = 0.45`: lava (`#ff5a1a`) by default, or any CSS colour given as `"liquid": "#28d7ff"` on the cell. The surface is a flat mesh trimmed to the carved air so it never shows through rock, with the colour as a strong emissive and a slowly drifting crust texture; one point light of the same colour floods the cell. Touching the liquid (your feet below its surface in that cell) kills you: a red flash and you respawn. The liquid is not a collider, so you fall into it. Hold `A` to fly across; a pool's sills are high enough to stand on at each mouth.
+
 A cell with `"flare": true` gets a dropped road flare: a short red stick placed at a seeded random spot on that cell's floor (found by raycasting down, so it sits on cave rock too), a flickering red point light at its tip, and a column of soft white smoke (a 32-point particle system with a small custom shader). Each flare is one real light, so use them in handfuls, not everywhere.
 
 On load, every opening is checked against its neighbour. A face that opens into a closed face logs a `console.warn` naming both cells.
 
 ## Movement (`src/main.js`)
 
-Raycast collision against the section meshes: two horizontal rays at knee and chest height block walls, a downward ray from step height finds the floor and follows slopes up and down, an upward ray stops you at ceilings, and gravity takes over at holes. Lifting with `A` cancels gravity while held and ramps up to 3.2 m/s. Because rock faces inward only, collision also only works from inside a cell; walking into a cell from outside passes through its wall. Fall below `y = -40` and you respawn.
+Raycast collision against the section meshes: two horizontal rays at knee and chest height block walls, a downward ray from step height finds the floor and follows slopes up and down, an upward ray stops you at ceilings, and gravity takes over at holes. Lifting with `A` cancels gravity while held and ramps up to 3.2 m/s. Because rock faces inward only, collision also only works from inside a cell; walking into a cell from outside passes through its wall. Fall below `y = -40`, or into liquid, and you respawn at the level's `spawn`.
 
 ## Performance
 
-No shadow maps. Pixel ratio is capped at 1.5. The only lights are the headlamp, a dim hemisphere fill, and one point light per flare. Collision rays only test the meshes of the 3×3×3 block of cells around the player. Fields are sampled at 30³, which keeps a cell at roughly 3–6k triangles; the console reports build time and the triangle count in view.
+No shadow maps. Pixel ratio is capped at 1.5. The only lights are the headlamp, a dim hemisphere fill, and one point light per flare or liquid cell. Collision rays only test the meshes of the 3×3×3 block of cells around the player. Fields are sampled at 30³, which keeps a cell at roughly 3–6k triangles; the console reports build time and the triangle count in view.
 
 ## Files
 
@@ -80,11 +84,11 @@ No shadow maps. Pixel ratio is capped at 1.5. The only lights are the headlamp, 
 | --- | --- |
 | `src/sections.js` | Cube constants, the kit table, rotation helper |
 | `src/level.js` | JSON loading, placing cells, connectivity check, labels, ground |
-| `src/materials.js` | Tileable canvas rock, triplanar-projected colour and bump (`onBeforeCompile`) |
+| `src/materials.js` | Tileable canvas rock, triplanar-projected colour and bump (`onBeforeCompile`); glowing liquid |
 | `src/noise.js` | Seeded RNG (random number generator) and 3D value noise |
-| `src/caves.js` | Signed distance field and marching-cubes mesh for every section |
+| `src/caves.js` | Signed distance field and marching-cubes mesh for every section; trimmed liquid surface |
 | `src/flare.js` | Dropped flare: stick, flickering light, smoke particles |
 | `src/main.js` | Renderer, headlamp, pointer-lock controls, collision, HUD (heads-up display) |
 | `src/style.css` | Entry sheet, survey log, crosshair |
 | `levels/gallery.json` | Every section on a 4×3 grid with aisles, vertical partners stacked |
-| `levels/sample.json` | Small connected loop using rotation and a chimney |
+| `levels/sample.json` | Small connected loop using rotation, a chimney and a lava pool |

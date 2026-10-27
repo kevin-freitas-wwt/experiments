@@ -1,6 +1,6 @@
 {
     "name": "sample",
-    "blurb": "A small connected loop that uses rotation and a chimney to change level: hold A under the hole to rise. Spawn faces south.",
+    "blurb": "A small connected loop that uses rotation and a chimney to change level: hold A under the hole to rise, and hold it again to fly the lava pool on the upper run. Spawn faces south.",
     "ground": false,
     "labels": false,
     "spawn": {
@@ -57,7 +57,7 @@
             "x": 1,
             "y": 1,
             "z": 2,
-            "type": "corridor",
+            "type": "pool",
             "rot": 1
         },
         {

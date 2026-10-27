@@ -1,6 +1,6 @@
 {
     "name": "gallery",
-    "blurb": "The whole kit on a 4\u00d73 grid with one-cell aisles, each section's vertical partner stacked above or sunk below wherever it opens up or down. Rock faces inward, so look straight through from the aisle or walk in.",
+    "blurb": "The whole kit on a 4\u00d73 grid with one-cell aisles, each section's vertical partner stacked above or sunk below wherever it opens up or down. The pool is lava; the channel shows a custom liquid colour. Rock faces inward, so look straight through from the aisle or walk in.",
     "ground": true,
     "labels": true,
     "fog": 0.018,
@@ -130,6 +130,21 @@
             "type": "pit",
             "rot": 0,
             "label": false
+        },
+        {
+            "x": 4,
+            "y": 0,
+            "z": -4,
+            "type": "pool",
+            "rot": 0
+        },
+        {
+            "x": 6,
+            "y": 0,
+            "z": -4,
+            "type": "channel",
+            "rot": 0,
+            "liquid": "#28d7ff"
         }
     ],
     "view": 8,

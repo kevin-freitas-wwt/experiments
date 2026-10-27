@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { PointerLockControls } from "three/addons/controls/PointerLockControls.js";
 import { CELL } from "./sections.js";
 import { buildLevel, cellAt, key, loadLevel } from "./level.js";
+import { LIQUID_Y } from "./caves.js";
 
 const EYE = 1.7;
 const RADIUS = 0.45;
@@ -204,8 +205,28 @@ function settle( delta ) {
         flying = false;
     }
     if ( feet.y < -40 ) {
-        feet.set( level.spawn.x * CELL, level.spawn.y * CELL, level.spawn.z * CELL );
-        vy = 0;
+        respawn();
+    }
+}
+
+// --- Liquid -------------------------------------------------------------------
+
+const deathFlash = document.getElementById( "death" );
+
+function respawn() {
+    feet.set( level.spawn.x * CELL, level.spawn.y * CELL, level.spawn.z * CELL );
+    vy = 0;
+    flying = false;
+    velocity.set( 0, 0, 0 );
+    deathFlash.classList.add( "on" );
+    setTimeout( () => deathFlash.classList.remove( "on" ), 700 );
+}
+
+function checkLiquid() {
+    const c = cellAt( feet );
+    const cell = built.cells.get( key( c.x, c.y, c.z ) );
+    if ( cell && cell.liquid && feet.y - c.y * CELL < LIQUID_Y ) {
+        respawn();
     }
 }
 
@@ -251,6 +272,9 @@ function animate() {
     for ( const flare of built.flares ) {
         flare.update( delta, elapsed );
     }
+    for ( const liquid of built.liquids ) {
+        liquid.update( elapsed );
+    }
 
     if ( controls.isLocked ) {
         camera.getWorldDirection( forward );
@@ -272,6 +296,7 @@ function animate() {
 
         slide( velocity.x * delta, velocity.z * delta );
         settle( delta );
+        checkLiquid();
         camera.position.set( feet.x, feet.y + EYE, feet.z );
         updateLog();
     }

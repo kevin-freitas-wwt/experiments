@@ -143,6 +143,28 @@ function rock( seed, tint, roughness ) {
     return material;
 }
 
+// Glowing liquid: a dark base with the chosen colour as emissive, modulated by
+// a slowly drifting crust texture. `update( elapsed )` drifts it.
+const crust = texture( rockCanvas( 0x1a7a, 256 ) );
+crust.colorSpace = THREE.NoColorSpace;
+
+export function liquidMaterial( colour ) {
+    const material = new THREE.MeshStandardMaterial( {
+        color: 0x0a0604,
+        emissive: new THREE.Color( colour ),
+        emissiveIntensity: 2.6,
+        emissiveMap: crust.clone(),
+        metalness: 0,
+        roughness: 0.9
+    } );
+    material.emissiveMap.repeat.set( 1.5, 1.5 );
+    material.emissiveMap.needsUpdate = true;
+    material.update = ( elapsed ) => {
+        material.emissiveMap.offset.set( elapsed * 0.012, elapsed * 0.02 );
+    };
+    return material;
+}
+
 export const materials = {
     ground: new THREE.MeshStandardMaterial( {
         color: 0x272d38,

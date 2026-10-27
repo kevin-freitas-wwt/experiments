@@ -22,6 +22,8 @@ const MOUTH = { half: 1.6, down: 1.5, up: 1.9 };   // horizontal mouth: ellipse 
 const VMOUTH = 1.3;                                // floor / ceiling mouth radius
 const CHAMBER = { y: 2.2, r: 2.3 };
 const NOISE_AMP = 1.0;
+export const LIQUID_Y = 0.45;
+const SILL = { y: 0.8, z: 2.35, w: 0.3 };
 const NOISE_FADE = 1.3;
 const SMOOTH_K = 0.9;
 
@@ -67,15 +69,17 @@ function capsule( px, py, pz, ax, ay, az, bx, by, bz, r ) {
     return Math.hypot( apx - abx * t, apy - aby * t, apz - abz * t ) - r;
 }
 
-// Builds the field function for one section.
-function carve( open, rand ) {
+// Builds the field function for one section. `basin` is "pool" (liquid held
+// inside the cell by a rock sill at each mouth) or "channel" (liquid runs face
+// to face so neighbouring channels join).
+function carve( open, rand, basin ) {
     const faces = [ ...open ];
     const horizontal = faces.filter( ( f ) => !DIR[ f ][ 1 ] );
     const vertical = faces.filter( ( f ) => DIR[ f ][ 1 ] );
-    const chamber = faces.length >= 3 || ( vertical.length && horizontal.length );
+    const chamber = faces.length >= 3 || ( vertical.length && horizontal.length ) || basin === "pool";
     const seed = rand() * 100;
     const tall = open.has( "up" );
-    const hub = { y: tall ? 2.7 : CHAMBER.y, r: tall ? 2.35 : CHAMBER.r };
+    const hub = basin === "pool" ? { y: 1.6, r: 2.45 } : { y: tall ? 2.7 : CHAMBER.y, r: tall ? 2.35 : CHAMBER.r };
     const amp = tall && chamber ? NOISE_AMP * 0.7 : NOISE_AMP;
 
     const bumps = [];
@@ -87,7 +91,7 @@ function carve( open, rand ) {
             drips.push( [ Math.cos( a ) * rho, Math.sin( a ) * rho, 0.1 + rand() * 0.12, 3.3 + rand() * 0.5 ] );
         }
     }
-    for ( const f of horizontal ) {
+    for ( const f of basin ? [] : horizontal ) {
         const d = DIR[ f ];
         for ( let i = 0; i < 2; i++ ) {
             const t = 0.6 + rand() * 1.2;
@@ -135,6 +139,11 @@ function carve( open, rand ) {
             air = Math.max( air, -capsule( px, py, pz, s[ 0 ], 5.6, s[ 1 ], s[ 0 ], s[ 3 ], s[ 1 ], s[ 2 ] ) );
         }
 
+        // Pool sills: a low rock ridge just inside each mouth holds the liquid in.
+        if ( basin === "pool" ) {
+            air = Math.max( air, Math.min( SILL.y - py, SILL.w - Math.abs( Math.abs( pz ) - SILL.z ) ) );
+        }
+
         // Shell: rock along every closed face, pierced only by the exact mouth.
         for ( const f of [ "n", "e", "s", "w" ] ) {
             const d = DIR[ f ];
@@ -162,12 +171,12 @@ const delta = 2 / RES;
 const scale = CELL / ( 2 - 3 * delta );
 const offset = -HALF + scale * ( 1 - delta );
 
-export function buildCave( group, open, ctx ) {
+export function buildCave( group, open, ctx, basin ) {
     if ( !mc ) {
         mc = new MarchingCubes( RES, materials.rock, true, false, 40000 );
         mc.isolation = 0;
     }
-    const field = carve( open, ctx.rand );
+    const field = carve( open, ctx.rand, basin );
     const data = mc.field;
     for ( let z = 0; z < RES; z++ ) {
         const wz = ( ( z - RES / 2 ) / ( RES / 2 ) ) * scale + offset;
@@ -199,4 +208,43 @@ export function buildCave( group, open, ctx ) {
 
     const mesh = new THREE.Mesh( geo, materials.rock );
     group.add( mesh );
+    return field;
+}
+
+// Flat liquid surface at LIQUID_Y, trimmed to the air of the field so it never
+// pokes through rock. Returns the mesh; the caller colours and lights it.
+export function buildLiquid( field, material ) {
+    const n = 72;
+    const step = CELL / n;
+    const pos = [];
+    const uv = [];
+    const idx = [];
+    const index = new Map();
+    const vertex = ( i, j ) => {
+        const k = i * ( n + 1 ) + j;
+        if ( !index.has( k ) ) {
+            index.set( k, pos.length / 3 );
+            pos.push( -HALF + i * step, LIQUID_Y, -HALF + j * step );
+            uv.push( i / n, j / n );
+        }
+        return index.get( k );
+    };
+    const air = ( i, j ) => field( -HALF + i * step, LIQUID_Y, -HALF + j * step ) < 0.05;
+    for ( let i = 0; i < n; i++ ) {
+        for ( let j = 0; j < n; j++ ) {
+            if ( air( i, j ) && air( i + 1, j ) && air( i, j + 1 ) && air( i + 1, j + 1 ) ) {
+                const a = vertex( i, j );
+                const b = vertex( i + 1, j );
+                const c = vertex( i, j + 1 );
+                const d = vertex( i + 1, j + 1 );
+                idx.push( a, c, b, b, c, d );
+            }
+        }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute( "position", new THREE.Float32BufferAttribute( pos, 3 ) );
+    geo.setAttribute( "uv", new THREE.Float32BufferAttribute( uv, 2 ) );
+    geo.setIndex( idx );
+    geo.computeVertexNormals();
+    return new THREE.Mesh( geo, material );
 }
