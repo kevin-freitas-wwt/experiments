@@ -211,22 +211,32 @@ function settle( delta ) {
 
 // --- Liquid -------------------------------------------------------------------
 
-const deathFlash = document.getElementById( "death" );
+const burn = document.getElementById( "burn" );
+const liquidRay = new THREE.Raycaster();
+let burning = false;
 
 function respawn() {
     feet.set( level.spawn.x * CELL, level.spawn.y * CELL, level.spawn.z * CELL );
     vy = 0;
     flying = false;
     velocity.set( 0, 0, 0 );
-    deathFlash.classList.add( "on" );
-    setTimeout( () => deathFlash.classList.remove( "on" ), 700 );
 }
 
+// Touching liquid only hurts where the liquid surface actually is: a ray down
+// onto that cell's liquid mesh, not the whole cell footprint.
 function checkLiquid() {
     const c = cellAt( feet );
     const cell = built.cells.get( key( c.x, c.y, c.z ) );
-    if ( cell && cell.liquid && feet.y - c.y * CELL < LIQUID_Y ) {
-        respawn();
+    let touching = false;
+    if ( cell && cell.liquidMesh && feet.y - c.y * CELL < LIQUID_Y + 0.02 ) {
+        origin.set( feet.x, c.y * CELL + LIQUID_Y + 1, feet.z );
+        liquidRay.set( origin, DOWN );
+        liquidRay.far = 2;
+        touching = liquidRay.intersectObject( cell.liquidMesh, false ).length > 0;
+    }
+    if ( touching !== burning ) {
+        burning = touching;
+        burn.classList.toggle( "on", burning );
     }
 }
 

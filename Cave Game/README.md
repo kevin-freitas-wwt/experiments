@@ -64,7 +64,7 @@ Two rules keep sections connectable. Noise fades to zero within `1.3` units of a
 
 Cells are in grid units (world position is `cell * CELL`). `spawn` may be fractional; `yaw` is radians, `0` faces north. `ground` adds a flat plane at `y = 0`; `labels` hangs a type/blurb sprite in front of each cell unless that cell sets `label: false`. `ambient` scales the hemisphere fill light (default 0.6, cave-dark; the gallery uses 9 so every exhibit is lit). `view` is the draw distance in cells (default 5): cells further than that from the player are hidden, and unless `fog` is given the fog density is set so the cut-off is already invisible.
 
-`pool` and `channel` cells are filled with a glowing liquid at `y = 0.45`: lava (`#ff5a1a`) by default, or any CSS colour given as `"liquid": "#28d7ff"` on the cell. The surface is a flat mesh trimmed to the carved air so it never shows through rock, with the colour as a strong emissive and a slowly drifting crust texture; one point light of the same colour floods the cell. Touching the liquid (your feet below its surface in that cell) kills you: a red flash and you respawn. The liquid is not a collider, so you fall into it. Hold `A` to fly across; a pool's sills are high enough to stand on at each mouth.
+`pool` and `channel` cells are filled with a glowing liquid at `y = 0.45`: lava (`#ff5a1a`) by default, or any CSS colour given as `"liquid": "#28d7ff"` on the cell. The surface is a flat mesh trimmed to the carved air so it never shows through rock, with the colour as a strong emissive and a slowly drifting crust texture; one point light of the same colour floods the cell. Touching the liquid pulses the screen red for as long as you are in it; the test is a ray down onto the liquid mesh itself, so the dry floor around a pool is safe. The liquid is not a collider, so you fall into it; no respawn, just wade or fly out. Hold `A` to fly across; a pool's sills are high enough to stand on at each mouth.
 
 A cell with `"flare": true` gets a dropped road flare: a short red stick placed at a seeded random spot on that cell's floor (found by raycasting down, so it sits on cave rock too), a flickering red point light at its tip, and a column of soft white smoke (a 32-point particle system with a small custom shader). Each flare is one real light, so use them in handfuls, not everywhere.
 
@@ -72,7 +72,7 @@ On load, every opening is checked against its neighbour. A face that opens into 
 
 ## Movement (`src/main.js`)
 
-Raycast collision against the section meshes: two horizontal rays at knee and chest height block walls, a downward ray from step height finds the floor and follows slopes up and down, an upward ray stops you at ceilings, and gravity takes over at holes. Lifting with `A` cancels gravity while held and ramps up to 3.2 m/s. Because rock faces inward only, collision also only works from inside a cell; walking into a cell from outside passes through its wall. Fall below `y = -40`, or into liquid, and you respawn at the level's `spawn`.
+Raycast collision against the section meshes: two horizontal rays at knee and chest height block walls, a downward ray from step height finds the floor and follows slopes up and down, an upward ray stops you at ceilings, and gravity takes over at holes. Lifting with `A` cancels gravity while held and ramps up to 3.2 m/s. Because rock faces inward only, collision also only works from inside a cell; walking into a cell from outside passes through its wall. Fall below `y = -40` and you respawn at the level's `spawn`.
 
 ## Performance
 

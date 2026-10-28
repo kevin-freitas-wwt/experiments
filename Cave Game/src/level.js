@@ -78,7 +78,8 @@ export function buildLevel( level ) {
         if ( basin ) {
             c.liquid = c.liquid || LIQUID_DEFAULT;
             const material = liquidMaterial( c.liquid );
-            section.add( buildLiquid( field, material, basin ) );
+            c.liquidMesh = buildLiquid( field, material, basin );
+            section.add( c.liquidMesh );
             liquids.push( material );
             const glow = new THREE.PointLight( c.liquid, 90, CELL * 2.2, 2 );
             glow.position.set( c.x * CELL, c.y * CELL + 1.6, c.z * CELL );
