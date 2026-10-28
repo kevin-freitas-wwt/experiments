@@ -16,7 +16,8 @@
             "y": 0,
             "z": 0,
             "type": "corridor",
-            "rot": 0
+            "rot": 0,
+            "lamp": true
         },
         {
             "x": 2,
@@ -30,7 +31,8 @@
             "y": 0,
             "z": 0,
             "type": "tee",
-            "rot": 0
+            "rot": 0,
+            "lamp": true
         },
         {
             "x": 6,

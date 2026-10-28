@@ -12,7 +12,7 @@ python3 "Cave Game/serve.py" 8765     # from the experiments folder
 
 Open http://localhost:8765/Cave%20Game/ (ES modules need `http://`, not `file://`). Three.js loads from jsDelivr via an importmap; there is no build step. `serve.py` is a plain static server that sends `Cache-Control: no-store`; with `python3 -m http.server` Chrome will happily keep stale modules across reloads and you end up hard-refreshing after every edit.
 
-Levels: `?level=gallery` (default, the whole kit laid out) or `?level=sample` (a small connected loop with a chimney). `?pose=x,y,z,yaw,pitch` frames a still with the overlay hidden.
+Levels: `?level=gallery` (default, the whole kit laid out), `?level=sample` (a small connected loop with a chimney) or `?level=descent` (four levels down, lit only at the top, lava at the bottom). `?pose=x,y,z,yaw,pitch` frames a still with the overlay hidden.
 
 ## Controls
 
@@ -66,6 +66,8 @@ Cells are in grid units (world position is `cell * CELL`). `spawn` may be fracti
 
 `pool` and `channel` cells are filled with a glowing liquid at `y = 0.45`: lava (`#ff5a1a`) by default, or any CSS colour given as `"liquid": "#28d7ff"` on the cell. The surface is a flat mesh trimmed to the carved air so it never shows through rock, with the colour as a strong emissive and a slowly drifting crust texture; one point light of the same colour floods the cell. Touching the liquid pulses the screen red for as long as you are in it; the test is a ray down onto the liquid mesh itself, so the dry floor around a pool is safe. The liquid is not a collider, so you fall into it; no respawn, just wade or fly out. Hold `A` to fly across; a pool's sills are high enough to stand on at each mouth.
 
+A cell with `"lamp": true` gets a cave lamp hung from the ceiling (found by raycasting up, so it sits under cave rock at the right height): a rod, a cap and a small warm glass body, with a dim warm point light. No flicker.
+
 A cell with `"flare": true` gets a dropped road flare: a short red stick placed at a seeded random spot on that cell's floor (found by raycasting down, so it sits on cave rock too), a flickering red point light at its tip, and a column of soft white smoke (a 32-point particle system with a small custom shader). Each flare is one real light, so use them in handfuls, not everywhere.
 
 On load, every opening is checked against its neighbour. A face that opens into a closed face logs a `console.warn` naming both cells.
@@ -76,7 +78,7 @@ Raycast collision against the section meshes: two horizontal rays at knee and ch
 
 ## Performance
 
-No shadow maps. Pixel ratio is capped at 1.5. The only lights are the headlamp, a dim hemisphere fill, and one point light per flare or liquid cell. Collision rays only test the meshes of the 3×3×3 block of cells around the player. Fields are sampled at 30³, which keeps a cell at roughly 3–6k triangles; the console reports build time and the triangle count in view.
+No shadow maps. Pixel ratio is capped at 1.5. The only lights are the headlamp, a dim hemisphere fill, and one point light per flare, lamp or liquid cell. Collision rays only test the meshes of the 3×3×3 block of cells around the player. Fields are sampled at 30³, which keeps a cell at roughly 3–6k triangles; the console reports build time and the triangle count in view.
 
 ## Files
 
@@ -88,7 +90,9 @@ No shadow maps. Pixel ratio is capped at 1.5. The only lights are the headlamp, 
 | `src/noise.js` | Seeded RNG (random number generator) and 3D value noise |
 | `src/caves.js` | Signed distance field and marching-cubes mesh for every section; trimmed liquid surface |
 | `src/flare.js` | Dropped flare: stick, flickering light, smoke particles |
+| `src/lamp.js` | Hung cave lamp with a dim warm light |
 | `src/main.js` | Renderer, headlamp, pointer-lock controls, collision, HUD (heads-up display) |
 | `src/style.css` | Entry sheet, survey log, crosshair |
 | `levels/gallery.json` | Every section on a 4×3 grid with aisles, vertical partners stacked |
 | `levels/sample.json` | Small connected loop using rotation, a chimney and a lava pool |
+| `levels/descent.json` | Four levels, 32 cells: lamps on top, flares below, lava pools and a channel at the bottom |

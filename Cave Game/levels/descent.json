@@ -1,0 +1,251 @@
+{
+    "name": "descent",
+    "blurb": "Four levels down. Lamps light the top; below that it is your headlamp and whatever flares were dropped. The lava is at the bottom. Drops only go one way, so hold A to climb back.",
+    "ground": false,
+    "labels": false,
+    "ambient": 0.35,
+    "view": 5,
+    "spawn": {
+        "x": 0,
+        "y": 3,
+        "z": 0,
+        "yaw": 3.14159
+    },
+    "cells": [
+        {
+            "x": 0,
+            "y": 3,
+            "z": 0,
+            "type": "end",
+            "rot": 2,
+            "lamp": true
+        },
+        {
+            "x": 0,
+            "y": 3,
+            "z": 1,
+            "type": "corridor",
+            "rot": 0
+        },
+        {
+            "x": 0,
+            "y": 3,
+            "z": 2,
+            "type": "corner",
+            "rot": 0,
+            "lamp": true
+        },
+        {
+            "x": 1,
+            "y": 3,
+            "z": 2,
+            "type": "corridor",
+            "rot": 1
+        },
+        {
+            "x": 2,
+            "y": 3,
+            "z": 2,
+            "type": "tee",
+            "rot": 1,
+            "lamp": true
+        },
+        {
+            "x": 2,
+            "y": 3,
+            "z": 3,
+            "type": "well",
+            "rot": 0
+        },
+        {
+            "x": 2,
+            "y": 3,
+            "z": 4,
+            "type": "end",
+            "rot": 0,
+            "flare": true
+        },
+        {
+            "x": 3,
+            "y": 3,
+            "z": 2,
+            "type": "corridor",
+            "rot": 1,
+            "lamp": true
+        },
+        {
+            "x": 4,
+            "y": 3,
+            "z": 2,
+            "type": "pit",
+            "rot": 3
+        },
+        {
+            "x": 2,
+            "y": 2,
+            "z": 3,
+            "type": "cap",
+            "rot": 0
+        },
+        {
+            "x": 2,
+            "y": 2,
+            "z": 4,
+            "type": "end",
+            "rot": 0,
+            "flare": true
+        },
+        {
+            "x": 2,
+            "y": 2,
+            "z": 2,
+            "type": "corner",
+            "rot": 1
+        },
+        {
+            "x": 3,
+            "y": 2,
+            "z": 2,
+            "type": "corridor",
+            "rot": 1
+        },
+        {
+            "x": 4,
+            "y": 2,
+            "z": 2,
+            "type": "cap",
+            "rot": 1
+        },
+        {
+            "x": 5,
+            "y": 2,
+            "z": 2,
+            "type": "pit",
+            "rot": 3
+        },
+        {
+            "x": 5,
+            "y": 1,
+            "z": 2,
+            "type": "cap",
+            "rot": 0
+        },
+        {
+            "x": 5,
+            "y": 1,
+            "z": 3,
+            "type": "end",
+            "rot": 0,
+            "flare": true
+        },
+        {
+            "x": 5,
+            "y": 1,
+            "z": 1,
+            "type": "corner",
+            "rot": 2
+        },
+        {
+            "x": 4,
+            "y": 1,
+            "z": 1,
+            "type": "corridor",
+            "rot": 1
+        },
+        {
+            "x": 3,
+            "y": 1,
+            "z": 1,
+            "type": "tee",
+            "rot": 3
+        },
+        {
+            "x": 3,
+            "y": 1,
+            "z": 0,
+            "type": "end",
+            "rot": 2,
+            "flare": true
+        },
+        {
+            "x": 2,
+            "y": 1,
+            "z": 1,
+            "type": "well",
+            "rot": 1
+        },
+        {
+            "x": 1,
+            "y": 1,
+            "z": 1,
+            "type": "end",
+            "rot": 1,
+            "flare": true
+        },
+        {
+            "x": 2,
+            "y": 0,
+            "z": 1,
+            "type": "cap",
+            "rot": 0
+        },
+        {
+            "x": 2,
+            "y": 0,
+            "z": 0,
+            "type": "end",
+            "rot": 2,
+            "flare": true
+        },
+        {
+            "x": 2,
+            "y": 0,
+            "z": 2,
+            "type": "pool",
+            "rot": 0
+        },
+        {
+            "x": 2,
+            "y": 0,
+            "z": 3,
+            "type": "channel",
+            "rot": 0
+        },
+        {
+            "x": 2,
+            "y": 0,
+            "z": 4,
+            "type": "pool",
+            "rot": 0
+        },
+        {
+            "x": 2,
+            "y": 0,
+            "z": 5,
+            "type": "corner",
+            "rot": 0
+        },
+        {
+            "x": 3,
+            "y": 0,
+            "z": 5,
+            "type": "corridor",
+            "rot": 1
+        },
+        {
+            "x": 4,
+            "y": 0,
+            "z": 5,
+            "type": "pool",
+            "rot": 1
+        },
+        {
+            "x": 5,
+            "y": 0,
+            "z": 5,
+            "type": "end",
+            "rot": 3,
+            "flare": true
+        }
+    ]
+}

@@ -14,7 +14,7 @@ const LIFT = 3.2;
 const LIFT_ACCEL = 4;
 const SINK = 2.2;
 const ACCEL = 10.5;
-const LEVELS = [ "gallery", "sample" ];
+const LEVELS = [ "gallery", "sample", "descent" ];
 
 const params = new URLSearchParams( location.search );
 const levelName = LEVELS.includes( params.get( "level" ) ) ? params.get( "level" ) : LEVELS[ 0 ];

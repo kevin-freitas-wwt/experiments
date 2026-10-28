@@ -3,6 +3,7 @@ import { CELL, KIT, LIQUID_DEFAULT, OPPOSITE, buildSection, rotatedOpenings } fr
 import { buildLiquid } from "./caves.js";
 import { liquidMaterial, materials } from "./materials.js";
 import { buildFlare } from "./flare.js";
+import { buildLamp } from "./lamp.js";
 
 const DELTA = {
     n: [ 0, 0, -1 ], e: [ 1, 0, 0 ], s: [ 0, 0, 1 ], w: [ -1, 0, 0 ],
@@ -90,6 +91,9 @@ export function buildLevel( level ) {
 
         if ( c.flare ) {
             flares.push( buildFlare( c, group ) );
+        }
+        if ( c.lamp ) {
+            buildLamp( c, group );
         }
 
         for ( const face of c.faces ) {
