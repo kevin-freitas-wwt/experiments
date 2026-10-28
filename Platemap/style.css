@@ -1,6 +1,7 @@
 :root {
     --accent: #7a1f2b;
     --accent-soft: rgba( 122, 31, 43, 0.12 );
+    --compare: #1f6f8b;
     --bg: #f4efe6;
     --fg: #1f1a17;
     --hair: rgba( 31, 26, 23, 0.14 );
@@ -15,6 +16,7 @@
     :root {
         --accent: #e0707c;
         --accent-soft: rgba( 224, 112, 124, 0.16 );
+        --compare: #5fb3c9;
         --bg: #16130f;
         --fg: #efe8dc;
         --hair: rgba( 239, 232, 220, 0.14 );
@@ -92,6 +94,99 @@ h1 {
 .toggle svg { transition: transform 0.2s; }
 .toggle[aria-expanded="false"] svg { transform: rotate( 180deg ); }
 
+.views {
+    background: var( --bg );
+    border-bottom: 1px solid var( --hair );
+    display: grid;
+    gap: 4px;
+    grid-template-columns: repeat( 3, 1fr );
+    padding: 10px 22px;
+}
+.views button {
+    align-items: center;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var( --muted );
+    cursor: pointer;
+    display: flex;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    gap: 6px;
+    justify-content: center;
+    padding: 7px 6px;
+}
+.views button:hover { color: var( --fg ); }
+.views button[aria-checked="true"] {
+    background: var( --paper );
+    border-color: var( --hair );
+    color: var( --accent );
+}
+.listhead {
+    align-items: center;
+    color: var( --muted );
+    display: flex;
+    font-size: 11px;
+    justify-content: space-between;
+    letter-spacing: 0.06em;
+    padding: 12px 22px 2px;
+    text-transform: uppercase;
+}
+.listhead button {
+    background: none;
+    border: 1px solid var( --hair );
+    border-radius: 999px;
+    color: var( --muted );
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    letter-spacing: 0;
+    padding: 3px 9px;
+    text-transform: none;
+}
+.listhead button[aria-pressed="true"] {
+    background: var( --fg );
+    border-color: var( --fg );
+    color: var( --paper );
+}
+.cuisines li .badge {
+    border-radius: 4px;
+    color: #fff;
+    display: none;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    margin-left: 6px;
+    padding: 3px 5px;
+    vertical-align: 1px;
+}
+.cuisines li[data-ab="a"] .badge { background: var( --accent ); display: inline-block; }
+.cuisines li[data-ab="b"] .badge { background: var( --compare ); display: inline-block; }
+.cuisines li[data-ab="b"] .bar i { background: var( --compare ); }
+.cuisines li.unspecified { color: var( --muted ); }
+.cuisines li.unspecified .name::after {
+    content: " · no category in source";
+    font-size: 11px;
+    font-weight: 400;
+}
+.legend__ramp {
+    align-items: center;
+    display: flex;
+    gap: 6px;
+}
+.legend__ramp i {
+    background: linear-gradient( 90deg, var( --ramp-lo ), var( --ramp-mid ), var( --ramp-hi ) );
+    border-radius: 3px;
+    display: block;
+    height: 10px;
+    width: 72px;
+}
+.legend__ramp b {
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+}
+.legend__ramp b:first-of-type { order: -1; }
 .menu {
     display: flex;
     flex-direction: column;
@@ -255,30 +350,6 @@ h1 {
     border-radius: 3px;
     width: 28px;
 }
-.heat {
-    align-items: center;
-    background: var( --paper );
-    border: 1px solid var( --hair );
-    border-radius: 999px;
-    color: var( --fg );
-    cursor: pointer;
-    display: flex;
-    font: inherit;
-    font-size: 12px;
-    font-weight: 500;
-    gap: 6px;
-    padding: 6px 12px 6px 8px;
-    position: fixed;
-    right: 56px;
-    top: 10px;
-    z-index: 2;
-}
-.heat:hover { border-color: var( --accent ); }
-.heat[aria-pressed="true"] {
-    background: var( --accent );
-    border-color: var( --accent );
-    color: #fff;
-}
 .legend__dot {
     background: var( --accent );
     border-radius: 50%;
@@ -340,19 +411,124 @@ h1 {
         max-height: 60vh;
     }
     .masthead { padding: 14px 16px; }
+    .views { padding: 8px 16px; }
+    .listhead { padding-left: 16px; padding-right: 16px; }
     .mark {
         height: 34px;
         width: 34px;
     }
     h1 { font-size: 24px; }
     .toggle { display: block; }
-    .toggle[aria-expanded="false"] + .menu { display: none; }
+    .toggle[aria-expanded="false"] + .views {
+    background: var( --bg );
+    border-bottom: 1px solid var( --hair );
+    display: grid;
+    gap: 4px;
+    grid-template-columns: repeat( 3, 1fr );
+    padding: 10px 22px;
+}
+.views button {
+    align-items: center;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var( --muted );
+    cursor: pointer;
+    display: flex;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    gap: 6px;
+    justify-content: center;
+    padding: 7px 6px;
+}
+.views button:hover { color: var( --fg ); }
+.views button[aria-checked="true"] {
+    background: var( --paper );
+    border-color: var( --hair );
+    color: var( --accent );
+}
+.listhead {
+    align-items: center;
+    color: var( --muted );
+    display: flex;
+    font-size: 11px;
+    justify-content: space-between;
+    letter-spacing: 0.06em;
+    padding: 12px 22px 2px;
+    text-transform: uppercase;
+}
+.listhead button {
+    background: none;
+    border: 1px solid var( --hair );
+    border-radius: 999px;
+    color: var( --muted );
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    letter-spacing: 0;
+    padding: 3px 9px;
+    text-transform: none;
+}
+.listhead button[aria-pressed="true"] {
+    background: var( --fg );
+    border-color: var( --fg );
+    color: var( --paper );
+}
+.cuisines li .badge {
+    border-radius: 4px;
+    color: #fff;
+    display: none;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    margin-left: 6px;
+    padding: 3px 5px;
+    vertical-align: 1px;
+}
+.cuisines li[data-ab="a"] .badge { background: var( --accent ); display: inline-block; }
+.cuisines li[data-ab="b"] .badge { background: var( --compare ); display: inline-block; }
+.cuisines li[data-ab="b"] .bar i { background: var( --compare ); }
+.cuisines li.unspecified { color: var( --muted ); }
+.cuisines li.unspecified .name::after {
+    content: " · no category in source";
+    font-size: 11px;
+    font-weight: 400;
+}
+.legend__ramp {
+    align-items: center;
+    display: flex;
+    gap: 6px;
+}
+.legend__ramp i {
+    background: linear-gradient( 90deg, var( --ramp-lo ), var( --ramp-mid ), var( --ramp-hi ) );
+    border-radius: 3px;
+    display: block;
+    height: 10px;
+    width: 72px;
+}
+.legend__ramp b {
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+}
+.legend__ramp b:first-of-type { order: -1; }
+.menu { display: none; }
     .search, .suggest li, .scope, .cuisines li, .colophon { padding-left: 16px; padding-right: 16px; }
     .colophon { display: none; }
-    .legend { left: 12px; }
-    .heat {
-        bottom: 54px;
-        right: 12px;
-        top: auto;
+    .legend {
+        bottom: 34px;
+        left: 12px;
+        max-width: calc( 100% - 24px );
     }
 }
+
+.legend .sw {
+    border-radius: 50%;
+    display: inline-block;
+    height: 9px;
+    margin: 0 4px 0 2px;
+    vertical-align: -1px;
+    width: 9px;
+}
+.legend .sw-a { background: var( --accent ); }
+.legend .sw-b { background: var( --compare ); }

@@ -1,14 +1,17 @@
 import duckdb, json, os, sys
 sys.path.insert( 0, os.path.dirname( __file__ ) )
-from groups import GROUPS, group
+from groups import GROUPS, group, group_from_name
 
 con = duckdb.connect()
-con.create_function( "grp", lambda s: group( s or "" ), [ str ], int )
+def grp( label, name ):
+    g = group( label or "" )
+    return group_from_name( name ) if g == 0 else g
+con.create_function( "grp", grp, [ str, str ], int )
 con.execute( """
     CREATE TABLE r AS
     SELECT name, round( lat, 5 ) lat, round( lng, 5 ) lng, address, locality, region,
            CASE WHEN regexp_matches( postcode, '^\\d{5}' ) THEN postcode[1:5] ELSE '' END z,
-           grp( cats[1] ) g
+           grp( cats[1], name ) g
     FROM 'data/us_restaurants.parquet'
     WHERE lat BETWEEN -15 AND 72 AND lng BETWEEN -180 AND -64
 """ )
@@ -39,5 +42,9 @@ for z, g, c in con.execute( "SELECT z, g, count(*) FROM r WHERE z <> '' GROUP BY
 totals = [ 0 ] * len( GROUPS )
 for g, c in con.execute( "SELECT g, count(*) FROM r GROUP BY 1" ).fetchall():
     totals[ g ] = c
+import csv
+pop = { r[ "zcta5" ]: int( r[ "totalpopulation" ] ) for r in csv.DictReader( open( "census/places.csv" ) ) if r[ "totalpopulation" ] }
+for z, r in zips.items():
+    r.append( pop.get( z, 0 ) )
 json.dump( { "groups": GROUPS, "totals": totals, "zips": zips }, open( "data/zips.json", "w" ), separators=( ",", ":" ) )
 print( n, "features", len( zips ), "zips", sum( totals ) )

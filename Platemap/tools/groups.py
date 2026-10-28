@@ -41,3 +41,41 @@ def group( label ):
         l4 = parts[3] if len( parts ) > 3 else ""
         return L4_ASIAN.get( l4, 16 )
     return L3.get( l3, 25 )
+
+
+import re
+
+NAME_RULES = [
+    ( r"\b(pizza|pizzeria|pizzas)\b", 2 ),
+    ( r"\b(taco|tacos|taqueria|mexican|burrito|burritos|cantina|carniceria|tortilleria|mariscos|birria|pupuseria|antojitos|tortas|cocina|el pollo|los|las)\b", 3 ),
+    ( r"\b(sushi|japanese|ramen|hibachi|teriyaki|izakaya|yakitori|poke|bento|tempura)\b", 12 ),
+    ( r"\b(china|chinese|wok|szechuan|sichuan|hunan|cantonese|dim sum|peking|panda|dumpling|dumplings|noodle|noodles|hot pot|shanghai|mandarin|chow)\b", 11 ),
+    ( r"\b(thai|pad thai|bangkok|siam)\b", 13 ),
+    ( r"\b(pho|vietnamese|banh mi|saigon)\b", 14 ),
+    ( r"\b(korean|bibimbap|kbbq|k-bbq|bulgogi|seoul|tofu house)\b", 15 ),
+    ( r"\b(indian|curry|tandoori|tandoor|biryani|masala|bombay|punjabi|nepali|himalayan|pakistani|halal)\b", 20 ),
+    ( r"\b(bbq|bar-b-q|bar-b-que|barbecue|barbeque|smokehouse|smoke house|rib|ribs|brisket)\b", 6 ),
+    ( r"\b(wings|wing|chicken|pollo|fried chicken|chick|hen house)\b", 17 ),
+    ( r"\b(burger|burgers|hamburger|hamburgers)\b", 8 ),
+    ( r"\b(seafood|fish|oyster|oysters|crab|crabs|shrimp|lobster|clam|clams|mariscos|catfish|cajun seafood)\b", 9 ),
+    ( r"\b(steak|steakhouse|steaks|chophouse|chop house|prime rib)\b", 19 ),
+    ( r"\b(deli|delicatessen|sandwich|sandwiches|subs|sub|hoagie|hoagies|cheesesteak|cheesesteaks|philly|bagel|bagels|panini|po-boy|po boy|poboy)\b", 5 ),
+    ( r"\b(italian|trattoria|ristorante|pasta|osteria|cucina)\b", 7 ),
+    ( r"\b(mediterranean|greek|gyro|gyros|kebab|kabob|kabab|shawarma|falafel|hummus|lebanese|turkish|persian|afghan|halal grill|middle eastern|souvlaki)\b", 21 ),
+    ( r"\b(cajun|creole|soul food|southern|gumbo|po'?boys?|crawfish|biscuit|biscuits|catfish|chitlins|hot chicken)\b", 22 ),
+    ( r"\b(cuban|caribbean|jamaican|jerk|puerto rican|dominican|latin|latino|peruvian|pollo a la brasa|salvadoran|colombian|venezuelan|arepa|arepas|empanada|empanadas|brazilian|churrascaria|honduran|guatemalan)\b", 18 ),
+    ( r"\b(diner|pancake|pancakes|waffle|waffles|breakfast|brunch|ihop|waffle house|griddle)\b", 10 ),
+    ( r"\b(vegan|vegetarian|veggie|salad|salads|juice|smoothie|smoothies|nutrition|acai|healthy)\b", 23 ),
+    ( r"\b(french|bistro|brasserie|crepe|crepes|creperie|german|bavarian|schnitzel|polish|pierogi|irish pub|british|fish & chips|fish and chips|spanish|tapas|portuguese|russian|ukrainian)\b", 24 ),
+    ( r"\b(filipino|asian|hawaiian|malaysian|indonesian|mongolian|cambodian|laotian|lao|burmese|boba|bubble tea|teriyaki grill|wok n roll)\b", 16 ),
+    ( r"\b(mcdonald'?s|burger king|wendy'?s|taco bell|subway|sonic|arby'?s|jack in the box|hardee'?s|carl'?s jr|whataburger|dairy queen|checkers|rally'?s|white castle|drive-in|drive in|fast food)\b", 4 ),
+    ( r"\b(grill|grille|american|tavern|pub|saloon|sports bar|bar & grill|bar and grill|roadhouse|alehouse|brewery|brewpub|gastropub|taphouse|lodge|supper club)\b", 1 ),
+]
+NAME_RULES = [ ( re.compile( p, re.I ), g ) for p, g in NAME_RULES ]
+
+
+def group_from_name( name ):
+    for rx, g in NAME_RULES:
+        if rx.search( name or "" ):
+            return g
+    return 0
