@@ -212,8 +212,10 @@ export function buildCave( group, open, ctx, basin ) {
 }
 
 // Flat liquid surface at LIQUID_Y, trimmed to the air of the field so it never
-// pokes through rock. Returns the mesh; the caller colours and lights it.
-export function buildLiquid( field, material ) {
+// pokes through rock. A pool is also trimmed to the inside of its sills, so the
+// mouths beyond them stay dry. Returns the mesh; the caller colours and lights it.
+export function buildLiquid( field, material, basin ) {
+    const reach = basin === "pool" ? SILL.z - SILL.w : HALF + 1;
     const n = 72;
     const step = CELL / n;
     const pos = [];
@@ -229,7 +231,10 @@ export function buildLiquid( field, material ) {
         }
         return index.get( k );
     };
-    const air = ( i, j ) => field( -HALF + i * step, LIQUID_Y, -HALF + j * step ) < 0.05;
+    const air = ( i, j ) => {
+        const z = -HALF + j * step;
+        return Math.abs( z ) < reach && field( -HALF + i * step, LIQUID_Y, z ) < 0.05;
+    };
     for ( let i = 0; i < n; i++ ) {
         for ( let j = 0; j < n; j++ ) {
             if ( air( i, j ) && air( i + 1, j ) && air( i, j + 1 ) && air( i + 1, j + 1 ) ) {
