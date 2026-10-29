@@ -4,16 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Platemap</title>
-    <meta name="description" content="1.4 million US restaurants on one map, filtered by cuisine and ZIP code.">
+    <meta name="description" content="1.45 million US restaurants on one map: counts, heat, per capita by ZIP, food deserts, chains vs independents, a radius report for any point.">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="experiments by Kevin">
     <meta property="og:title" content="Platemap">
-    <meta property="og:description" content="1.4 million US restaurants on one map, filtered by cuisine and ZIP code.">
+    <meta property="og:description" content="1.45 million US restaurants on one map: counts, heat, per capita by ZIP, food deserts, chains vs independents, a radius report for any point.">
     <meta property="og:url" content="https://kevin-freitas-wwt.github.io/experiments/Platemap/">
     <meta property="og:image" content="https://kevin-freitas-wwt.github.io/experiments/Platemap/og.png">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Platemap">
-    <meta name="twitter:description" content="1.4 million US restaurants on one map, filtered by cuisine and ZIP code.">
+    <meta name="twitter:description" content="1.45 million US restaurants on one map: counts, heat, per capita by ZIP, food deserts, chains vs independents, a radius report for any point.">
     <meta name="twitter:image" content="https://kevin-freitas-wwt.github.io/experiments/Platemap/og.png">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -35,6 +35,9 @@
                 <h1>Platemap</h1>
                 <p class="dek"><span id="total">1.4M</span> US restaurants by cuisine and ZIP</p>
             </div>
+            <button class="iconbtn" id="share" type="button" title="Save a share card (PNG)" aria-label="Save a share card">
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 10V2M5 5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 9v4h10V9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
             <button class="toggle" id="toggle" aria-expanded="true" aria-controls="menu" aria-label="Toggle menu">
                 <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M3 5l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
             </button>
@@ -55,6 +58,19 @@
             </button>
         </div>
 
+        <div class="lenses" id="lenses">
+            <button type="button" data-lens="chains" aria-pressed="false" title="Color by chain vs independent">Chains vs indie</button>
+            <button type="button" data-lens="desert" aria-pressed="false" title="Show only ZIPs with the fewest restaurants per resident" hidden>Food deserts</button>
+            <button type="button" id="nearme" title="Report on the restaurants around you">
+                <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><circle cx="8" cy="8" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><path d="M8 1v2.5M8 12.5V15M1 8h2.5M12.5 8H15" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                Near me
+            </button>
+            <button type="button" id="pinmode" aria-pressed="false" title="Click the map to place a pin and get a radius report">
+                <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 15s5-5.2 5-9A5 5 0 0 0 3 6c0 3.8 5 9 5 9z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="6" r="1.6" fill="currentColor"/></svg>
+                Drop pin
+            </button>
+        </div>
+
         <div class="menu" id="menu">
             <label class="search">
                 <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
@@ -63,12 +79,28 @@
             <ul class="suggest" id="suggest" role="listbox" hidden></ul>
 
             <div class="scope" id="scope" hidden>
-                <div>
+                <div class="scope__main">
                     <strong id="scopeZip"></strong>
                     <span id="scopePlace"></span>
                 </div>
-                <button id="clearZip" type="button">Clear</button>
+                <button id="vsZip" type="button" class="pill">vs. another ZIP</button>
+                <button id="clearZip" type="button" class="pill pill--accent">Clear</button>
             </div>
+
+            <div class="scope scope--pin" id="pinScope" hidden>
+                <div class="scope__main">
+                    <strong>Around the pin</strong>
+                    <span id="pinPlace"></span>
+                </div>
+                <div class="radii" id="radii" role="radiogroup" aria-label="Radius">
+                    <button type="button" data-r="1" aria-checked="true">1 mi</button>
+                    <button type="button" data-r="3" aria-checked="false">3 mi</button>
+                    <button type="button" data-r="5" aria-checked="false">5 mi</button>
+                </div>
+                <button id="clearPin" type="button" class="pill pill--accent">Clear</button>
+            </div>
+
+            <section class="report" id="report" hidden></section>
 
             <div class="listhead">
                 <span id="listTitle">Cuisine</span>
@@ -76,8 +108,13 @@
             </div>
             <ol class="cuisines" id="cuisines"></ol>
 
+            <section class="names" id="names" hidden>
+                <div class="listhead"><span>In the names here</span><span class="hint" id="namesHint"></span></div>
+                <div class="chips" id="nameChips"></div>
+            </section>
+
             <footer class="colophon">
-                <p>Places from <a href="https://opensource.foursquare.com/os-places/" target="_blank" rel="noopener">Foursquare OS Places</a> (Jan 2025 release, Apache 2.0). Counts include listings Foursquare has not marked closed, so treat them as upper bounds. Population from <a href="https://data.cdc.gov/500-Cities-Places/PLACES-ZCTA-Data-GIS-Friendly-Format-2023-release/c7b2-4ecy" target="_blank" rel="noopener">CDC PLACES</a> (ACS), ZIP shapes from Census ZCTA 2020. Basemap by <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> and <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>.</p>
+                <p>Places from <a href="https://opensource.foursquare.com/os-places/" target="_blank" rel="noopener">Foursquare OS Places</a> (Jan 2025 release, Apache 2.0). Counts include listings Foursquare has not marked closed, so treat them as upper bounds. Population from <a href="https://data.cdc.gov/500-Cities-Places/PLACES-ZCTA-Data-GIS-Friendly-Format-2023-release/c7b2-4ecy" target="_blank" rel="noopener">CDC PLACES</a> (ACS), ZIP shapes from Census ZCTA 2020. Chains are names with 40+ locations. Basemap by <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> and <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>.</p>
             </footer>
         </div>
     </aside>
@@ -89,6 +126,8 @@
         <span class="legend__ramp" id="legendRamp" hidden><i></i><b id="legendLo"></b><b id="legendHi"></b></span>
         <span id="legendText">Zoom in for individual restaurants</span>
     </div>
+
+    <div class="toast" id="toast" hidden></div>
 
     <script type="module" src="app.js"></script>
 </body>

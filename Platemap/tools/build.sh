@@ -18,7 +18,7 @@ for line in open( "data/points.geojsonl" ):
     lng = float( line.split( '"coordinates":[', 1 )[1].split( ",", 1 )[0] )
     ( w if lng < -90 else e ).write( line )
 PY
-ACC=$( for i in $( seq 0 25 ); do printf -- "--accumulate-attribute=c$i:sum "; done )
+ACC="$( for i in $( seq 0 25 ); do printf -- "--accumulate-attribute=c$i:sum "; done ) --accumulate-attribute=k:sum"
 tippecanoe -q -P -o data/clusters.mbtiles -l clusters -Z0 -z11 -r1 --cluster-distance=64 $ACC --force data/clusters.geojsonl
 tippecanoe -q -P -o data/zippoints.mbtiles -l zippoints -Z9 -z9 -r1 --no-feature-limit --no-tile-size-limit -y z -y g --force data/points.geojsonl
 tippecanoe -q -P -o data/heat.mbtiles -l heat -Z0 -z11 -r1 --cluster-distance=10 $ACC --no-tile-size-limit --force data/clusters.geojsonl
@@ -37,7 +37,9 @@ with open( "data/zcta.geojsonl", "w" ) as out:
         z = dict( zip( fields, sr.record ) )[ "ZCTA5CE20" ]
         out.write( json.dumps( { "type": "Feature", "id": int( z ), "geometry": sr.shape.__geo_interface__, "properties": { "z": z } }, separators=( ",", ":" ) ) + "\n" )
 PY
+tippecanoe -q -P -o data/words.mbtiles -l words -Z4 -z8 -r1 --no-feature-limit --no-tile-size-limit --force data/words.geojsonl
+tile-join -q -o data/words.pmtiles --force --no-tile-size-limit data/words.mbtiles
 tippecanoe -q -P -o data/zcta_lo.mbtiles -l zcta -Z3 -z5 --drop-smallest-as-needed --simplification=10 --detect-shared-borders --force data/zcta.geojsonl
 tippecanoe -q -P -o data/zcta_hi.mbtiles -l zcta -Z6 -z9 --no-feature-limit --no-tile-size-limit --simplification=10 --detect-shared-borders --force data/zcta.geojsonl
 tile-join -q -o data/zcta.pmtiles --force --no-tile-size-limit data/zcta_lo.mbtiles data/zcta_hi.mbtiles
-echo "copy data/overview.pmtiles data/zcta.pmtiles data/heat.pmtiles data/points_{w,e}.pmtiles data/zips.json into Platemap/data/"
+echo "copy data/overview.pmtiles data/words.pmtiles data/zcta.pmtiles data/heat.pmtiles data/points_{w,e}.pmtiles data/zips.json into Platemap/data/"

@@ -244,9 +244,12 @@ h1 {
     align-items: center;
     background: var( --accent-soft );
     display: flex;
-    gap: 12px;
+    flex-wrap: wrap;
+    gap: 8px 10px;
     padding: 12px 22px;
 }
+.scope__main { flex: 1 1 100%; }
+.scope--pin .scope__main strong { font-size: 17px; }
 .scope strong {
     font-family: var( --serif );
     font-size: 20px;
@@ -255,20 +258,199 @@ h1 {
     margin-right: 8px;
 }
 .scope span { color: var( --muted ); }
-.scope button {
+.pill {
     background: none;
-    border: 1px solid var( --accent );
+    border: 1px solid var( --hair );
     border-radius: 999px;
-    color: var( --accent );
+    color: var( --fg );
     cursor: pointer;
     font: inherit;
     font-size: 12px;
-    margin-left: auto;
     padding: 4px 10px;
 }
+.pill--accent {
+    border-color: var( --accent );
+    color: var( --accent );
+    margin-left: auto;
+}
+.pill[aria-pressed="true"] {
+    background: var( --fg );
+    border-color: var( --fg );
+    color: var( --paper );
+}
+.radii {
+    border: 1px solid var( --hair );
+    border-radius: 999px;
+    display: inline-flex;
+    overflow: hidden;
+}
+.radii button {
+    background: none;
+    border: 0;
+    color: var( --muted );
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    padding: 4px 10px;
+}
+.radii button + button { border-left: 1px solid var( --hair ); }
+.radii button[aria-checked="true"] {
+    background: var( --accent );
+    color: #fff;
+}
+.lenses {
+    border-bottom: 1px solid var( --hair );
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 22px;
+}
+.lenses button {
+    align-items: center;
+    background: none;
+    border: 1px solid var( --hair );
+    border-radius: 999px;
+    color: var( --muted );
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    font-size: 12px;
+    gap: 5px;
+    padding: 4px 10px;
+}
+.lenses button:hover { color: var( --fg ); }
+.lenses button[aria-pressed="true"] {
+    background: var( --fg );
+    border-color: var( --fg );
+    color: var( --paper );
+}
+.iconbtn {
+    background: none;
+    border: 1px solid var( --hair );
+    border-radius: 8px;
+    color: var( --muted );
+    cursor: pointer;
+    flex: none;
+    height: 32px;
+    margin-left: auto;
+    padding: 0;
+    width: 32px;
+}
+.iconbtn:hover { color: var( --accent ); }
+.report {
+    border-bottom: 1px solid var( --hair );
+    font-size: 12.5px;
+    padding: 12px 22px 14px;
+}
+.report .big {
+    font-family: var( --serif );
+    font-size: 26px;
+    font-variation-settings: "opsz" 48;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+}
+.report .big small {
+    color: var( --muted );
+    font-family: var( --sans );
+    font-size: 12.5px;
+    letter-spacing: 0;
+    margin-left: 6px;
+}
+.report h4 {
+    color: var( --muted );
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    margin: 12px 0 4px;
+    text-transform: uppercase;
+}
+.report p { margin: 0 0 2px; }
+.report .nearest {
+    display: grid;
+    gap: 2px 10px;
+    grid-template-columns: minmax( 0, 1fr ) minmax( 0, 1.4fr ) auto;
+    margin: 0;
+}
+.report .nearest dt {
+    color: var( --muted );
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.report .nearest dd {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.report .nearest dd.dist {
+    color: var( --muted );
+    font-variant-numeric: tabular-nums;
+}
+.report .gap { color: var( --accent ); }
+.report .muted { color: var( --muted ); }
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px 6px;
+    padding: 4px 22px 14px;
+}
+.chips span {
+    background: var( --accent-soft );
+    border-radius: 6px;
+    color: var( --fg );
+    font-size: calc( 11px + var( --lift, 0 ) * 6px );
+    line-height: 1.2;
+    padding: 3px 7px;
+}
+.chips span b {
+    color: var( --muted );
+    font-weight: 400;
+    margin-left: 3px;
+}
+.names {
+    border-top: 1px solid var( --hair );
+    flex: none;
+    max-height: 170px;
+    overflow: auto;
+}
+.hint {
+    color: var( --muted );
+    font-size: 11px;
+    letter-spacing: 0;
+    text-transform: none;
+}
+.cuisines li .bars {
+    display: grid;
+    gap: 2px;
+    grid-column: 1 / -1;
+}
+.cuisines li .bars .bar + .bar i { background: var( --compare ); }
+.cuisines li .count .b { color: var( --compare ); }
+.toast {
+    background: var( --fg );
+    border-radius: 10px;
+    bottom: 60px;
+    color: var( --paper );
+    font-size: 13px;
+    left: 50%;
+    padding: 10px 16px;
+    position: fixed;
+    transform: translateX( -50% );
+    z-index: 5;
+}
+.pin-marker {
+    color: var( --accent );
+    cursor: grab;
+    height: 32px;
+    width: 32px;
+}
+.map.pinning .maplibregl-canvas { cursor: crosshair; }
 
 .cuisines {
     flex: 1;
+    min-height: 220px;
     list-style: none;
     margin: 0;
     overflow: auto;
@@ -412,107 +594,16 @@ h1 {
     }
     .masthead { padding: 14px 16px; }
     .views { padding: 8px 16px; }
+    .lenses { padding: 8px 16px; }
+    .report, .chips { padding-left: 16px; padding-right: 16px; }
+    .rail.collapsed .menu, .rail.collapsed .lenses { display: none; }
     .listhead { padding-left: 16px; padding-right: 16px; }
     .mark {
         height: 34px;
         width: 34px;
     }
     h1 { font-size: 24px; }
-    .toggle { display: block; }
-    .toggle[aria-expanded="false"] + .views {
-    background: var( --bg );
-    border-bottom: 1px solid var( --hair );
-    display: grid;
-    gap: 4px;
-    grid-template-columns: repeat( 3, 1fr );
-    padding: 10px 22px;
-}
-.views button {
-    align-items: center;
-    background: none;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    color: var( --muted );
-    cursor: pointer;
-    display: flex;
-    font: inherit;
-    font-size: 12.5px;
-    font-weight: 500;
-    gap: 6px;
-    justify-content: center;
-    padding: 7px 6px;
-}
-.views button:hover { color: var( --fg ); }
-.views button[aria-checked="true"] {
-    background: var( --paper );
-    border-color: var( --hair );
-    color: var( --accent );
-}
-.listhead {
-    align-items: center;
-    color: var( --muted );
-    display: flex;
-    font-size: 11px;
-    justify-content: space-between;
-    letter-spacing: 0.06em;
-    padding: 12px 22px 2px;
-    text-transform: uppercase;
-}
-.listhead button {
-    background: none;
-    border: 1px solid var( --hair );
-    border-radius: 999px;
-    color: var( --muted );
-    cursor: pointer;
-    font: inherit;
-    font-size: 11px;
-    letter-spacing: 0;
-    padding: 3px 9px;
-    text-transform: none;
-}
-.listhead button[aria-pressed="true"] {
-    background: var( --fg );
-    border-color: var( --fg );
-    color: var( --paper );
-}
-.cuisines li .badge {
-    border-radius: 4px;
-    color: #fff;
-    display: none;
-    font-size: 10px;
-    font-weight: 600;
-    line-height: 1;
-    margin-left: 6px;
-    padding: 3px 5px;
-    vertical-align: 1px;
-}
-.cuisines li[data-ab="a"] .badge { background: var( --accent ); display: inline-block; }
-.cuisines li[data-ab="b"] .badge { background: var( --compare ); display: inline-block; }
-.cuisines li[data-ab="b"] .bar i { background: var( --compare ); }
-.cuisines li.unspecified { color: var( --muted ); }
-.cuisines li.unspecified .name::after {
-    content: " · no category in source";
-    font-size: 11px;
-    font-weight: 400;
-}
-.legend__ramp {
-    align-items: center;
-    display: flex;
-    gap: 6px;
-}
-.legend__ramp i {
-    background: linear-gradient( 90deg, var( --ramp-lo ), var( --ramp-mid ), var( --ramp-hi ) );
-    border-radius: 3px;
-    display: block;
-    height: 10px;
-    width: 72px;
-}
-.legend__ramp b {
-    font-variant-numeric: tabular-nums;
-    font-weight: 500;
-}
-.legend__ramp b:first-of-type { order: -1; }
-.menu { display: none; }
+    .toggle { display: block; margin-left: 6px; }
     .search, .suggest li, .scope, .cuisines li, .colophon { padding-left: 16px; padding-right: 16px; }
     .colophon { display: none; }
     .legend {
@@ -532,3 +623,24 @@ h1 {
 }
 .legend .sw-a { background: var( --accent ); }
 .legend .sw-b { background: var( --compare ); }
+
+.popup .inferred, .popup .chain {
+    background: var( --accent-soft );
+    border-radius: 4px;
+    color: var( --muted );
+    font-size: 11px;
+    margin-left: 4px;
+    padding: 1px 5px;
+}
+.popup .flagline {
+    font-size: 11px;
+    margin-top: 4px;
+}
+.popup .flagline a { color: var( --muted ); }
+.scope .vs {
+    color: var( --muted );
+    font-family: var( --sans );
+    font-size: 12px;
+    margin: 0 2px;
+}
+.scope .b { color: var( --compare ); }
