@@ -143,24 +143,63 @@ function rock( seed, tint, roughness ) {
     return material;
 }
 
-// Glowing liquid: a dark base with the chosen colour as emissive, modulated by
-// a slowly drifting crust texture. `update( elapsed )` drifts it.
+// Glowing liquid: two layers of tileable noise scroll and warp each other to
+// make drifting crust over molten colour. Unlit; fogged and tone mapped like
+// everything else. `update( elapsed )` advances it.
 const crust = texture( rockCanvas( 0x1a7a, 256 ) );
 crust.colorSpace = THREE.NoColorSpace;
 
 export function liquidMaterial( colour ) {
-    const material = new THREE.MeshStandardMaterial( {
-        color: 0x0a0604,
-        emissive: new THREE.Color( colour ),
-        emissiveIntensity: 2.6,
-        emissiveMap: crust.clone(),
-        metalness: 0,
-        roughness: 0.9
+    const material = new THREE.ShaderMaterial( {
+        fog: true,
+        fragmentShader: `
+            uniform vec3 uColour;
+            uniform float uTime;
+            uniform sampler2D uNoise;
+            varying vec2 vUv;
+            #include <common>
+            #include <fog_pars_fragment>
+            void main() {
+                vec2 uv = vUv * 2.0;
+                float n1 = texture2D( uNoise, uv * 0.45 + vec2( uTime * 0.012, uTime * 0.02 ) ).r;
+                float n2 = texture2D( uNoise, uv * 0.9 + vec2( -uTime * 0.017, uTime * 0.009 ) + ( n1 - 0.5 ) * 0.4 ).r;
+                float n3 = texture2D( uNoise, uv * 1.8 + vec2( uTime * 0.03, -uTime * 0.024 ) + ( n2 - 0.5 ) * 0.25 ).r;
+                // 0 = cooled crust, 1 = white hot
+                float heat = clamp( ( n1 * 0.5 + n2 * 0.38 + n3 * 0.12 - 0.5 ) * 6.0 + 0.5, 0.0, 1.0 );
+                float crust = 1.0 - smoothstep( 0.28, 0.46, heat );
+                float white = smoothstep( 0.68, 0.95, heat );
+                float pulse = 0.9 + 0.1 * sin( uTime * 1.7 );
+                vec3 hot = mix( uColour, vec3( 1.0 ), 0.35 ) * 1.3;
+                vec3 molten = uColour * 0.75;
+                vec3 dark = uColour * 0.06;
+                vec3 colour = mix( mix( molten, hot, white ), dark, crust ) * pulse;
+                gl_FragColor = vec4( colour, 1.0 );
+                #include <tonemapping_fragment>
+                #include <colorspace_fragment>
+                #include <fog_fragment>
+            }`,
+        uniforms: THREE.UniformsUtils.merge( [
+            THREE.UniformsLib.fog,
+            {
+                uColour: { value: new THREE.Color( colour ) },
+                uNoise: { value: crust },
+                uTime: { value: 0 }
+            }
+        ] ),
+        vertexShader: `
+            varying vec2 vUv;
+            #include <common>
+            #include <fog_pars_vertex>
+            void main() {
+                vUv = uv;
+                vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+                gl_Position = projectionMatrix * mvPosition;
+                #include <fog_vertex>
+            }`
     } );
-    material.emissiveMap.repeat.set( 1.5, 1.5 );
-    material.emissiveMap.needsUpdate = true;
+    material.uniforms.uNoise.value = crust;
     material.update = ( elapsed ) => {
-        material.emissiveMap.offset.set( elapsed * 0.012, elapsed * 0.02 );
+        material.uniforms.uTime.value = elapsed;
     };
     return material;
 }

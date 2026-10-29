@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { CELL } from "./sections.js";
+import { glowSprite } from "./glow.js";
 
 // A cave lamp: a rod hung from the ceiling with a small warm glass body and a
 // dim point light. Static; the light has no flicker.
@@ -33,6 +34,10 @@ export function buildLamp( cell, root ) {
     const glass = new THREE.Mesh( new THREE.SphereGeometry( 0.15, 12, 8 ), glassMaterial );
     glass.position.y = -drop;
     group.add( glass );
+
+    const halo = glowSprite( 0xffc27a, 1.3, 0.6 );
+    halo.position.y = -drop;
+    group.add( halo );
 
     const light = new THREE.PointLight( 0xffc27a, 9, 11, 2 );
     light.position.set( cell.x * CELL, cell.y * CELL + ceiling - drop - 0.1, cell.z * CELL );

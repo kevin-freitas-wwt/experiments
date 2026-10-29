@@ -4,6 +4,9 @@ import { buildLiquid } from "./caves.js";
 import { liquidMaterial, materials } from "./materials.js";
 import { buildFlare } from "./flare.js";
 import { buildLamp } from "./lamp.js";
+import { glowSprite } from "./glow.js";
+import { noise3 } from "./noise.js";
+import { LIQUID_Y } from "./caves.js";
 
 const DELTA = {
     n: [ 0, 0, -1 ], e: [ 1, 0, 0 ], s: [ 0, 0, 1 ], w: [ -1, 0, 0 ],
@@ -81,10 +84,21 @@ export function buildLevel( level ) {
             const material = liquidMaterial( c.liquid );
             c.liquidMesh = buildLiquid( field, material, basin );
             section.add( c.liquidMesh );
-            liquids.push( material );
             const glow = new THREE.PointLight( c.liquid, 90, CELL * 2.2, 2 );
             glow.position.set( c.x * CELL, c.y * CELL + 1.6, c.z * CELL );
             group.add( glow );
+            const halo = glowSprite( c.liquid, 4, 0.2 );
+            halo.position.set( 0, LIQUID_Y + 1.1, 0 );
+            c.group.add( halo );
+            const phase = c.x * 1.3 + c.z * 0.7;
+            liquids.push( {
+                update( elapsed ) {
+                    material.update( elapsed );
+                    const pulse = 0.72 + 0.18 * Math.sin( elapsed * 1.7 + phase ) + 0.1 * noise3( elapsed * 0.9 + phase, 0, 0 );
+                    glow.intensity = 90 * pulse;
+                    halo.material.opacity = 0.08 + 0.14 * pulse;
+                }
+            } );
         } else {
             delete c.liquid;
         }

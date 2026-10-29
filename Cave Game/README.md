@@ -64,11 +64,11 @@ Two rules keep sections connectable. Noise fades to zero within `1.3` units of a
 
 Cells are in grid units (world position is `cell * CELL`). `spawn` may be fractional; `yaw` is radians, `0` faces north. `ground` adds a flat plane at `y = 0`; `labels` hangs a type/blurb sprite in front of each cell unless that cell sets `label: false`. `ambient` scales the hemisphere fill light (default 0.6, cave-dark; the gallery uses 9 so every exhibit is lit). `view` is the draw distance in cells (default 5): cells further than that from the player are hidden, and unless `fog` is given the fog density is set so the cut-off is already invisible.
 
-`pool` and `channel` cells are filled with a glowing liquid at `y = 0.45`: lava (`#ff5a1a`) by default, or any CSS colour given as `"liquid": "#28d7ff"` on the cell. The surface is a flat mesh trimmed to the carved air so it never shows through rock, with the colour as a strong emissive and a slowly drifting crust texture; one point light of the same colour floods the cell. Touching the liquid pulses the screen red for as long as you are in it; the test is a ray down onto the liquid mesh itself, so the dry floor around a pool is safe. The liquid is not a collider, so you fall into it; no respawn, just wade or fly out. Hold `A` to fly across; a pool's sills are high enough to stand on at each mouth.
+`pool` and `channel` cells are filled with a glowing liquid at `y = 0.45`: lava (`#ff5a1a`) by default, or any CSS colour given as `"liquid": "#28d7ff"` on the cell. The surface is a flat mesh trimmed to the carved air so it never shows through rock, shaded by a small unlit shader: three layers of tileable noise scroll and warp one another so dark crust drifts over molten colour, with a slow pulse. One point light of the same colour floods the cell and breathes with it (sine plus noise), and a wide soft halo sprite hangs over the surface. Touching the liquid pulses the screen red for as long as you are in it; the test is a ray down onto the liquid mesh itself, so the dry floor around a pool is safe. The liquid is not a collider, so you fall into it; no respawn, just wade or fly out. Hold `A` to fly across; a pool's sills are high enough to stand on at each mouth.
 
-A cell with `"lamp": true` gets a cave lamp hung from the ceiling (found by raycasting up, so it sits under cave rock at the right height): a rod, a cap and a small warm glass body, with a dim warm point light. No flicker.
+A cell with `"lamp": true` gets a cave lamp hung from the ceiling (found by raycasting up, so it sits under cave rock at the right height): a rod, a cap and a small warm glass body, with a dim warm point light and a small halo. No flicker.
 
-A cell with `"flare": true` gets a dropped road flare: a short red stick placed at a seeded random spot on that cell's floor (found by raycasting down, so it sits on cave rock too), a flickering red point light at its tip, and a column of soft white smoke (a 32-point particle system with a small custom shader). Each flare is one real light, so use them in handfuls, not everywhere.
+A cell with `"flare": true` gets a dropped road flare: a short red stick placed at a seeded random spot on that cell's floor (found by raycasting down, so it sits on cave rock too), a flickering red point light at its tip with a halo that breathes with it, and a column of soft white smoke (a 32-point particle system with a small custom shader). Each flare is one real light, so use them in handfuls, not everywhere.
 
 On load, every opening is checked against its neighbour. A face that opens into a closed face logs a `console.warn` naming both cells.
 
@@ -86,11 +86,12 @@ No shadow maps. Pixel ratio is capped at 1.5. The only lights are the headlamp, 
 | --- | --- |
 | `src/sections.js` | Cube constants, the kit table, rotation helper |
 | `src/level.js` | JSON loading, placing cells, connectivity check, labels, ground |
-| `src/materials.js` | Tileable canvas rock, triplanar-projected colour and bump (`onBeforeCompile`); glowing liquid |
+| `src/materials.js` | Tileable canvas rock, triplanar-projected colour and bump (`onBeforeCompile`); animated liquid shader |
 | `src/noise.js` | Seeded RNG (random number generator) and 3D value noise |
 | `src/caves.js` | Signed distance field and marching-cubes mesh for every section; trimmed liquid surface |
 | `src/flare.js` | Dropped flare: stick, flickering light, smoke particles |
 | `src/lamp.js` | Hung cave lamp with a dim warm light |
+| `src/glow.js` | Additive halo sprite shared by every light source |
 | `src/main.js` | Renderer, headlamp, pointer-lock controls, collision, HUD (heads-up display) |
 | `src/style.css` | Entry sheet, survey log, crosshair |
 | `levels/gallery.json` | Every section on a 4×3 grid with aisles, vertical partners stacked |

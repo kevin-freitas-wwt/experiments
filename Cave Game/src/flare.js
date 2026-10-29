@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { seeded, noise3 } from "./noise.js";
 import { CELL } from "./sections.js";
+import { glowSprite } from "./glow.js";
 
 // A dropped road flare: a short red stick on the floor, a flickering red
 // point light at its tip, and a column of soft white smoke.
@@ -73,6 +74,10 @@ export function buildFlare( cell, root ) {
     tip.position.set( 0.17, 0.085, 0 );
     group.add( tip );
 
+    const halo = glowSprite( 0xff4a2a, 1, 0.85 );
+    halo.position.copy( tip.position );
+    group.add( halo );
+
     const light = new THREE.PointLight( 0xff3318, 14, 10, 2 );
     light.position.copy( tip.position ).add( group.position ).add( cell.group.position );
     light.position.y += 0.25;
@@ -100,6 +105,8 @@ export function buildFlare( cell, root ) {
         const flicker = 0.55 + noise3( elapsed * 9 + seed, 0, 0 ) * 0.6 + noise3( elapsed * 31, seed, 0 ) * 0.25;
         light.intensity = 14 * flicker;
         tipMaterial.emissiveIntensity = 4 + flicker * 4;
+        halo.scale.setScalar( 0.7 + flicker * 0.6 );
+        halo.material.opacity = 0.5 + flicker * 0.4;
 
         for ( let i = 0; i < SMOKE; i++ ) {
             ages[ i ] += delta;
