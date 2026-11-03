@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CHUNK, SEA } from './blocks.js';
+import { CHUNK, SEA, spawnOf } from './blocks.js';
 import { fineTileMat, midTileMat, coarseTileMat, oceanMat, fadeIn } from './materials.js';
 
 const N = 33;
@@ -18,6 +18,7 @@ function gridIndex() {
 class Level {
     constructor( scene, pool, seed, size, range, material ) {
         this.scene = scene; this.pool = pool; this.seed = seed; this.material = material;
+        this.spawn = spawnOf( seed );
         this.size = size; this.step = size / ( N - 1 ); this.range = range;
         this.tiles = new Map();
         this.index = gridIndex();
@@ -35,7 +36,7 @@ class Level {
         this.pool.cancel( 'tile' + this.size, ( p ) => near( p.tx, p.tz ) <= range );
         for ( let tx = t0; tx <= t1; tx++ ) for ( let tz = u0; tz <= u1; tz++ ) {
             const d = near( tx, tz );
-            if ( d > range ) continue;
+            if ( d > range || Math.hypot( ( tx + 0.5 ) * this.size - this.spawn.x, ( tz + 0.5 ) * this.size - this.spawn.z ) > 170000 ) continue;
             const k = this.key( tx, tz );
             if ( this.tiles.has( k ) ) continue;
             this.tiles.set( k, { tx, tz, mesh: null } );
@@ -85,6 +86,9 @@ class Level {
 
 export class FarField {
     constructor( scene, pool, seed, radius ) {
+        this.parent = scene;
+        this.spawn = spawnOf( seed );
+        this.limit = 170000;
         const scale = radius / 8;
         this.fine = new Level( scene, pool, seed, 256, 3000 * scale, fineTileMat );
         this.mid = new Level( scene, pool, seed, 1024, 12000 * scale, midTileMat );
@@ -92,25 +96,26 @@ export class FarField {
         this.midCeiling = 30000;
         this.ringRadius = radius * CHUNK;
         this.fineCeiling = 9000;
-        this.ocean = new THREE.Mesh( new THREE.RingGeometry( 1, 150000, 64, 60 ).rotateX( -Math.PI / 2 ), oceanMat );
-        this.ocean.position.y = SEA - 14;
+        this.ocean = new THREE.Mesh( new THREE.RingGeometry( 1, 190000, 64, 60 ).rotateX( -Math.PI / 2 ), oceanMat );
+        this.ocean.position.set( this.spawn.x, SEA - 14, this.spawn.z );
         scene.add( this.ocean );
         this.timer = 0;
     }
 
     update( dt, pos, world ) {
         const fe = fineTileMat.userData.edge, me = midTileMat.userData.edge, ce = coarseTileMat.userData.edge;
+        const ox = this.parent.position.x, oz = this.parent.position.z;
         if ( world.center && world.chunks.size ) {
-            fe.center.value.set( ( world.center.cx + 0.5 ) * CHUNK, ( world.center.cz + 0.5 ) * CHUNK );
+            fe.center.value.set( ( world.center.cx + 0.5 ) * CHUNK + ox, ( world.center.cz + 0.5 ) * CHUNK + oz );
             fe.r0.value = this.ringRadius - 48; fe.r1.value = this.ringRadius + 16;
         } else fe.r1.value = -1;
         const alt = pos.y - SEA;
         if ( alt < this.fineCeiling ) {
-            me.center.value.set( pos.x, pos.z );
+            me.center.value.set( pos.x + ox, pos.z + oz );
             me.r0.value = this.fine.range - 700; me.r1.value = this.fine.range - 100;
         } else me.r1.value = -1;
         if ( alt < this.midCeiling ) {
-            ce.center.value.set( pos.x, pos.z );
+            ce.center.value.set( pos.x + ox, pos.z + oz );
             ce.r0.value = this.mid.range - 2500; ce.r1.value = this.mid.range - 500;
         } else ce.r1.value = -1;
         this.timer -= dt;
@@ -121,7 +126,6 @@ export class FarField {
         if ( alt < this.midCeiling ) this.mid.update( pos.x, pos.z );
         else this.mid.clear();
         this.coarse.update( pos.x, pos.z );
-        this.ocean.position.x = pos.x; this.ocean.position.z = pos.z;
         this.cull( world );
     }
 

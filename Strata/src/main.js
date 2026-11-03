@@ -5,7 +5,7 @@ import { FarField } from './far.js';
 import { Space } from './space.js';
 import { Player } from './player.js';
 import { Crumbs } from './crumbs.js';
-import { BIOMES, SEA, CHUNK } from './blocks.js';
+import { BIOMES, SEA, CHUNK, spawnOf } from './blocks.js';
 import { tickFades, hole } from './materials.js';
 
 const params = new URLSearchParams( location.search );
@@ -59,13 +59,14 @@ scene.add( sun, fill, hemi, ambient );
 const pool = new Pool();
 const home = new Shell( scene, pool, seed, radius );
 const world = home.world;
-const far = new FarField( scene, pool, seed, radius );
+const SPAWN = spawnOf( seed );
+const far = new FarField( home.group, pool, seed, radius );
 const space = new Space( scene, pool, seed, radius, sunDir );
 const player = new Player( camera, home, canvas );
-const crumbs = new Crumbs( scene, spacing );
+const crumbs = new Crumbs( home.group, spacing );
 
 const hud = {};
-for ( const id of [ 'alt', 'biome', 'coord', 'chunks', 'seed', 'mode', 'crumbs', 'speed', 'body' ] ) hud[ id ] = document.getElementById( id );
+for ( const id of [ 'alt', 'biome', 'coord', 'chunks', 'seed', 'mode', 'crumbs', 'speed', 'body', 'system' ] ) hud[ id ] = document.getElementById( id );
 const overlay = document.getElementById( 'overlay' ), seedInput = document.getElementById( 'seed-input' );
 const tint = document.getElementById( 'tint' ), prompt = document.getElementById( 'prompt' );
 hud.seed.textContent = seedWord;
@@ -86,7 +87,7 @@ document.getElementById( 'enter' ).addEventListener( 'click', () => {
 document.getElementById( 'crumb-spacing' ).value = String( spacing );
 document.getElementById( 'crumb-spacing' ).addEventListener( 'change', ( e ) => { crumbs.spacing = parseFloat( e.target.value ); } );
 function lookAt( target ) {
-    const f = target.clone().sub( player.pos );
+    const f = target.clone().sub( player.worldPos );
     player.yaw = Math.atan2( -f.x, -f.z );
     player.pitch = Math.max( -1.5, Math.min( 1.5, Math.atan2( f.y, Math.hypot( f.x, f.z ) ) ) );
 }
@@ -95,38 +96,41 @@ function travel( kind, index = 0 ) {
     leaveShell();
     player.vel.set( 0, 0, 0 );
     player.flying = true;
+    const wp = player.worldPos, go = ( renderPos ) => home.toLocal( renderPos, player.pos );
     const away = ( from, pos, dist ) => {
         const dir = pos.clone().sub( from );
         if ( dir.lengthSq() < 1 ) dir.set( 0.3, 0.4, 1 );
         return from.clone().addScaledVector( dir.normalize(), dist );
     };
     if ( kind === 'home' ) {
-        player.pos.set( 8.5, 140, 8.5 );
+        player.pos.set( SPAWN.x + 0.5, 140, SPAWN.z + 0.5 );
         player.yaw = 0; player.pitch = -0.5;
-        world.update( 8, 8 );
+        world.update( SPAWN.x, SPAWN.z );
     } else if ( kind === 'planet' ) {
-        const b = space.bodies[ index ];
-        player.pos.copy( away( b.pos, player.pos, b.radius * 2.6 ) );
+        const sys = space.nearestSystem( wp ), b = sys.bodies[ index ];
+        if ( ! b ) return;
+        go( away( b.pos, wp, b.radius * 2.6 ) );
         lookAt( b.pos );
     } else if ( kind === 'rock' ) {
-        const r = space.nearestRock( player.pos );
-        player.pos.copy( away( r.pos, player.pos, r.radius * 4 + 60 ) );
+        const r = space.nearestRock( wp );
+        go( away( r.pos, wp, r.radius * 4 + 60 ) );
         lookAt( r.pos );
     } else if ( kind === 'ship' ) {
-        const sh = space.nearestShip( player.pos );
+        const sh = space.nearestShip( wp );
         const side = new THREE.Vector3( 1, 0.35, 0 ).applyQuaternion( sh.group.quaternion ).normalize();
         const span = sh.cls === 'capital' ? 130 : sh.cls === 'medium' ? 70 : 60;
-        player.pos.copy( sh.group.position ).addScaledVector( side, span * sh.voxel );
+        go( sh.group.position.clone().addScaledVector( side, span * sh.voxel ) );
         lookAt( sh.group.position );
     } else if ( kind === 'station' ) {
-        const st = space.nearestStation( player.pos );
-        player.pos.copy( away( st.group.position, player.pos, 90 * st.voxel ) );
+        const st = space.nearestStation( wp );
+        if ( ! st ) return;
+        go( away( st.group.position, wp, 90 * st.voxel ) );
         lookAt( st.group.position );
     }
     crumbs.last = null;
 }
 
-const NAV = { Digit1: [ 'planet', 0 ], Digit2: [ 'planet', 1 ], Digit3: [ 'planet', 2 ], Digit4: [ 'planet', 3 ], Digit5: [ 'planet', 4 ], Digit6: [ 'rock' ], Digit7: [ 'ship' ], Digit8: [ 'station' ], Digit0: [ 'home' ] };
+const NAV = { Digit1: [ 'planet', 0 ], Digit2: [ 'planet', 1 ], Digit3: [ 'planet', 2 ], Digit4: [ 'planet', 3 ], Digit5: [ 'planet', 4 ], Digit6: [ 'planet', 5 ], Digit7: [ 'planet', 6 ], Digit8: [ 'rock' ], Digit9: [ 'ship' ], Minus: [ 'station' ], Digit0: [ 'home' ] };
 document.addEventListener( 'keydown', ( e ) => {
     if ( e.repeat || ! overlay.classList.contains( 'hidden' ) ) return;
     if ( e.code === 'KeyB' ) crumbs.toggle();
@@ -135,20 +139,30 @@ document.addEventListener( 'keydown', ( e ) => {
     if ( e.code === 'Enter' ) useAirlock();
 } );
 const nav = document.getElementById( 'nav' );
-const navItems = [ ...space.bodies.map( ( b, i ) => [ `${i + 1}`, `${b.name}`, `${b.kind}, ${( b.radius / 1000 ).toFixed( 1 )} km`, [ 'planet', i ] ] ),
-    [ '6', 'Nearest asteroid', 'belt and strays', [ 'rock' ] ], [ '7', 'Nearest ship', 'skiffs to capitals', [ 'ship' ] ], [ '8', 'Nearest station', 'in orbit', [ 'station' ] ], [ '0', 'Home', 'the spawn shore', [ 'home' ] ] ];
-for ( const [ key, name, sub, args ] of navItems ) {
-    const b = document.createElement( 'button' );
-    b.type = 'button';
-    b.innerHTML = `<kbd>${key}</kbd><span>${name}</span><small>${sub}</small>`;
-    b.addEventListener( 'click', () => { travel( ...args ); overlay.classList.add( 'hidden' ); canvas.requestPointerLock(); } );
-    nav.appendChild( b );
+let navSystem = null;
+function buildNav( sys ) {
+    navSystem = sys;
+    nav.innerHTML = '';
+    document.getElementById( 'nav-title' ).textContent = `${sys.name} system · ${sys.bodies.length} planet${sys.bodies.length === 1 ? '' : 's'}, ${sys.rocks.length} asteroids, ${sys.ships.length} ships, ${sys.stations.length} station${sys.stations.length === 1 ? '' : 's'}`;
+    const items = [ ...sys.bodies.slice( 0, 7 ).map( ( b, i ) => [ `${i + 1}`, b.name, `${b.kind}, ${( b.radius / 1000 ).toFixed( 1 )} km`, [ 'planet', i ] ] ),
+        [ '8', 'Nearest asteroid', 'belt and strays', [ 'rock' ] ], [ '9', 'Nearest ship', 'skiffs to capitals', [ 'ship' ] ] ];
+    if ( sys.stations.length ) items.push( [ '-', 'Nearest station', 'in orbit', [ 'station' ] ] );
+    items.push( [ '0', 'Home', 'the spawn shore', [ 'home' ] ] );
+    for ( const [ key, name, sub, args ] of items ) {
+        const b = document.createElement( 'button' );
+        b.type = 'button';
+        b.innerHTML = `<kbd>${key}</kbd><span>${name}</span><small>${sub}</small>`;
+        b.addEventListener( 'click', () => { travel( ...args ); overlay.classList.add( 'hidden' ); canvas.requestPointerLock(); } );
+        nav.appendChild( b );
+    }
 }
+buildNav( space.home );
+
 document.getElementById( 'reroll' ).addEventListener( 'click', () => { seedInput.value = randomWord(); } );
 const radiusSelect = document.getElementById( 'radius' );
 if ( ! [ ...radiusSelect.options ].some( ( o ) => o.value === String( radius ) ) ) radiusSelect.add( new Option( `custom (${radius} chunks)`, String( radius ) ) );
 radiusSelect.value = String( radius );
-document.getElementById( 'radius' ).addEventListener( 'change', ( e ) => {
+radiusSelect.addEventListener( 'change', ( e ) => {
     const q = new URLSearchParams( location.search );
     q.set( 'seed', seedInput.value.trim() || seedWord );
     q.set( 'r', e.target.value );
@@ -176,6 +190,7 @@ if ( pose ) {
 }
 
 const fmtDist = ( m ) => m < 1000 ? `${m.toFixed( 0 )} m` : m < 100000 ? `${( m / 1000 ).toFixed( 1 ) } km` : `${( m / 1000 ).toFixed( 0 ) } km`;
+
 const retiring = [];
 
 function enterShell( body ) {
@@ -214,7 +229,7 @@ function exitInterior() {
     const out = lock.clone().sub( centre ).normalize();
     player.shell = home;
     shell.dispose();
-    player.pos.copy( lock ).addScaledVector( out, 7 );
+    home.toLocal( lock.clone().addScaledVector( out, 7 ), player.pos );
     player.vel.set( 0, 0, 0 );
     player.flying = true;
     lookAt( centre );
@@ -227,7 +242,7 @@ function nearDoor() {
 
 function nearAirlock() {
     if ( player.shell !== home || ! player.inSpace ) return null;
-    const a = space.nearestAirlock( player.pos );
+    const a = space.nearestAirlock( player.worldPos );
     return a && a.d < 45 ? a : null;
 }
 
@@ -252,13 +267,14 @@ function manageShells( dt ) {
         const rk = player.shell.rock;
         if ( ! rk.mesh || player.pos.length() > rk.radius * 3 + 80 ) leaveShell();
     } else if ( player.shell === home && player.inSpace ) {
+        const wp = player.worldPos;
         for ( const b of space.bodies ) {
-            const wp = player.pos, d = wp.distanceTo( b.pos );
+            const d = wp.distanceTo( b.pos );
             if ( d < b.radius * 1.3 && d - space.surfaceRadius( b, wp ) < 220 ) { enterShell( b ); return; }
         }
-        const rk = space.nearestRock( player.pos, true );
-        if ( rk && rk.pos.distanceTo( player.pos ) < rk.radius * 2.5 + 25 ) {
-            const frame = new RockFrame( rk, player.pos );
+        const rk = space.nearestRock( wp, true );
+        if ( rk && rk.pos.distanceTo( wp ) < rk.radius * 2.5 + 25 ) {
+            const frame = new RockFrame( rk, wp );
             player.moveTo( frame );
         }
     }
@@ -268,27 +284,38 @@ function manageShells( dt ) {
 
 const timer = new THREE.Timer();
 let hudTimer = 0;
-const lastPos = new THREE.Vector3(), homePos = new THREE.Vector3( 8, 60, 8 );
+const lastPos = new THREE.Vector3(), homePos = new THREE.Vector3( SPAWN.x, 60, SPAWN.z );
 
 function frame() {
     requestAnimationFrame( frame );
     timer.update();
     const dt = Math.min( 0.05, timer.getDelta() );
-    const worldPos = player.worldPos;
-    const alt = worldPos.y - SEA;
-    if ( ! spawned || ( player.shell === home && player.pos.y < 700 ) ) world.update( player.pos.x, player.pos.z );
+    const worldPos = player.worldPos, homeLocal = home.toLocal( worldPos );
+    const offHome = Math.hypot( homeLocal.x - SPAWN.x, homeLocal.z - SPAWN.z ) > 220000;
+    const alt = offHome ? 1e9 : homeLocal.y - SEA;
+    if ( ! spawned ) world.update( SPAWN.x, SPAWN.z );
+    else if ( player.shell === home && player.pos.y < 700 && ! offHome ) world.update( player.pos.x, player.pos.z );
     world.absorb( 3 );
     if ( player.shell.planet || player.shell.interior ) { player.world.update( player.pos.x, player.pos.z ); player.world.absorb( 4 ); }
-    if ( player.shell === home ) homePos.copy( worldPos );
+    if ( player.shell === home ) homePos.copy( player.pos );
     far.update( dt, homePos, world );
     ambient.intensity = player.shell.interior ? 2.2 : 0.6;
     tickFades( dt );
     lastPos.copy( worldPos );
     if ( ! spawned ) {
-        if ( world.loaded( 8, 8 ) ) { player.place( 8, 8 ); spawned = true; }
+        if ( world.loaded( SPAWN.x, SPAWN.z ) ) { player.place( SPAWN.x, SPAWN.z ); spawned = true; }
         if ( spawned && ! pose ) crumbs.last = null;
-    } else if ( ! pose ) { manageShells( dt ); player.step( dt, space ); crumbs.step( player.worldPos ); }
+    } else if ( ! pose ) { manageShells( dt ); player.step( dt, space ); crumbs.step( home.toLocal( player.worldPos ) ); }
     else player.placeCamera();
+    if ( camera.position.length() > 50000 ) {
+        const delta = camera.position.clone().divideScalar( 1000 ).round().multiplyScalar( 1000 );
+        space.rebase( delta );
+        home.group.position.sub( delta );
+        lastPos.sub( delta );
+        player.placeCamera();
+    }
+    const nearSys = space.nearestSystem( player.worldPos );
+    if ( nearSys && nearSys !== navSystem ) buildNav( nearSys );
     const spaceness = Math.min( 1, Math.max( 0, ( alt - 1500 ) / 9000 ) );
     skyMat.uniforms.space.value = spaceness;
     hemi.intensity = 1.15 - spaceness * 1.0;
@@ -302,9 +329,9 @@ function frame() {
         hudTimer = 0;
         const onPlanet = player.shell.planet;
         const b = player.world.biome( player.pos.x, player.pos.z );
-        hud.alt.textContent = onPlanet ? fmtDist( player.pos.y - ( player.shell.seaLevel ?? BASE ) ) : fmtDist( alt );
-        hud.biome.textContent = onPlanet || player.shell.interior ? ( b < 0 ? '…' : BIOMES[ b ] ) : player.shell.radial ? 'asteroid' : alt > 2000 ? ( spaceness >= 1 ? 'open space' : 'upper air' ) : b < 0 ? '…' : BIOMES[ b ];
-        hud.coord.textContent = `${worldPos.x.toFixed( 0 )}, ${worldPos.z.toFixed( 0 )}`;
+        hud.alt.textContent = onPlanet ? fmtDist( player.pos.y - ( player.shell.seaLevel ?? BASE ) ) : player.shell === home && ! offHome ? fmtDist( alt ) : fmtDist( worldPos.distanceTo( home.toWorld( new THREE.Vector3( SPAWN.x, SEA, SPAWN.z ) ) ) );
+        hud.biome.textContent = onPlanet || player.shell.interior ? ( b < 0 ? '…' : BIOMES[ b ] ) : player.shell.radial ? 'asteroid' : alt > 2000 ? ( spaceness >= 1 ? 'deep space' : 'upper air' ) : b < 0 ? '…' : BIOMES[ b ];
+        hud.coord.textContent = `${homeLocal.x.toFixed( 0 )}, ${homeLocal.z.toFixed( 0 )}`;
         const s = player.world.stats, f = far.stats;
         hud.chunks.textContent = `${s.loaded}${s.pending ? ` +${s.pending}` : ''} · ${f.fine + f.coarse} tiles`;
         const where = onPlanet ? ` on ${player.shell.body.name}` : player.shell.radial ? ' on an asteroid' : player.shell.interior ? ` aboard ${player.shell.vessel.name || player.shell.vessel.cls + ' ship'}` : '';
@@ -312,6 +339,7 @@ function frame() {
         hud.speed.textContent = speed < 1000 ? `${speed.toFixed( 0 )} m/s` : `${( speed / 1000 ).toFixed( 1 )} km/s`;
         const n = space.nearest( worldPos );
         hud.body.textContent = n ? `${n.name} (${n.kind}) ${fmtDist( Math.max( 0, n.d ) )}` : '–';
+        hud.system.textContent = navSystem ? `${navSystem.name} · ${fmtDist( navSystem.center.distanceTo( worldPos ) )}` : '–';
         hud.crumbs.textContent = crumbs.on ? `every ${crumbs.spacing} m · ${crumbs.count}` : crumbs.count ? `off · ${crumbs.count}` : 'off';
     }
     renderer.render( scene, camera );

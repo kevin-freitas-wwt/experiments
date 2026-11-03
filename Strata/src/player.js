@@ -120,9 +120,9 @@ export class Player {
         else if ( this.shell.planet || this.shell.interior ) clearance = Math.max( 0, this.pos.y - this.world.top( Math.floor( this.pos.x ), Math.floor( this.pos.z ) ) - 3 );
         else {
             clearance = Math.max( 0, this.pos.y - SEA - 40 );
-            if ( space ) { const n = space.nearest( this.pos ); if ( n ) clearance = Math.min( clearance, Math.max( 0, n.d ) ); }
+            if ( space ) { const n = space.nearest( this.worldPos ); if ( n ) clearance = Math.min( clearance, Math.max( 0, n.d ) ); }
         }
-        const flySpeed = Math.min( 9000, 14 * ( 1 + clearance / 120 ) );
+        const flySpeed = Math.min( 400000, 14 * ( 1 + clearance / 120 ) );
         const speed = this.flying ? flySpeed * ( run ? 3 : 1 ) : swim ? 3 : ( run ? 9 : 5 );
         const sin = Math.sin( this.yaw ), cos = Math.cos( this.yaw );
         const cp = this.flying ? Math.cos( this.pitch ) : 1, sp = this.flying ? Math.sin( this.pitch ) : 0;
@@ -152,7 +152,10 @@ export class Player {
         const next = this.pos.clone();
         if ( high || ghost ) {
             next.addScaledVector( this.vel, dt );
-            if ( high && space && space.resolve( next ) ) this.vel.set( 0, 0, 0 );
+            if ( high && space ) {
+                const wn = this.shell.toWorld( next );
+                if ( space.resolve( wn ) ) { this.shell.toLocal( wn, next ); this.vel.set( 0, 0, 0 ); }
+            }
         } else {
             const canStep = ! this.flying && ! swim && this.vel.y <= 0.01;
             const slide = ( axis ) => {

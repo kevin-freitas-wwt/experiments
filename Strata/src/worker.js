@@ -1,7 +1,7 @@
 import { fbm, ridged, hash2, fbm3, hash3 } from './noise.js';
 import { KINDS, surfaceAt } from './planet.js';
 import { AIR, STONE, DIRT, GRASS, SAND, WATER, SNOW, LOG, LEAF, NEEDLE, GRAVEL, TUNDRA, CLAY, ICE, BASALT, LAVA, RUST, CLOUD,
-    PLATE, PANEL, FLOOR, GLASS, LIGHT, CORE, DOOR, CHUNK, HEIGHT, SEA, PALETTE, isSolid, isLiquid, isOpaque } from './blocks.js';
+    PLATE, PANEL, FLOOR, GLASS, LIGHT, CORE, DOOR, CHUNK, HEIGHT, SEA, PALETTE, isSolid, isLiquid, isOpaque, spawnOf } from './blocks.js';
 
 const PAD = 3, P = CHUNK + PAD * 2;
 
@@ -10,13 +10,14 @@ const smooth = ( a, b, x ) => {
     return t * t * ( 3 - 2 * t );
 };
 
-let originSeed = null, originC = 0;
+let originSeed = null, originC = 0, originSpawn = { x: 0, z: 0 };
 
 const continent = ( x, z, seed ) => fbm( x / 1500, z / 1500, seed, 4 ) * 0.7 + fbm( x / 520 + 9, z / 520, seed + 1, 3 ) * 0.3;
 
 function column( x, z, seed ) {
-    if ( originSeed !== seed ) { originSeed = seed; originC = continent( 0, 0, seed ); }
-    const c = continent( x, z, seed ) - originC + 0.05;
+    if ( originSeed !== seed ) { originSeed = seed; originSpawn = spawnOf( seed ); originC = continent( originSpawn.x, originSpawn.z, seed ); }
+    const edge = smooth( 90000, 140000, Math.hypot( x - originSpawn.x, z - originSpawn.z ) );
+    const c = continent( x, z, seed ) - originC + 0.05 - edge * 2;
     const m = ridged( x / 230, z / 230, seed + 7, 5 );
     const d = fbm( x / 38, z / 38, seed + 13, 3 );
     const land = smooth( 0.02, 0.3, c );

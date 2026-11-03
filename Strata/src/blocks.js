@@ -45,3 +45,8 @@ export function isLiquid( b ) {
 export function isOpaque( b ) {
     return isSolid( b ) && b !== GLASS;
 }
+
+export function spawnOf( seed ) {
+    const x = ( ( seed * 7919 + 1234 ) % 24000 ) - 12000, z = ( ( seed * 104729 + 4321 ) % 24000 ) - 12000;
+    return { x: Math.floor( x / 16 ) * 16 + 8, z: Math.floor( z / 16 ) * 16 + 8 };
+}

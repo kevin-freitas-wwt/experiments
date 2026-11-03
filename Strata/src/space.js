@@ -4,9 +4,11 @@ import { bodyMat, rockMat, fadeIn } from './materials.js';
 import { KINDS as SURFACE, surfaceAt } from './planet.js';
 
 const KINDS = [ 'gas', 'lush', 'icy', 'rocky', 'ember' ];
-const NAMES = [ 'Oriel', 'Tamsin', 'Halvard', 'Nerys', 'Cordan', 'Ilse', 'Brannoc', 'Sable', 'Ysolde', 'Marrow' ];
+const NAMES = [ 'Oriel', 'Tamsin', 'Halvard', 'Nerys', 'Cordan', 'Ilse', 'Brannoc', 'Sable', 'Ysolde', 'Marrow', 'Quill', 'Vesper', 'Ashdown', 'Lorn', 'Kestrel', 'Pembray', 'Solenne', 'Thackery', 'Wren', 'Ismay' ];
+const STAR_NAMES = [ 'Aldric', 'Bellane', 'Corvane', 'Dunmore', 'Elsinor', 'Fairweather', 'Galloway', 'Harrow', 'Inverleith', 'Jessamy', 'Kinloch', 'Lammas', 'Morrow', 'Nethercote', 'Orrin', 'Penhallow', 'Quenby', 'Rosslyn', 'Sorrel', 'Tarrant' ];
 const DETAILS = [ 2, 4, 6, 7 ];
 const PATCH_N = 97;
+export const CELL = 500000;
 
 const rimMaterial = ( color ) => new THREE.ShaderMaterial( {
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -27,36 +29,63 @@ function glowTexture() {
     return new THREE.CanvasTexture( c );
 }
 
-export class Space {
-    constructor( scene, pool, seed, radius, sunDir ) {
-        this.scene = scene; this.pool = pool; this.seed = seed;
-        this.scale = radius / 8;
-        this.glow = glowTexture();
+function voxelGeometry( data ) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute( 'position', new THREE.BufferAttribute( data.pos, 3 ) );
+    g.setAttribute( 'color', new THREE.BufferAttribute( data.col, 3, true ) );
+    g.setAttribute( 'normal', new THREE.BufferAttribute( data.nrm, 3, true ) );
+    g.setIndex( new THREE.BufferAttribute( data.idx, 1 ) );
+    g.computeBoundingSphere();
+    return g;
+}
+
+class System {
+    constructor( space, key, center, seed, home ) {
+        this.space = space; this.key = key; this.center = center; this.seed = seed; this.home = home;
+        this.scene = space.scene; this.pool = space.pool;
+        this.name = STAR_NAMES[ seed % STAR_NAMES.length ] + ( home ? '' : ` ${seed % 97}` );
+        this.bodies = []; this.rocks = []; this.ships = []; this.stations = [];
+        this.makeStar();
         this.makeBodies();
         this.makeRocks();
-        this.makeShips();
-        this.makeSky( sunDir );
-        this.timer = 0;
+        this.makeVessels();
     }
 
     rnd( i, j ) {
         return hash2( i, j, this.seed + 4242 );
     }
 
+    makeStar() {
+        const warm = this.rnd( 0, 1 );
+        const color = warm < 0.2 ? 0xbfd4ff : warm < 0.6 ? 0xfff3dc : warm < 0.85 ? 0xffd9a0 : 0xffb080;
+        this.starColor = color;
+        this.starPos = this.home ? this.center.clone().addScaledVector( this.space.sunDir, 300000 ) : this.center.clone();
+        this.star = new THREE.Sprite( new THREE.SpriteMaterial( { map: this.space.glow, color, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true } ) );
+        this.star.scale.setScalar( this.home ? 26000 : 40000 );
+        this.star.position.copy( this.starPos );
+        this.starBall = new THREE.Mesh( new THREE.SphereGeometry( this.home ? 6000 : 11000, 24, 16 ), new THREE.MeshBasicMaterial( { color } ) );
+        this.starBall.position.copy( this.starPos );
+        this.scene.add( this.star, this.starBall );
+    }
+
     makeBodies() {
-        this.bodies = [];
-        const n = 5;
+        const n = this.home ? 4 + Math.floor( this.rnd( 1, 1 ) * 4 ) : 2 + Math.floor( this.rnd( 1, 1 ) * 7 );
+        let gasCount = 0;
         for ( let i = 0; i < n; i++ ) {
-            const kind = KINDS[ i ], gas = kind === 'gas';
-            const radius = gas ? 9000 : 1600 + this.rnd( i, 1 ) * 4800;
-            const dist = 36000 + i * 16000 + this.rnd( i, 2 ) * 9000;
-            const az = ( i / n ) * Math.PI * 2 + this.rnd( i, 3 ) * 1.1, el = 0.14 + this.rnd( i, 4 ) * 0.6;
-            const pos = new THREE.Vector3( Math.cos( az ) * Math.cos( el ) * dist, Math.sin( el ) * dist + radius, Math.sin( az ) * Math.cos( el ) * dist );
+            let kind = KINDS[ Math.floor( this.rnd( i, 2 ) * KINDS.length ) ];
+            if ( kind === 'gas' && gasCount >= 2 ) kind = 'rocky';
+            if ( this.home && i === 0 ) kind = 'gas';
+            if ( kind === 'gas' ) gasCount++;
+            const gas = kind === 'gas';
+            const radius = gas ? 7000 + this.rnd( i, 3 ) * 4000 : 1400 + this.rnd( i, 3 ) * 5200;
+            const dist = ( this.home ? 36000 : 60000 ) + i * ( this.home ? 16000 : 38000 ) + this.rnd( i, 4 ) * 12000;
+            const az = ( i / n ) * Math.PI * 2 + this.rnd( i, 5 ) * 1.1, el = this.home ? 0.14 + this.rnd( i, 6 ) * 0.6 : ( this.rnd( i, 6 ) - 0.5 ) * 0.5;
+            const pos = new THREE.Vector3( Math.cos( az ) * Math.cos( el ) * dist, Math.sin( el ) * dist + ( this.home ? radius : 0 ), Math.sin( az ) * Math.cos( el ) * dist ).add( this.center );
             const group = new THREE.Group();
             group.position.copy( pos );
             const mesh = new THREE.Mesh( new THREE.IcosahedronGeometry( radius, 1 ), bodyMat );
             group.add( mesh );
-            const body = { i, kind, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: 0.00015 + this.rnd( i, 5 ) * 0.0003, seed: this.seed + i * 17, patch: null, patchWant: 0 };
+            const body = { i, kind, system: this, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: 0.00015 + this.rnd( i, 7 ) * 0.0003, seed: this.seed + i * 17, patch: null, patchWant: 0 };
             if ( kind !== 'rocky' && kind !== 'ember' ) {
                 const shellR = gas ? radius * 1.045 : radius * ( 1 + SURFACE[ kind ].amp * 2 ) * 1.015;
                 const rim = new THREE.Mesh( new THREE.SphereGeometry( shellR, 48, 32 ), rimMaterial( gas ? 0xf0cc8a : kind === 'icy' ? 0xbfe0ff : 0x7fb4ff ) );
@@ -64,17 +93,173 @@ export class Space {
                 group.add( rim );
                 body.rim = rim;
             }
-            if ( gas ) {
-                const ring = new THREE.Mesh( new THREE.RingGeometry( radius * 1.5, radius * 2.4, 128 ), new THREE.MeshBasicMaterial( { color: 0xd9c7a6, side: THREE.DoubleSide, transparent: true, opacity: 0.42, depthWrite: false } ) );
-                ring.rotation.x = Math.PI / 2 + 0.35;
-                ring.rotation.y = 0.4;
+            if ( gas && this.rnd( i, 8 ) < 0.7 ) {
+                const ring = new THREE.Mesh( new THREE.RingGeometry( radius * 1.5, radius * ( 2 + this.rnd( i, 9 ) * 0.6 ), 128 ), new THREE.MeshBasicMaterial( { color: 0xd9c7a6, side: THREE.DoubleSide, transparent: true, opacity: 0.42, depthWrite: false } ) );
+                ring.rotation.x = Math.PI / 2 + ( this.rnd( i, 10 ) - 0.5 ) * 0.9;
+                ring.rotation.y = this.rnd( i, 11 );
                 group.add( ring );
                 body.ringNormal = new THREE.Vector3( 0, 1, 0 ).applyEuler( ring.rotation );
             }
             this.scene.add( group );
             this.bodies.push( body );
-            this.requestBody( body, 0 );
+            this.space.requestBody( body, 0 );
         }
+    }
+
+    makeRocks() {
+        const n = 30 + Math.floor( this.rnd( 3, 1 ) * 190 );
+        const host = this.bodies.find( ( b ) => b.ringNormal ) || this.bodies.reduce( ( a, b ) => ( b.radius > a.radius ? b : a ) );
+        const normal = host.ringNormal || new THREE.Vector3( this.rnd( 3, 2 ) - 0.5, 1, this.rnd( 3, 3 ) - 0.5 ).normalize();
+        const u = new THREE.Vector3( 1, 0, 0 ).cross( normal ).normalize(), v = normal.clone().cross( u );
+        const beltShare = 0.5 + this.rnd( 3, 4 ) * 0.4;
+        this.rockFar = new THREE.InstancedMesh( new THREE.IcosahedronGeometry( 1, 1 ), rockMat, n );
+        this.rockFar.instanceColor = new THREE.InstancedBufferAttribute( new Float32Array( n * 3 ), 3 );
+        const d = new THREE.Object3D();
+        for ( let i = 0; i < n; i++ ) {
+            const belt = i < n * beltShare;
+            const size = 12 + Math.floor( this.rnd( i, 20 ) * 10 ), voxel = 3 + this.rnd( i, 21 ) * 9;
+            let pos;
+            if ( belt ) {
+                const a = this.rnd( i, 22 ) * Math.PI * 2, r = host.radius * ( 2.7 + this.rnd( i, 23 ) * 1.6 );
+                pos = host.pos.clone().addScaledVector( u, Math.cos( a ) * r ).addScaledVector( v, Math.sin( a ) * r ).addScaledVector( normal, ( this.rnd( i, 24 ) - 0.5 ) * 1200 );
+            } else {
+                const a = this.rnd( i, 25 ) * Math.PI * 2, r = 20000 + this.rnd( i, 26 ) * 90000;
+                pos = new THREE.Vector3( Math.cos( a ) * r, ( this.home ? 6000 : -20000 ) + this.rnd( i, 27 ) * 40000, Math.sin( a ) * r ).add( this.center );
+            }
+            const rock = { i, system: this, size, voxel, pos, radius: size * voxel * 0.42, mesh: null, want: false, spin: new THREE.Vector3( this.rnd( i, 28 ) - 0.5, this.rnd( i, 29 ) - 0.5, this.rnd( i, 30 ) - 0.5 ).multiplyScalar( 0.3 ), rot: new THREE.Euler( 0, 0, 0 ) };
+            d.position.copy( pos );
+            d.scale.setScalar( rock.radius * 0.9 );
+            d.updateMatrix();
+            this.rockFar.setMatrixAt( i, d.matrix );
+            this.rockFar.setColorAt( i, new THREE.Color( 0xb0a89c ) );
+            this.rocks.push( rock );
+        }
+        this.rockFar.frustumCulled = false;
+        this.scene.add( this.rockFar );
+    }
+
+    makeVessels() {
+        const spriteMat = new THREE.SpriteMaterial( { map: this.space.glow, color: 0xffb070, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true } );
+        const nShips = 4 + Math.floor( this.rnd( 4, 1 ) * 17 );
+        for ( let i = 0; i < nShips; i++ ) {
+            const roll = this.rnd( i, 45 ), cls = roll < 0.55 ? 'small' : roll < 0.85 ? 'medium' : 'capital';
+            const host = this.bodies[ Math.floor( this.rnd( i, 46 ) * this.bodies.length ) ];
+            const voxel = cls === 'small' ? 2 + this.rnd( i, 44 ) * 2 : cls === 'medium' ? 3 + this.rnd( i, 44 ) * 2 : 5 + this.rnd( i, 44 ) * 2;
+            const speed = cls === 'small' ? 80 + this.rnd( i, 43 ) * 160 : cls === 'medium' ? 60 + this.rnd( i, 43 ) * 80 : 30 + this.rnd( i, 43 ) * 30;
+            const ship = {
+                i, cls, host, system: this, group: new THREE.Group(), mesh: null, voxel, speed, seed: this.seed * 7 + i,
+                orbitR: host.radius * ( 1.35 + this.rnd( i, 40 ) * 0.9 ), angle: this.rnd( i, 41 ) * Math.PI * 2, tilt: ( this.rnd( i, 42 ) - 0.5 ) * 1.2,
+            };
+            ship.omega = ship.speed / ship.orbitR;
+            ship.sprite = new THREE.Sprite( spriteMat );
+            ship.group.add( ship.sprite );
+            this.scene.add( ship.group );
+            this.ships.push( ship );
+            this.pool.submit( { type: 'ship', seed: ship.seed, cls }, { priority: 40, tag: 'ship' } ).then( ( data ) => {
+                if ( this.disposed ) return;
+                const m = new THREE.Mesh( voxelGeometry( data ), rockMat );
+                m.scale.setScalar( voxel );
+                ship.mesh = m;
+                ship.sprite.position.set( 0, 0, -( cls === 'capital' ? 48 : cls === 'medium' ? 20 : 9 ) * voxel );
+                ship.group.add( m );
+                const W = cls === 'capital' ? 34 : cls === 'medium' ? 17 : 9;
+                this.space.airlock( ship, new THREE.Vector3( W / 2 * voxel + 2, 0, 0 ) );
+            } );
+        }
+        const hosts = this.bodies.filter( ( b ) => b.kind !== 'gas' );
+        const nSt = hosts.length ? Math.floor( this.rnd( 5, 1 ) * Math.min( 5, hosts.length + 1 ) ) + ( this.home ? 1 : 0 ) : 0;
+        for ( let i = 0; i < nSt; i++ ) {
+            const host = hosts[ i % hosts.length ];
+            const st = { i, host, system: this, name: `${host.name} Station`, group: new THREE.Group(), mesh: null, voxel: 7 + this.rnd( i, 50 ) * 3, seed: this.seed * 11 + i,
+                orbitR: host.radius * ( 1.9 + this.rnd( i, 51 ) * 0.5 ), angle: this.rnd( i, 52 ) * Math.PI * 2, tilt: ( this.rnd( i, 53 ) - 0.5 ) * 0.8, spin: 0.015 + this.rnd( i, 54 ) * 0.02 };
+            st.omega = 25 / st.orbitR;
+            this.scene.add( st.group );
+            this.stations.push( st );
+            this.pool.submit( { type: 'station', seed: st.seed }, { priority: 45, tag: 'ship' } ).then( ( data ) => {
+                if ( this.disposed ) return;
+                const m = new THREE.Mesh( voxelGeometry( data ), rockMat );
+                m.scale.setScalar( st.voxel );
+                st.mesh = m;
+                st.group.add( m );
+                this.space.airlock( st, new THREE.Vector3( 0, 13 * st.voxel + 2, 0 ) );
+            } );
+        }
+    }
+
+    rebase( delta ) {
+        this.center.sub( delta );
+        this.starPos.sub( delta );
+        this.star.position.sub( delta );
+        this.starBall.position.sub( delta );
+        for ( const b of this.bodies ) { b.pos.sub( delta ); b.group.position.sub( delta ); }
+        for ( const r of this.rocks ) { r.pos.sub( delta ); if ( r.mesh ) { r.mesh.position.sub( delta ); r.frame.position.sub( delta ); } }
+        this.rockDirty = true;
+    }
+
+    dispose() {
+        this.disposed = true;
+        this.scene.remove( this.star, this.starBall, this.rockFar );
+        for ( const b of this.bodies ) { this.scene.remove( b.group ); b.group.traverse( ( o ) => o.geometry && o.geometry.dispose() ); for ( const g of b.geos.values() ) g.dispose(); }
+        for ( const r of this.rocks ) if ( r.mesh ) { this.scene.remove( r.mesh, r.frame ); r.mesh.geometry.dispose(); }
+        for ( const v of [ ...this.ships, ...this.stations ] ) { this.scene.remove( v.group ); v.group.traverse( ( o ) => o.geometry && o.geometry.dispose() ); }
+    }
+}
+
+export class Space {
+    constructor( scene, pool, seed, radius, sunDir ) {
+        this.scene = scene; this.pool = pool; this.seed = seed;
+        this.scale = radius / 8;
+        this.glow = glowTexture();
+        this.sunDir = sunDir.clone().normalize();
+        this.systems = new Map();
+        this.offset = new THREE.Vector3();
+        this.makeSky();
+        this.timer = 0;
+        this.home = this.loadSystem( 0, 0, 0, true );
+        this.refresh( new THREE.Vector3() );
+    }
+
+    get bodies() { return [ ...this.systems.values() ].flatMap( ( s ) => s.bodies ); }
+    get rocks() { return [ ...this.systems.values() ].flatMap( ( s ) => s.rocks ); }
+    get ships() { return [ ...this.systems.values() ].flatMap( ( s ) => s.ships ); }
+    get stations() { return [ ...this.systems.values() ].flatMap( ( s ) => s.stations ); }
+
+    cellCenter( i, j, k ) {
+        if ( i === 0 && j === 0 && k === 0 ) return new THREE.Vector3( 0, 0, 0 ).sub( this.offset );
+        const h = ( n ) => hash2( i * 73 + j * 31 + k * 17, n, this.seed + 99 );
+        return new THREE.Vector3( ( i + 0.5 + ( h( 1 ) - 0.5 ) * 0.5 ) * CELL, ( j + ( h( 2 ) - 0.5 ) * 0.3 ) * CELL, ( k + 0.5 + ( h( 3 ) - 0.5 ) * 0.5 ) * CELL ).sub( this.offset );
+    }
+
+    loadSystem( i, j, k, home = false ) {
+        const key = `${i},${j},${k}`;
+        if ( this.systems.has( key ) ) return this.systems.get( key );
+        const seed = home ? this.seed : ( this.seed * 31 + ( ( i * 92837111 ) ^ ( j * 689287499 ) ^ ( k * 283923481 ) ) ) >>> 0;
+        const sys = new System( this, key, this.cellCenter( i, j, k ), seed % 1000003, home );
+        this.systems.set( key, sys );
+        return sys;
+    }
+
+    refresh( camPos ) {
+        const abs = camPos.clone().add( this.offset );
+        const ci = Math.floor( abs.x / CELL ), cj = Math.round( abs.y / CELL ), ck = Math.floor( abs.z / CELL );
+        const wanted = new Set();
+        for ( let i = ci - 2; i <= ci + 2; i++ ) for ( let j = cj - 2; j <= cj + 2; j++ ) for ( let k = ck - 2; k <= ck + 2; k++ ) {
+            const c = this.cellCenter( i, j, k );
+            if ( c.distanceTo( camPos ) < CELL * 1.1 || ( i === 0 && j === 0 && k === 0 ) ) { wanted.add( `${i},${j},${k}` ); this.loadSystem( i, j, k ); }
+        }
+        for ( const [ key, sys ] of this.systems ) if ( ! wanted.has( key ) && ! sys.home ) { sys.dispose(); this.systems.delete( key ); }
+        this.homeLoaded = wanted.has( '0,0,0' );
+    }
+
+    nearestSystem( pos ) {
+        let best = null;
+        for ( const s of this.systems.values() ) { const d = s.center.distanceTo( pos ); if ( ! best || d < best.d ) best = { system: s, d }; }
+        return best && best.system;
+    }
+
+    rebase( delta ) {
+        this.offset.add( delta );
+        for ( const s of this.systems.values() ) s.rebase( delta );
     }
 
     requestBody( body, level ) {
@@ -82,6 +267,7 @@ export class Space {
         if ( body.geos.has( level ) ) { this.applyBody( body, level ); return; }
         this.pool.submit( { type: 'body', kind: body.kind, radius: body.radius, detail: DETAILS[ level ], seed: body.seed, level, i: body.i }, { priority: 50 - level * 10, tag: 'body' } )
             .then( ( data ) => {
+                if ( body.system.disposed ) return;
                 const g = new THREE.BufferGeometry();
                 g.setAttribute( 'position', new THREE.BufferAttribute( data.pos, 3 ) );
                 g.setAttribute( 'color', new THREE.BufferAttribute( data.col, 3, true ) );
@@ -123,7 +309,7 @@ export class Space {
         if ( p && p.userData.center.angleTo( local ) < p.userData.ang * 0.35 && Math.abs( Math.log( ang / p.userData.ang ) ) < 0.3 ) return;
         const stamp = ++body.patchWant;
         this.pool.submit( { type: 'patch', kind: body.kind, radius: body.radius, seed: body.seed, center: local.toArray(), ang, n: PATCH_N }, { priority: 1, tag: 'patch' } ).then( ( data ) => {
-            if ( stamp !== body.patchWant ) return;
+            if ( stamp !== body.patchWant || body.system.disposed ) return;
             const g = new THREE.BufferGeometry();
             g.setAttribute( 'position', new THREE.BufferAttribute( data.pos, 3 ) );
             g.setAttribute( 'color', new THREE.BufferAttribute( data.col, 3, true ) );
@@ -138,85 +324,6 @@ export class Space {
             body.group.add( m );
             fadeIn( m, 0.5, () => { if ( old ) { body.group.remove( old ); old.geometry.dispose(); } } );
         } );
-    }
-
-    makeRocks() {
-        const gas = this.bodies[ 0 ], n = 110;
-        this.rocks = [];
-        const u = new THREE.Vector3( 1, 0, 0 ).cross( gas.ringNormal ).normalize(), v = gas.ringNormal.clone().cross( u );
-        this.rockFar = new THREE.InstancedMesh( new THREE.IcosahedronGeometry( 1, 1 ), rockMat, n );
-        this.rockFar.instanceColor = new THREE.InstancedBufferAttribute( new Float32Array( n * 3 ), 3 );
-        const d = new THREE.Object3D();
-        for ( let i = 0; i < n; i++ ) {
-            const belt = i < 80;
-            const size = 12 + Math.floor( this.rnd( i, 20 ) * 10 ), voxel = 3 + this.rnd( i, 21 ) * 9;
-            let pos;
-            if ( belt ) {
-                const a = this.rnd( i, 22 ) * Math.PI * 2, r = gas.radius * ( 2.7 + this.rnd( i, 23 ) * 1.6 );
-                pos = gas.pos.clone().addScaledVector( u, Math.cos( a ) * r ).addScaledVector( v, Math.sin( a ) * r ).addScaledVector( gas.ringNormal, ( this.rnd( i, 24 ) - 0.5 ) * 1200 );
-            } else {
-                const a = this.rnd( i, 25 ) * Math.PI * 2, r = 20000 + this.rnd( i, 26 ) * 70000;
-                pos = new THREE.Vector3( Math.cos( a ) * r, 6000 + this.rnd( i, 27 ) * 30000, Math.sin( a ) * r );
-            }
-            const rock = { i, size, voxel, pos, radius: size * voxel * 0.42, mesh: null, want: false, spin: new THREE.Vector3( this.rnd( i, 28 ) - 0.5, this.rnd( i, 29 ) - 0.5, this.rnd( i, 30 ) - 0.5 ).multiplyScalar( 0.3 ), rot: new THREE.Euler( 0, 0, 0 ) };
-            d.position.copy( pos );
-            d.scale.setScalar( rock.radius * 0.9 );
-            d.updateMatrix();
-            this.rockFar.setMatrixAt( i, d.matrix );
-            this.rockFar.setColorAt( i, new THREE.Color( 0xb0a89c ) );
-            this.rocks.push( rock );
-        }
-        this.rockFar.frustumCulled = false;
-        this.scene.add( this.rockFar );
-    }
-
-    makeShips() {
-        this.ships = [];
-        const spriteMat = new THREE.SpriteMaterial( { map: this.glow, color: 0xffb070, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true } );
-        const classes = [ 'small', 'small', 'small', 'small', 'small', 'small', 'small', 'medium', 'medium', 'medium', 'medium', 'capital', 'capital' ];
-        classes.forEach( ( cls, i ) => {
-            const host = cls === 'capital' ? this.bodies[ i % 2 ] : this.bodies[ 1 + ( i % 4 ) ];
-            const voxel = cls === 'small' ? 2 + this.rnd( i, 44 ) * 2 : cls === 'medium' ? 3 + this.rnd( i, 44 ) * 2 : 5 + this.rnd( i, 44 ) * 2;
-            const speed = cls === 'small' ? 80 + this.rnd( i, 43 ) * 160 : cls === 'medium' ? 60 + this.rnd( i, 43 ) * 80 : 30 + this.rnd( i, 43 ) * 30;
-            const ship = {
-                i, cls, host, group: new THREE.Group(), mesh: null, voxel, speed,
-                orbitR: host.radius * ( 1.35 + this.rnd( i, 40 ) * 0.9 ), angle: this.rnd( i, 41 ) * Math.PI * 2,
-                tilt: ( this.rnd( i, 42 ) - 0.5 ) * 1.2,
-            };
-            ship.omega = ship.speed / ship.orbitR;
-            const sprite = new THREE.Sprite( spriteMat );
-            ship.sprite = sprite;
-            ship.group.add( sprite );
-            this.scene.add( ship.group );
-            this.ships.push( ship );
-            this.pool.submit( { type: 'ship', seed: this.seed * 7 + i, cls }, { priority: 40, tag: 'ship' } ).then( ( data ) => {
-                const m = new THREE.Mesh( this.voxelGeometry( data ), rockMat );
-                m.scale.setScalar( voxel );
-                ship.mesh = m;
-                ship.seed = this.seed * 7 + i;
-                sprite.position.set( 0, 0, -( cls === 'capital' ? 48 : cls === 'medium' ? 20 : 9 ) * voxel );
-                ship.group.add( m );
-                const W = cls === 'capital' ? 34 : cls === 'medium' ? 17 : 9;
-                this.airlock( ship, new THREE.Vector3( W / 2 * voxel + 2, 0, 0 ) );
-            } );
-        } );
-        this.stations = [];
-        for ( let i = 0; i < 3; i++ ) {
-            const host = this.bodies[ 1 + i ];
-            const st = { i, host, name: `${host.name} Station`, group: new THREE.Group(), mesh: null, voxel: 7 + this.rnd( i, 50 ) * 3,
-                orbitR: host.radius * ( 1.9 + this.rnd( i, 51 ) * 0.5 ), angle: this.rnd( i, 52 ) * Math.PI * 2, tilt: ( this.rnd( i, 53 ) - 0.5 ) * 0.8, spin: 0.015 + this.rnd( i, 54 ) * 0.02 };
-            st.omega = 25 / st.orbitR;
-            this.scene.add( st.group );
-            this.stations.push( st );
-            this.pool.submit( { type: 'station', seed: this.seed * 11 + i }, { priority: 45, tag: 'ship' } ).then( ( data ) => {
-                const m = new THREE.Mesh( this.voxelGeometry( data ), rockMat );
-                m.scale.setScalar( st.voxel );
-                st.mesh = m;
-                st.seed = this.seed * 11 + i;
-                st.group.add( m );
-                this.airlock( st, new THREE.Vector3( 0, 13 * st.voxel + 2, 0 ) );
-            } );
-        }
     }
 
     airlock( vessel, local ) {
@@ -252,16 +359,6 @@ export class Space {
         return best && best.rock;
     }
 
-    voxelGeometry( data ) {
-        const g = new THREE.BufferGeometry();
-        g.setAttribute( 'position', new THREE.BufferAttribute( data.pos, 3 ) );
-        g.setAttribute( 'color', new THREE.BufferAttribute( data.col, 3, true ) );
-        g.setAttribute( 'normal', new THREE.BufferAttribute( data.nrm, 3, true ) );
-        g.setIndex( new THREE.BufferAttribute( data.idx, 1 ) );
-        g.computeBoundingSphere();
-        return g;
-    }
-
     orbitPoint( o, angle, out ) {
         return out.set( Math.cos( angle ) * o.orbitR, Math.sin( angle ) * o.orbitR * Math.sin( o.tilt ), Math.sin( angle ) * o.orbitR * Math.cos( o.tilt ) ).add( o.host.pos );
     }
@@ -269,15 +366,22 @@ export class Space {
     nearestStation( pos ) {
         let best = null;
         for ( const s of this.stations ) { const d = s.group.position.distanceTo( pos ); if ( ! best || d < best.d ) best = { station: s, d }; }
-        return best.station;
+        return best && best.station;
     }
 
-    makeSky( sunDir ) {
+    nearestShip( pos ) {
+        let best = null;
+        for ( const s of this.ships ) { const d = s.group.position.distanceTo( pos ); if ( ! best || d < best.d ) best = { ship: s, d }; }
+        return best && best.ship;
+    }
+
+    makeSky() {
         const n = 3000, pos = new Float32Array( n * 3 ), col = new Float32Array( n * 3 );
+        const r = ( i, j ) => hash2( i, j, this.seed + 7 );
         for ( let i = 0; i < n; i++ ) {
-            const u = this.rnd( i, 60 ) * 2 - 1, a = this.rnd( i, 61 ) * Math.PI * 2, s = Math.sqrt( 1 - u * u );
+            const u = r( i, 60 ) * 2 - 1, a = r( i, 61 ) * Math.PI * 2, s = Math.sqrt( 1 - u * u );
             pos.set( [ Math.cos( a ) * s * 240000, u * 240000, Math.sin( a ) * s * 240000 ], i * 3 );
-            const w = 0.55 + this.rnd( i, 62 ) * 0.45, warm = this.rnd( i, 63 );
+            const w = 0.55 + r( i, 62 ) * 0.45, warm = r( i, 63 );
             col.set( [ w, w * ( 0.92 + warm * 0.08 ), w * ( 0.85 + ( 1 - warm ) * 0.15 ) ], i * 3 );
         }
         const g = new THREE.BufferGeometry();
@@ -287,10 +391,6 @@ export class Space {
         this.stars = new THREE.Points( g, this.starMat );
         this.stars.frustumCulled = false;
         this.scene.add( this.stars );
-        this.sunDir = sunDir.clone().normalize();
-        this.sun = new THREE.Sprite( new THREE.SpriteMaterial( { map: this.glow, color: 0xfff3dc, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true } ) );
-        this.sun.scale.setScalar( 26000 );
-        this.scene.add( this.sun );
     }
 
     resolve( pos ) {
@@ -300,6 +400,10 @@ export class Space {
             if ( d > b.radius * 1.4 ) continue;
             const r = this.surfaceRadius( b, pos ) + 2;
             if ( d < r ) { pos.sub( b.pos ).setLength( r ).add( b.pos ); hit = b; }
+        }
+        for ( const s of this.systems.values() ) {
+            const r = ( s.home ? 6000 : 11000 ) * 1.5, d = pos.distanceTo( s.starPos );
+            if ( d < r ) { pos.sub( s.starPos ).setLength( r ).add( s.starPos ); hit = s; }
         }
         return hit;
     }
@@ -311,42 +415,42 @@ export class Space {
             if ( d < b.radius * 0.4 ) d = pos.distanceTo( b.pos ) - this.surfaceRadius( b, pos );
             if ( ! best || d < best.d ) best = { name: b.name, kind: b.kind, d };
         }
+        for ( const s of this.systems.values() ) {
+            const d = pos.distanceTo( s.starPos ) - ( s.home ? 6000 : 11000 );
+            if ( ! best || d < best.d ) best = { name: s.name, kind: 'star', d };
+        }
         return best;
-    }
-
-    nearestShip( pos ) {
-        let best = null;
-        for ( const s of this.ships ) { const d = s.group.position.distanceTo( pos ); if ( ! best || d < best.d ) best = { ship: s, d }; }
-        return best.ship;
     }
 
     update( dt, camPos, space ) {
         this.starMat.opacity = space * space;
         this.stars.position.copy( camPos );
-        this.sun.position.copy( camPos ).addScaledVector( this.sunDir, 200000 );
-        this.sun.material.opacity = 0.35 + space * 0.65;
-        for ( const b of this.bodies ) {
-            b.group.rotation.y += b.spin * dt;
-            if ( b.rim ) b.rim.material.uniforms.fade.value = Math.min( 1, Math.max( 0, ( camPos.distanceTo( b.pos ) - b.rim.userData.shellR ) / ( b.radius * 0.4 ) ) );
-        }
         const ahead = new THREE.Vector3();
-        for ( const s of this.ships ) {
-            s.angle += s.omega * dt;
-            this.orbitPoint( s, s.angle, s.group.position );
-            s.group.lookAt( this.orbitPoint( s, s.angle + 0.01, ahead ) );
-            const d = s.group.position.distanceTo( camPos );
-            s.group.visible = d < 150000;
-            s.sprite.scale.setScalar( Math.max( 12 * s.voxel, d * 0.004 ) );
+        for ( const sys of this.systems.values() ) {
+            sys.star.material.opacity = sys.home ? 0.35 + space * 0.65 : 1;
+            for ( const b of sys.bodies ) {
+                b.group.rotation.y += b.spin * dt;
+                if ( b.rim ) b.rim.material.uniforms.fade.value = Math.min( 1, Math.max( 0, ( camPos.distanceTo( b.pos ) - b.rim.userData.shellR ) / ( b.radius * 0.4 ) ) );
+            }
+            for ( const s of sys.ships ) {
+                s.angle += s.omega * dt;
+                this.orbitPoint( s, s.angle, s.group.position );
+                s.group.lookAt( this.orbitPoint( s, s.angle + 0.01, ahead ) );
+                const d = s.group.position.distanceTo( camPos );
+                s.group.visible = d < 150000;
+                s.sprite.scale.setScalar( Math.max( 12 * s.voxel, d * 0.004 ) );
+            }
+            for ( const st of sys.stations ) {
+                st.angle += st.omega * dt;
+                this.orbitPoint( st, st.angle, st.group.position );
+                st.group.rotation.y += st.spin * dt;
+            }
+            for ( const r of sys.rocks ) if ( r.mesh ) { r.rot.x += r.spin.x * dt; r.rot.y += r.spin.y * dt; r.rot.z += r.spin.z * dt; r.mesh.rotation.copy( r.rot ); r.frame.rotation.copy( r.rot ); }
         }
-        for ( const st of this.stations ) {
-            st.angle += st.omega * dt;
-            this.orbitPoint( st, st.angle, st.group.position );
-            st.group.rotation.y += st.spin * dt;
-        }
-        for ( const r of this.rocks ) if ( r.mesh ) { r.rot.x += r.spin.x * dt; r.rot.y += r.spin.y * dt; r.rot.z += r.spin.z * dt; r.mesh.rotation.copy( r.rot ); r.frame.rotation.copy( r.rot ); }
         this.timer -= dt;
         if ( this.timer > 0 ) return;
         this.timer = 0.5;
+        this.refresh( camPos );
         for ( const b of this.bodies ) {
             const d = camPos.distanceTo( b.pos ) / b.radius, sc = Math.max( 0.75, this.scale );
             const level = d < 3 * sc ? 3 : d < 7 * sc ? 2 : d < 30 * sc ? 1 : 0;
@@ -355,42 +459,42 @@ export class Space {
         }
         const nearR = 4000 * this.scale;
         const dummy = new THREE.Object3D();
-        let dirty = false;
-        for ( const r of this.rocks ) {
-            const d = r.pos.distanceTo( camPos );
-            if ( d < nearR && ! r.want ) {
-                r.want = true;
-                this.pool.submit( { type: 'rock', size: r.size, seed: this.seed * 3 + r.i, i: r.i }, { priority: d / 100, tag: 'rock' } ).then( ( data ) => {
-                    if ( ! r.want ) return;
-                    const g = new THREE.BufferGeometry();
-                    g.setAttribute( 'position', new THREE.BufferAttribute( data.pos, 3 ) );
-                    g.setAttribute( 'color', new THREE.BufferAttribute( data.col, 3, true ) );
-                    g.setAttribute( 'normal', new THREE.BufferAttribute( data.nrm, 3, true ) );
-                    g.setIndex( new THREE.BufferAttribute( data.idx, 1 ) );
-                    g.computeBoundingSphere();
-                    r.mesh = new THREE.Mesh( g, rockMat );
-                    r.mesh.position.copy( r.pos );
-                    r.mesh.scale.setScalar( r.voxel );
-                    r.vol = data.vol;
-                    r.frame = new THREE.Group();
-                    r.frame.position.copy( r.pos );
-                    this.scene.add( r.mesh, r.frame );
-                    fadeIn( r.mesh, 0.5 );
-                } );
-            } else if ( d > nearR * 2 && r.want ) {
-                r.want = false;
-                if ( r.mesh ) { this.scene.remove( r.mesh, r.frame ); r.mesh.geometry.dispose(); r.mesh = null; r.frame = null; }
+        for ( const sys of this.systems.values() ) {
+            let dirty = sys.rockDirty;
+            sys.rockDirty = false;
+            for ( const r of sys.rocks ) {
+                const d = r.pos.distanceTo( camPos );
+                if ( d < nearR && ! r.want ) {
+                    r.want = true;
+                    this.pool.submit( { type: 'rock', size: r.size, seed: sys.seed * 3 + r.i, i: r.i }, { priority: d / 100, tag: 'rock' } ).then( ( data ) => {
+                        if ( ! r.want || sys.disposed ) return;
+                        r.mesh = new THREE.Mesh( voxelGeometry( data ), rockMat );
+                        r.mesh.position.copy( r.pos );
+                        r.mesh.scale.setScalar( r.voxel );
+                        r.vol = data.vol;
+                        r.frame = new THREE.Group();
+                        r.frame.position.copy( r.pos );
+                        this.scene.add( r.mesh, r.frame );
+                        fadeIn( r.mesh, 0.5 );
+                        sys.rockDirty = true;
+                    } );
+                } else if ( d > nearR * 2 && r.want ) {
+                    r.want = false;
+                    if ( r.mesh ) { this.scene.remove( r.mesh, r.frame ); r.mesh.geometry.dispose(); r.mesh = null; r.frame = null; }
+                    dirty = true;
+                }
+                if ( ! dirty && d >= nearR ) continue;
+                dummy.position.copy( r.pos );
+                dummy.scale.setScalar( r.mesh ? 0.0001 : r.radius * 0.9 );
+                dummy.updateMatrix();
+                sys.rockFar.setMatrixAt( r.i, dummy.matrix );
+                dirty = true;
             }
-            dummy.position.copy( r.pos );
-            dummy.scale.setScalar( r.mesh ? 0.0001 : r.radius * 0.9 );
-            dummy.updateMatrix();
-            this.rockFar.setMatrixAt( r.i, dummy.matrix );
-            dirty = true;
+            if ( dirty ) sys.rockFar.instanceMatrix.needsUpdate = true;
         }
-        if ( dirty ) this.rockFar.instanceMatrix.needsUpdate = true;
     }
 
     get stats() {
-        return { rocks: this.rocks.filter( ( r ) => r.mesh ).length, bodies: this.bodies.map( ( b ) => b.level ).join( '' ) };
+        return { systems: this.systems.size, rocks: this.rocks.filter( ( r ) => r.mesh ).length, bodies: this.bodies.length };
     }
 }

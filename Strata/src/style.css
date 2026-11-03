@@ -249,6 +249,11 @@ body {
 .controls-wrap { margin-bottom: 0; }
 .controls-wrap + #enter { margin-top: 18px; }
 
+.nav-title {
+    color: var(--ink-soft);
+    font-size: 12px;
+    margin: 0 0 8px;
+}
 .nav {
     display: grid;
     gap: 6px;
