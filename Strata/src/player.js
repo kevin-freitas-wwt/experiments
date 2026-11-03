@@ -145,14 +145,29 @@ export class Player {
             next.addScaledVector( this.vel, dt );
             if ( space && space.resolve( next ) ) this.vel.set( 0, 0, 0 );
         } else {
-            next.x += this.vel.x * dt;
-            if ( this.collides( next ) ) { next.x = this.pos.x; this.vel.x = 0; }
-            next.z += this.vel.z * dt;
-            if ( this.collides( next ) ) { next.z = this.pos.z; this.vel.z = 0; }
+            const canStep = ! this.flying && ! swim && this.vel.y <= 0.01;
+            const slide = ( axis ) => {
+                next[ axis ] += this.vel[ axis ] * dt;
+                if ( ! this.collides( next ) ) return;
+                if ( canStep ) {
+                    const stepped = next.clone().setY( next.y + 1.05 );
+                    if ( ! this.collides( stepped ) ) {
+                        let y = stepped.y;
+                        while ( y > next.y && ! this.collides( stepped.clone().setY( y - 0.05 ) ) ) y -= 0.05;
+                        next.y = y;
+                        return;
+                    }
+                }
+                next[ axis ] = this.pos[ axis ];
+                this.vel[ axis ] = 0;
+            };
+            slide( 'x' );
+            slide( 'z' );
+            const stood = next.y;
             next.y += this.vel.y * dt;
             if ( this.collides( next ) ) {
                 if ( this.vel.y < 0 ) this.grounded = true;
-                next.y = this.pos.y;
+                next.y = stood;
                 this.vel.y = 0;
             }
             if ( ! this.grounded && ! this.flying && ! swim && this.vel.y === 0 && this.collides( next.clone().setY( next.y - 0.05 ) ) ) this.grounded = true;
