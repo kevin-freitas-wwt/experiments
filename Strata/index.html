@@ -52,7 +52,10 @@
         <div class="sheet">
             <p class="eyebrow">survey // endless ground</p>
             <h1>Strata</h1>
-            <p>The land is made as you reach it. Each 16&times;16 column of the world is carved in a background worker from one seed, so the same word always grows the same continents, forests and seas. Climb and the ground coarsens into heightfield tiles, the sky thins to stars, and the same seed hangs five planets, an asteroid belt and a handful of ships overhead, each rendered in more detail the closer you fly.</p>
+            <details class="more">
+                <summary><span>An endless voxel world grown from one seed, with a small solar system above it.</span><i class="arrow" aria-hidden="true"></i></summary>
+                <p>Each 16&times;16 column of ground is carved in a background worker as you reach it, so the same word always grows the same continents, forests and seas. Climb and the ground coarsens into heightfield tiles, the sky thins to stars, and the same seed hangs five planets, an asteroid belt and a handful of ships overhead, each rendered in more detail the closer you fly.</p>
+            </details>
             <div class="field">
                 <label for="seed-input">seed</label>
                 <input id="seed-input" autocomplete="off" spellcheck="false">
@@ -76,6 +79,8 @@
                     <option value="32">every 32 m</option>
                 </select>
             </div>
+            <details class="more controls-wrap">
+                <summary><span>Controls</span><i class="arrow" aria-hidden="true"></i></summary>
             <dl class="controls">
                 <dt><kbd>E</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd></dt><dd>walk (or arrows)</dd>
                 <dt><kbd>Shift</kbd></dt><dd>sprint</dd>
@@ -85,6 +90,7 @@
                 <dt><kbd>B</kbd></dt><dd>breadcrumbs on/off, <kbd>X</kbd> clears the trail</dd>
                 <dt>mouse</dt><dd>look &middot; <kbd>Esc</kbd> releases</dd>
             </dl>
+            </details>
             <button id="enter">Set out</button>
             <p class="foot">Nothing is uploaded; there is no server.</p>
         </div>

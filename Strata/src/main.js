@@ -86,7 +86,9 @@ document.addEventListener( 'keydown', ( e ) => {
     if ( e.code === 'KeyX' ) crumbs.clear();
 } );
 document.getElementById( 'reroll' ).addEventListener( 'click', () => { seedInput.value = randomWord(); } );
-document.getElementById( 'radius' ).value = String( radius );
+const radiusSelect = document.getElementById( 'radius' );
+if ( ! [ ...radiusSelect.options ].some( ( o ) => o.value === String( radius ) ) ) radiusSelect.add( new Option( `custom (${radius} chunks)`, String( radius ) ) );
+radiusSelect.value = String( radius );
 document.getElementById( 'radius' ).addEventListener( 'change', ( e ) => {
     const q = new URLSearchParams( location.search );
     q.set( 'seed', seedInput.value.trim() || seedWord );
