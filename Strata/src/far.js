@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CHUNK, SEA } from './blocks.js';
-import { fineTileMat, coarseTileMat, oceanMat, fadeIn } from './materials.js';
+import { fineTileMat, midTileMat, coarseTileMat, oceanMat, fadeIn } from './materials.js';
 
 const N = 33;
 
@@ -87,7 +87,9 @@ export class FarField {
     constructor( scene, pool, seed, radius ) {
         const scale = radius / 8;
         this.fine = new Level( scene, pool, seed, 256, 3000 * scale, fineTileMat );
+        this.mid = new Level( scene, pool, seed, 1024, 12000 * scale, midTileMat );
         this.coarse = new Level( scene, pool, seed, 4096, 40000 * scale, coarseTileMat );
+        this.midCeiling = 30000;
         this.ringRadius = radius * CHUNK;
         this.fineCeiling = 9000;
         this.ocean = new THREE.Mesh( new THREE.RingGeometry( 1, 150000, 64, 60 ).rotateX( -Math.PI / 2 ), oceanMat );
@@ -97,21 +99,27 @@ export class FarField {
     }
 
     update( dt, pos, world ) {
-        const fe = fineTileMat.userData.edge, ce = coarseTileMat.userData.edge;
+        const fe = fineTileMat.userData.edge, me = midTileMat.userData.edge, ce = coarseTileMat.userData.edge;
         if ( world.center && world.chunks.size ) {
             fe.center.value.set( ( world.center.cx + 0.5 ) * CHUNK, ( world.center.cz + 0.5 ) * CHUNK );
             fe.r0.value = this.ringRadius - 48; fe.r1.value = this.ringRadius + 16;
         } else fe.r1.value = -1;
         const alt = pos.y - SEA;
         if ( alt < this.fineCeiling ) {
+            me.center.value.set( pos.x, pos.z );
+            me.r0.value = this.fine.range - 700; me.r1.value = this.fine.range - 100;
+        } else me.r1.value = -1;
+        if ( alt < this.midCeiling ) {
             ce.center.value.set( pos.x, pos.z );
-            ce.r0.value = this.fine.range - 700; ce.r1.value = this.fine.range - 100;
+            ce.r0.value = this.mid.range - 2500; ce.r1.value = this.mid.range - 500;
         } else ce.r1.value = -1;
         this.timer -= dt;
         if ( this.timer > 0 ) return;
         this.timer = 0.4;
         if ( alt < this.fineCeiling ) this.fine.update( pos.x, pos.z );
         else this.fine.clear();
+        if ( alt < this.midCeiling ) this.mid.update( pos.x, pos.z );
+        else this.mid.clear();
         this.coarse.update( pos.x, pos.z );
         this.ocean.position.x = pos.x; this.ocean.position.z = pos.z;
         this.cull( world );
@@ -126,17 +134,21 @@ export class FarField {
                 if ( ! world.chunks.has( `${t.tx * per + cx},${t.tz * per + cz}` ) ) { covered = false; break; }
             t.mesh.visible = ! covered;
         }
-        const ratio = this.coarse.size / this.fine.size;
-        for ( const t of this.coarse.tiles.values() ) {
-            if ( ! t.mesh ) continue;
-            let covered = true;
-            for ( let fx = 0; fx < ratio && covered; fx++ ) for ( let fz = 0; fz < ratio; fz++ )
-                if ( ! this.fine.has( t.tx * ratio + fx, t.tz * ratio + fz ) ) { covered = false; break; }
-            t.mesh.visible = ! covered;
-        }
+        const coveredBy = ( level, finer ) => {
+            const ratio = level.size / finer.size;
+            for ( const t of level.tiles.values() ) {
+                if ( ! t.mesh ) continue;
+                let covered = true;
+                for ( let fx = 0; fx < ratio && covered; fx++ ) for ( let fz = 0; fz < ratio; fz++ )
+                    if ( ! finer.has( t.tx * ratio + fx, t.tz * ratio + fz ) ) { covered = false; break; }
+                t.mesh.visible = ! covered;
+            }
+        };
+        coveredBy( this.mid, this.fine );
+        coveredBy( this.coarse, this.mid );
     }
 
     get stats() {
-        return { fine: this.fine.count, coarse: this.coarse.count };
+        return { fine: this.fine.count, coarse: this.mid.count + this.coarse.count };
     }
 }

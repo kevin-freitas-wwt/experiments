@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SEA, CHUNK, isLiquid } from './blocks.js';
+import { SEA, isLiquid } from './blocks.js';
 
 const KEYS = { fwd: [ 'KeyE', 'ArrowUp' ], back: [ 'KeyD', 'ArrowDown' ], left: [ 'KeyS', 'ArrowLeft' ], right: [ 'KeyF', 'ArrowRight' ], up: [ 'KeyA' ], down: [ 'KeyZ' ] };
 
@@ -96,12 +96,21 @@ export class Player {
     }
 
     get inSpace() {
-        return this.shell === this.home && ( this.pos.y > 400 || Math.hypot( this.pos.x, this.pos.z ) > this.world.radius * CHUNK + 200 );
+        return this.shell === this.home && this.pos.y > 400;
+    }
+
+    unstick() {
+        if ( ! this.collides( this.pos ) ) return;
+        for ( let dy = 0.25; dy <= 64; dy += 0.25 ) {
+            if ( ! this.collides( this.pos.clone().setY( this.pos.y + dy ) ) ) { this.pos.y += dy; this.vel.y = Math.max( 0, this.vel.y ); return; }
+        }
     }
 
     step( dt, space ) {
         const high = this.inSpace;
-        if ( ! high && ! this.world.loaded( this.pos.x, this.pos.z ) ) return;
+        const ghost = ! high && ! this.world.loaded( this.pos.x, this.pos.z );
+        if ( ghost && ! this.flying ) return;
+        if ( ! high && ! ghost ) this.unstick();
         if ( high && ! this.flying ) this.vel.y = Math.max( this.vel.y, -60 );
         const run = this.any( [ 'ShiftLeft', 'ShiftRight' ] );
         const swim = this.inWater() && ! this.flying;
@@ -141,9 +150,9 @@ export class Player {
 
         this.grounded = false;
         const next = this.pos.clone();
-        if ( high ) {
+        if ( high || ghost ) {
             next.addScaledVector( this.vel, dt );
-            if ( space && space.resolve( next ) ) this.vel.set( 0, 0, 0 );
+            if ( high && space && space.resolve( next ) ) this.vel.set( 0, 0, 0 );
         } else {
             const canStep = ! this.flying && ! swim && this.vel.y <= 0.01;
             const slide = ( axis ) => {

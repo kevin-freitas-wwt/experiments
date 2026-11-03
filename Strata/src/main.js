@@ -276,7 +276,7 @@ function frame() {
     const dt = Math.min( 0.05, timer.getDelta() );
     const worldPos = player.worldPos;
     const alt = worldPos.y - SEA;
-    if ( ! spawned || ( player.shell === home && ! player.inSpace ) ) world.update( player.pos.x, player.pos.z );
+    if ( ! spawned || ( player.shell === home && player.pos.y < 700 ) ) world.update( player.pos.x, player.pos.z );
     world.absorb( 3 );
     if ( player.shell.planet || player.shell.interior ) { player.world.update( player.pos.x, player.pos.z ); player.world.absorb( 4 ); }
     if ( player.shell === home ) homePos.copy( worldPos );
