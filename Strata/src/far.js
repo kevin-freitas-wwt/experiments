@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CHUNK, SEA } from './blocks.js';
-import { tileMat, oceanMat } from './materials.js';
+import { fineTileMat, coarseTileMat, oceanMat, fadeIn } from './materials.js';
 
 const N = 33;
 
@@ -16,8 +16,8 @@ function gridIndex() {
 }
 
 class Level {
-    constructor( scene, pool, seed, size, range ) {
-        this.scene = scene; this.pool = pool; this.seed = seed;
+    constructor( scene, pool, seed, size, range, material ) {
+        this.scene = scene; this.pool = pool; this.seed = seed; this.material = material;
         this.size = size; this.step = size / ( N - 1 ); this.range = range;
         this.tiles = new Map();
         this.index = gridIndex();
@@ -59,8 +59,9 @@ class Level {
         g.setIndex( this.index );
         g.computeVertexNormals();
         g.computeBoundingSphere();
-        const m = new THREE.Mesh( g, tileMat );
+        const m = new THREE.Mesh( g, this.material );
         m.position.set( data.x0, 0, data.z0 );
+        fadeIn( m, 0.8 );
         t.mesh = m;
         this.scene.add( m );
     }
@@ -85,8 +86,9 @@ class Level {
 export class FarField {
     constructor( scene, pool, seed, radius ) {
         const scale = radius / 8;
-        this.fine = new Level( scene, pool, seed, 256, 3000 * scale );
-        this.coarse = new Level( scene, pool, seed, 4096, 40000 * scale );
+        this.fine = new Level( scene, pool, seed, 256, 3000 * scale, fineTileMat );
+        this.coarse = new Level( scene, pool, seed, 4096, 40000 * scale, coarseTileMat );
+        this.ringRadius = radius * CHUNK;
         this.fineCeiling = 9000;
         this.ocean = new THREE.Mesh( new THREE.RingGeometry( 1, 150000, 64, 60 ).rotateX( -Math.PI / 2 ), oceanMat );
         this.ocean.position.y = SEA - 14;
@@ -95,10 +97,19 @@ export class FarField {
     }
 
     update( dt, pos, world ) {
+        const fe = fineTileMat.userData.edge, ce = coarseTileMat.userData.edge;
+        if ( world.center && world.chunks.size ) {
+            fe.center.value.set( ( world.center.cx + 0.5 ) * CHUNK, ( world.center.cz + 0.5 ) * CHUNK );
+            fe.r0.value = this.ringRadius - 48; fe.r1.value = this.ringRadius + 16;
+        } else fe.r1.value = -1;
+        const alt = pos.y - SEA;
+        if ( alt < this.fineCeiling ) {
+            ce.center.value.set( pos.x, pos.z );
+            ce.r0.value = this.fine.range - 700; ce.r1.value = this.fine.range - 100;
+        } else ce.r1.value = -1;
         this.timer -= dt;
         if ( this.timer > 0 ) return;
         this.timer = 0.4;
-        const alt = pos.y - SEA;
         if ( alt < this.fineCeiling ) this.fine.update( pos.x, pos.z );
         else this.fine.clear();
         this.coarse.update( pos.x, pos.z );

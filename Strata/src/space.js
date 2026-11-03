@@ -1,16 +1,18 @@
 import * as THREE from 'three';
 import { hash2 } from './noise.js';
-import { bodyMat, rockMat } from './materials.js';
+import { bodyMat, rockMat, fadeIn } from './materials.js';
+import { KINDS as SURFACE, surfaceAt } from './planet.js';
 
 const KINDS = [ 'gas', 'lush', 'icy', 'rocky', 'ember' ];
 const NAMES = [ 'Oriel', 'Tamsin', 'Halvard', 'Nerys', 'Cordan', 'Ilse', 'Brannoc', 'Sable', 'Ysolde', 'Marrow' ];
-const DETAILS = [ 2, 4, 6 ];
+const DETAILS = [ 2, 4, 6, 7 ];
+const PATCH_N = 97;
 
 const rimMaterial = ( color ) => new THREE.ShaderMaterial( {
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    uniforms: { tint: { value: new THREE.Color( color ) } },
+    uniforms: { tint: { value: new THREE.Color( color ) }, fade: { value: 1 } },
     vertexShader: '#include <common>\n#include <logdepthbuf_pars_vertex>\nvarying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix * vec4( position, 1.0 ); vN = normalize( normalMatrix * normal ); vV = normalize( -mv.xyz ); gl_Position = projectionMatrix * mv;\n#include <logdepthbuf_vertex>\n}',
-    fragmentShader: '#include <common>\n#include <logdepthbuf_pars_fragment>\nuniform vec3 tint; varying vec3 vN; varying vec3 vV; void main(){\n#include <logdepthbuf_fragment>\nfloat f = pow( 1.0 - max( 0.0, dot( vN, vV ) ), 3.0 ); gl_FragColor = vec4( tint, f * 0.9 ); }',
+    fragmentShader: '#include <common>\n#include <logdepthbuf_pars_fragment>\nuniform vec3 tint; uniform float fade; varying vec3 vN; varying vec3 vV; void main(){\n#include <logdepthbuf_fragment>\nfloat f = pow( 1.0 - max( 0.0, dot( vN, vV ) ), 3.0 ); gl_FragColor = vec4( tint, f * 0.9 * fade ); }',
 } );
 
 function glowTexture() {
@@ -54,10 +56,13 @@ export class Space {
             group.position.copy( pos );
             const mesh = new THREE.Mesh( new THREE.IcosahedronGeometry( radius, 1 ), bodyMat );
             group.add( mesh );
-            const body = { i, kind, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: 0.004 + this.rnd( i, 5 ) * 0.01 };
+            const body = { i, kind, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: 0.004 + this.rnd( i, 5 ) * 0.01, seed: this.seed + i * 17, patch: null, patchWant: 0 };
             if ( kind !== 'rocky' && kind !== 'ember' ) {
-                const rim = new THREE.Mesh( new THREE.SphereGeometry( radius * 1.045, 48, 32 ), rimMaterial( gas ? 0xf0cc8a : kind === 'icy' ? 0xbfe0ff : 0x7fb4ff ) );
+                const shellR = gas ? radius * 1.045 : radius * ( 1 + SURFACE[ kind ].amp * 2 ) * 1.015;
+                const rim = new THREE.Mesh( new THREE.SphereGeometry( shellR, 48, 32 ), rimMaterial( gas ? 0xf0cc8a : kind === 'icy' ? 0xbfe0ff : 0x7fb4ff ) );
+                rim.userData.shellR = shellR;
                 group.add( rim );
+                body.rim = rim;
             }
             if ( gas ) {
                 const ring = new THREE.Mesh( new THREE.RingGeometry( radius * 1.5, radius * 2.4, 128 ), new THREE.MeshBasicMaterial( { color: 0xd9c7a6, side: THREE.DoubleSide, transparent: true, opacity: 0.42, depthWrite: false } ) );
@@ -73,9 +78,9 @@ export class Space {
     }
 
     requestBody( body, level ) {
-        if ( body.want === level || body.geos.has( level ) ) { this.applyBody( body, level ); return; }
         body.want = level;
-        this.pool.submit( { type: 'body', kind: body.kind, radius: body.radius, detail: DETAILS[ level ], seed: this.seed + body.i * 17, level, i: body.i }, { priority: 50 - level * 10, tag: 'body' } )
+        if ( body.geos.has( level ) ) { this.applyBody( body, level ); return; }
+        this.pool.submit( { type: 'body', kind: body.kind, radius: body.radius, detail: DETAILS[ level ], seed: body.seed, level, i: body.i }, { priority: 50 - level * 10, tag: 'body' } )
             .then( ( data ) => {
                 const g = new THREE.BufferGeometry();
                 g.setAttribute( 'position', new THREE.BufferAttribute( data.pos, 3 ) );
@@ -91,9 +96,48 @@ export class Space {
     applyBody( body, level ) {
         const g = body.geos.get( level );
         if ( ! g || body.level === level ) return;
-        if ( body.level < 0 ) body.mesh.geometry.dispose();
-        body.mesh.geometry = g;
+        const old = body.mesh, first = body.level < 0;
+        const next = new THREE.Mesh( g, bodyMat );
+        body.group.add( next );
+        body.mesh = next;
         body.level = level;
+        if ( first ) { body.group.remove( old ); old.geometry.dispose(); return; }
+        fadeIn( next, 0.7, () => body.group.remove( old ) );
+    }
+
+    surfaceRadius( body, worldPos ) {
+        const local = body.group.worldToLocal( worldPos.clone() ).normalize();
+        return surfaceAt( body.kind, SURFACE[ body.kind ], local.toArray(), body.seed, body.radius, 6 ).r;
+    }
+
+    updatePatch( body, camPos ) {
+        const d = camPos.distanceTo( body.pos ), alt = Math.max( 0, d - this.surfaceRadius( body, camPos ) );
+        const wantPatch = d / body.radius < 1.6 * this.scale && body.kind !== 'gas';
+        if ( ! wantPatch ) {
+            if ( body.patch ) { body.group.remove( body.patch ); body.patch.geometry.dispose(); body.patch = null; }
+            return;
+        }
+        const local = body.group.worldToLocal( camPos.clone() ).normalize();
+        const ang = Math.min( 0.5, Math.max( 0.025, alt / body.radius * 2.2 + 0.015 ) );
+        const p = body.patch;
+        if ( p && p.userData.center.angleTo( local ) < p.userData.ang * 0.35 && Math.abs( Math.log( ang / p.userData.ang ) ) < 0.3 ) return;
+        const stamp = ++body.patchWant;
+        this.pool.submit( { type: 'patch', kind: body.kind, radius: body.radius, seed: body.seed, center: local.toArray(), ang, n: PATCH_N }, { priority: 1, tag: 'patch' } ).then( ( data ) => {
+            if ( stamp !== body.patchWant ) return;
+            const g = new THREE.BufferGeometry();
+            g.setAttribute( 'position', new THREE.BufferAttribute( data.pos, 3 ) );
+            g.setAttribute( 'color', new THREE.BufferAttribute( data.col, 3, true ) );
+            g.setIndex( new THREE.BufferAttribute( data.idx, 1 ) );
+            g.computeVertexNormals();
+            g.computeBoundingSphere();
+            const m = new THREE.Mesh( g, bodyMat );
+            m.userData.center = local.clone();
+            m.userData.ang = ang;
+            const old = body.patch;
+            body.patch = m;
+            body.group.add( m );
+            fadeIn( m, 0.5, () => { if ( old ) { body.group.remove( old ); old.geometry.dispose(); } } );
+        } );
     }
 
     makeRocks() {
@@ -183,7 +227,9 @@ export class Space {
     resolve( pos ) {
         let hit = null;
         for ( const b of this.bodies ) {
-            const r = b.radius * 1.03 + 2, d = pos.distanceTo( b.pos );
+            const d = pos.distanceTo( b.pos );
+            if ( d > b.radius * 1.4 ) continue;
+            const r = ( b.kind === 'gas' ? b.radius * 1.02 : this.surfaceRadius( b, pos ) ) + 2;
             if ( d < r ) { pos.sub( b.pos ).setLength( r ).add( b.pos ); hit = b; }
         }
         return hit;
@@ -192,10 +238,23 @@ export class Space {
     nearest( pos ) {
         let best = null;
         for ( const b of this.bodies ) {
-            const d = pos.distanceTo( b.pos ) - b.radius;
+            let d = pos.distanceTo( b.pos ) - b.radius;
+            if ( d < b.radius * 0.4 && b.kind !== 'gas' ) d = pos.distanceTo( b.pos ) - this.surfaceRadius( b, pos );
             if ( ! best || d < best.d ) best = { name: b.name, kind: b.kind, d };
         }
         return best;
+    }
+
+    nearestRock( pos ) {
+        let best = null;
+        for ( const r of this.rocks ) { const d = r.pos.distanceTo( pos ); if ( ! best || d < best.d ) best = { rock: r, d }; }
+        return best.rock;
+    }
+
+    nearestShip( pos ) {
+        let best = null;
+        for ( const s of this.ships ) { const d = s.group.position.distanceTo( pos ); if ( ! best || d < best.d ) best = { ship: s, d }; }
+        return best.ship;
     }
 
     update( dt, camPos, space ) {
@@ -203,7 +262,10 @@ export class Space {
         this.stars.position.copy( camPos );
         this.sun.position.copy( camPos ).addScaledVector( this.sunDir, 200000 );
         this.sun.material.opacity = 0.35 + space * 0.65;
-        for ( const b of this.bodies ) b.group.rotation.y += b.spin * dt;
+        for ( const b of this.bodies ) {
+            b.group.rotation.y += b.spin * dt;
+            if ( b.rim ) b.rim.material.uniforms.fade.value = Math.min( 1, Math.max( 0, ( camPos.distanceTo( b.pos ) - b.rim.userData.shellR ) / ( b.radius * 0.4 ) ) );
+        }
         for ( const s of this.ships ) {
             s.angle += s.omega * dt;
             const h = s.host;
@@ -220,9 +282,10 @@ export class Space {
         if ( this.timer > 0 ) return;
         this.timer = 0.5;
         for ( const b of this.bodies ) {
-            const d = camPos.distanceTo( b.pos ) / b.radius;
-            const level = d < 7 * this.scale ? 2 : d < 30 * this.scale ? 1 : 0;
-            if ( level !== b.level ) this.requestBody( b, level );
+            const d = camPos.distanceTo( b.pos ) / b.radius, sc = Math.max( 0.75, this.scale );
+            const level = d < 3 * sc ? 3 : d < 7 * sc ? 2 : d < 30 * sc ? 1 : 0;
+            if ( level !== b.level && level !== b.want ) this.requestBody( b, level );
+            this.updatePatch( b, camPos );
         }
         const nearR = 4000 * this.scale;
         const dummy = new THREE.Object3D();
@@ -243,6 +306,7 @@ export class Space {
                     r.mesh.position.copy( r.pos );
                     r.mesh.scale.setScalar( r.voxel );
                     this.scene.add( r.mesh );
+                    fadeIn( r.mesh, 0.5 );
                 } );
             } else if ( d > nearR * 2 && r.want ) {
                 r.want = false;

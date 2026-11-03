@@ -29,9 +29,9 @@ The main thread keeps a ring of chunks around the player, installs at most three
 
 ## Space
 
-Past 1.5 km the sky thins to black and stars fade in. The same seed places five planets (gas giant with rings, lush, icy, rocky, ember) 36 to 110 km out, each an icosphere displaced and coloured by 3D noise in a worker at three detail levels (320, 5,120 and 81,920 triangles) chosen by distance over radius. 110 asteroids, 80 of them in the gas giant's ring plane, are low-poly instances until you come within a few kilometres, when each is generated as a voxel blob and meshed with the same ambient-occlusion mesher as the ground. Ten procedural voxel ships (mirrored random hulls with an engine glow) orbit the inner planets.
+Past 1.5 km the sky thins to black and stars fade in. The same seed places five planets (gas giant with rings, lush, icy, rocky, ember) 36 to 110 km out, each an icosphere displaced and coloured by 3D noise in a worker at four detail levels (320 to 327,680 triangles) chosen by distance over radius, and within 1.6 radii a 97×97 high-resolution patch of the same surface function is regenerated under you as you move, so the ground keeps resolving down to a few metres per cell. Collision uses the real surface height, so you can land. Detail changes everywhere cross-fade with hashed alpha rather than popping, and the seams between voxel ring, fine tiles and coarse tiles are dithered over a band rather than cut. 110 asteroids, 80 of them in the gas giant's ring plane, are low-poly instances until you come within a few kilometres, when each is generated as a voxel blob and meshed with the same ambient-occlusion mesher as the ground. Ten procedural voxel ships (mirrored random hulls with an engine glow) orbit the inner planets.
 
-Flight speed scales with clearance: 14 m/s on the deck, growing by that much again for every 120 m of height or distance to the nearest planet surface, up to 9 km/s (`Shift` triples it). Space is under a minute away and the same rule slows you down again on approach, so you can land on a planet without overshooting; planets are solid, nothing else is. Movement on the ground is a swept AABB (axis-aligned bounding box) against the block grid: `E S D F` to walk, `Shift` to sprint, `A` to jump or rise, `Z` to descend, `V` to toggle flight. `B` turns on breadcrumbs, bright red dots dropped every few metres (spacing from the start card or `?crumb=`) so a route can be retraced; `X` clears them.
+Flight speed scales with clearance: 14 m/s on the deck, growing by that much again for every 120 m of height or distance to the nearest planet surface, up to 9 km/s (`Shift` triples it). Space is under a minute away and the same rule slows you down again on approach, so you can land on a planet without overshooting; planets are solid, nothing else is. Movement on the ground is a swept AABB (axis-aligned bounding box) against the block grid: `E S D F` to walk, `Shift` to sprint, `A` to jump or rise, `Z` to descend, `V` to toggle flight. `B` turns on breadcrumbs, bright red dots dropped every few metres (spacing from the start card or `?crumb=`) so a route can be retraced; `X` clears them. `1` to `5` jump to a planet, `6` to the nearest asteroid, `7` to the nearest ship and `0` home; the same list sits under Travel on the start card.
 
 ## Palette
 
@@ -47,8 +47,9 @@ Woodblock-print tones: Prussian-blue water, cream mist on the horizon, ochre san
 | `src/pool.js` | priority worker pool shared by everything below |
 | `src/world.js` | chunk ring, block queries |
 | `src/far.js` | heightfield tile levels and the sea disc |
-| `src/space.js` | planets, asteroids, ships, stars, sun, planet collision |
-| `src/materials.js` | shared materials and the horizon-curvature shader patch |
+| `src/planet.js` | planet surface function shared by worker (meshes) and main thread (collision) |
+| `src/space.js` | planets, LOD and near-surface patches, asteroids, ships, stars, sun |
+| `src/materials.js` | shared materials, horizon-curvature and edge-dither shader patch, hashed-alpha fade-ins |
 | `src/player.js` | input, physics, camera |
 | `src/crumbs.js` | breadcrumb trail (one InstancedMesh, unfogged so it reads at distance) |
 | `src/main.js` | scene, sky, lights, HUD, URL parameters |

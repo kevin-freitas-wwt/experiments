@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CHUNK, HEIGHT, AIR, isSolid } from './blocks.js';
-import { solidMat, waterMat } from './materials.js';
+import { solidMat, waterMat, fadeIn } from './materials.js';
 
 const key = ( cx, cz ) => `${cx},${cz}`;
 
@@ -62,7 +62,9 @@ export class World {
             g.setAttribute( 'normal', new THREE.BufferAttribute( part.nrm, 3, true ) );
             g.setIndex( new THREE.BufferAttribute( part.idx, 1 ) );
             g.computeBoundingSphere();
-            group.add( new THREE.Mesh( g, mat ) );
+            const m = new THREE.Mesh( g, mat );
+            if ( mat === solidMat && this.center && ( Math.abs( data.cx - this.center.cx ) > 1 || Math.abs( data.cz - this.center.cz ) > 1 ) ) fadeIn( m );
+            group.add( m );
         }
         this.scene.add( group );
         this.chunks.set( k, { cx: data.cx, cz: data.cz, group, blocks: data.blocks, biomes: data.biomes } );

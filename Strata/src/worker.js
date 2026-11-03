@@ -1,4 +1,5 @@
 import { fbm, ridged, hash2, fbm3, hash3 } from './noise.js';
+import { KINDS, surfaceAt } from './planet.js';
 import { AIR, STONE, DIRT, GRASS, SAND, WATER, SNOW, LOG, LEAF, NEEDLE, GRAVEL, TUNDRA, CLAY,
     CHUNK, HEIGHT, SEA, PALETTE, isSolid } from './blocks.js';
 
@@ -262,40 +263,50 @@ function icosphere( detail ) {
     return { verts, faces };
 }
 
-const mix = ( a, b, t ) => a.map( ( c, i ) => c + ( b[ i ] - c ) * t );
-
-const KINDS = {
-    rocky:  { amp: 0.06, freq: 2.2, low: [ 0x6a, 0x5a, 0x50 ], mid: [ 0xa8, 0x8a, 0x6c ], high: [ 0xd8, 0xc6, 0xb0 ], sea: null },
-    lush:   { amp: 0.04, freq: 2.6, low: [ 0x3f, 0x6e, 0x45 ], mid: [ 0x8a, 0x9a, 0x5c ], high: [ 0xe8, 0xe4, 0xd8 ], sea: [ 0x2b, 0x4a, 0x7c ], seaLevel: 0.1 },
-    icy:    { amp: 0.03, freq: 3.0, low: [ 0x9c, 0xb4, 0xc4 ], mid: [ 0xdd, 0xe8, 0xee ], high: [ 0xff, 0xff, 0xff ], sea: [ 0x7a, 0x9a, 0xb4 ], seaLevel: -0.2 },
-    ember:  { amp: 0.07, freq: 2.0, low: [ 0xc8, 0x40, 0x2e ], mid: [ 0x3a, 0x2c, 0x2a ], high: [ 0x6a, 0x5c, 0x58 ], sea: [ 0xe0, 0x5a, 0x24 ], seaLevel: -0.3 },
-    gas:    { amp: 0.0, freq: 1, low: [ 0xe2, 0xbf, 0x86 ], mid: [ 0xf1, 0xe4, 0xcc ], high: [ 0xc9, 0x8e, 0x6a ], sea: null },
-};
-
 function body( { kind, radius, detail, seed } ) {
     const k = KINDS[ kind ], { verts, faces } = icosphere( detail );
     const pos = new Float32Array( verts.length * 3 ), col = new Uint8Array( verts.length * 3 );
+    const octaves = detail >= 6 ? 6 : 5;
     verts.forEach( ( v, i ) => {
-        let e = k.amp ? fbm3( v[ 0 ] * k.freq + 10, v[ 1 ] * k.freq, v[ 2 ] * k.freq, seed, 5 ) : 0;
-        if ( kind === 'rocky' ) e -= 0.08 * Math.max( 0, 1 - 30 * Math.abs( fbm3( v[ 0 ] * 5, v[ 1 ] * 5, v[ 2 ] * 5, seed + 3, 2 ) ) );
-        const wet = k.sea && e < k.seaLevel;
-        const r = radius * ( 1 + ( wet ? k.seaLevel : e ) * k.amp * 4 );
+        const { r, rgb } = surfaceAt( kind, k, v, seed, radius, octaves );
         pos[ i * 3 ] = v[ 0 ] * r; pos[ i * 3 + 1 ] = v[ 1 ] * r; pos[ i * 3 + 2 ] = v[ 2 ] * r;
-        let rgb;
-        if ( kind === 'gas' ) {
-            const band = fbm( v[ 1 ] * 9 + fbm3( v[ 0 ] * 3, v[ 1 ] * 3, v[ 2 ] * 3, seed, 3 ) * 1.5, 0.5, seed + 9, 3 );
-            rgb = band > 0.2 ? k.low : band < -0.2 ? k.high : k.mid;
-        } else if ( wet ) rgb = k.sea;
-        else {
-            const t = Math.min( 1, Math.max( 0, ( e + 0.5 ) ) );
-            rgb = t < 0.5 ? mix( k.low, k.mid, t * 2 ) : mix( k.mid, k.high, ( t - 0.5 ) * 2 );
-            if ( kind !== 'icy' && Math.abs( v[ 1 ] ) > 0.86 + e * 0.3 ) rgb = [ 0xee, 0xee, 0xf4 ];
-        }
         const j = 0.96 + hash3( i, detail, 0, seed ) * 0.08;
         col[ i * 3 ] = rgb[ 0 ] * j; col[ i * 3 + 1 ] = rgb[ 1 ] * j; col[ i * 3 + 2 ] = rgb[ 2 ] * j;
     } );
     const idx = new Uint32Array( faces.length * 3 );
     faces.forEach( ( f, i ) => idx.set( f, i * 3 ) );
+    return { pos, col, idx };
+}
+
+function patch( { kind, radius, seed, center, ang, n } ) {
+    const k = KINDS[ kind ];
+    const c = center, len = Math.hypot( ...c );
+    const cn = c.map( ( x ) => x / len );
+    const ref = Math.abs( cn[ 1 ] ) < 0.9 ? [ 0, 1, 0 ] : [ 1, 0, 0 ];
+    const u = [ cn[ 1 ] * ref[ 2 ] - cn[ 2 ] * ref[ 1 ], cn[ 2 ] * ref[ 0 ] - cn[ 0 ] * ref[ 2 ], cn[ 0 ] * ref[ 1 ] - cn[ 1 ] * ref[ 0 ] ];
+    const ul = Math.hypot( ...u ); u.forEach( ( x, i ) => u[ i ] = x / ul );
+    const w = [ cn[ 1 ] * u[ 2 ] - cn[ 2 ] * u[ 1 ], cn[ 2 ] * u[ 0 ] - cn[ 0 ] * u[ 2 ], cn[ 0 ] * u[ 1 ] - cn[ 1 ] * u[ 0 ] ];
+    const pos = new Float32Array( n * n * 3 ), col = new Uint8Array( n * n * 3 );
+    const t = Math.tan( ang ), skirt = radius * ang * 0.08;
+    let i = 0;
+    for ( let gy = 0; gy < n; gy++ ) for ( let gx = 0; gx < n; gx++ ) {
+        const a = ( gx / ( n - 1 ) * 2 - 1 ) * t, b = ( gy / ( n - 1 ) * 2 - 1 ) * t;
+        const d = [ cn[ 0 ] + u[ 0 ] * a + w[ 0 ] * b, cn[ 1 ] + u[ 1 ] * a + w[ 1 ] * b, cn[ 2 ] + u[ 2 ] * a + w[ 2 ] * b ];
+        const dl = Math.hypot( ...d ); d.forEach( ( x, j ) => d[ j ] = x / dl );
+        const { r, rgb } = surfaceAt( kind, k, d, seed, radius, 8 );
+        const rim = ( gx === 0 || gy === 0 || gx === n - 1 || gy === n - 1 ) ? skirt : -0.4;
+        const rr = r - rim;
+        pos[ i * 3 ] = d[ 0 ] * rr; pos[ i * 3 + 1 ] = d[ 1 ] * rr; pos[ i * 3 + 2 ] = d[ 2 ] * rr;
+        const j = 0.95 + hash3( gx, gy, Math.round( ang * 1000 ), seed ) * 0.1;
+        col[ i * 3 ] = rgb[ 0 ] * j; col[ i * 3 + 1 ] = rgb[ 1 ] * j; col[ i * 3 + 2 ] = rgb[ 2 ] * j;
+        i++;
+    }
+    const idx = new Uint32Array( ( n - 1 ) * ( n - 1 ) * 6 );
+    let q = 0;
+    for ( let gy = 0; gy < n - 1; gy++ ) for ( let gx = 0; gx < n - 1; gx++ ) {
+        const a0 = gy * n + gx, b0 = a0 + 1, c0 = a0 + n, d0 = c0 + 1;
+        idx.set( [ a0, b0, c0, b0, d0, c0 ], q ); q += 6;
+    }
     return { pos, col, idx };
 }
 
@@ -353,6 +364,7 @@ self.onmessage = ( { data } ) => {
     const { type } = data;
     if ( type === 'tile' ) { const t = tile( data ); return self.postMessage( { ...data, ...t }, buffersOf( t ) ); }
     if ( type === 'body' ) { const b = body( data ); return self.postMessage( { ...data, ...b }, buffersOf( b ) ); }
+    if ( type === 'patch' ) { const b = patch( data ); return self.postMessage( { ...data, ...b }, buffersOf( b ) ); }
     if ( type === 'rock' ) { const r = rock( data ); return self.postMessage( { ...data, ...r }, buffersOf( r ) ); }
     if ( type === 'ship' ) { const r = ship( data ); return self.postMessage( { ...data, ...r }, buffersOf( r ) ); }
     const { cx, cz, seed } = data;
