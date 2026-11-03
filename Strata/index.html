@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Strata</title>
+    <meta name="description" content="An endless voxel landscape generated chunk by chunk as you walk: seeded continents, biomes, forests and seas, built in workers with no build step.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="experiments by Kevin">
+    <meta property="og:title" content="Strata">
+    <meta property="og:description" content="An endless voxel landscape generated chunk by chunk as you walk: seeded continents, biomes, forests and seas, built in workers with no build step.">
+    <meta property="og:url" content="https://kevin-freitas-wwt.github.io/experiments/Strata/">
+    <meta property="og:image" content="https://kevin-freitas-wwt.github.io/experiments/Strata/thumb.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Strata">
+    <meta name="twitter:description" content="An endless voxel landscape generated chunk by chunk as you walk.">
+    <meta name="twitter:image" content="https://kevin-freitas-wwt.github.io/experiments/Strata/thumb.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./src/style.css" />
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js"
+        }
+    }
+    </script>
+</head>
+<body>
+    <canvas id="view"></canvas>
+    <div id="tint" aria-hidden="true"></div>
+    <div id="crosshair" aria-hidden="true"></div>
+
+    <div id="stamp-block" aria-hidden="true">
+        <div id="seed-stamp"></div>
+        <div id="seed"></div>
+    </div>
+
+    <dl id="hud" aria-live="off">
+        <dt class="k">above sea</dt><dd class="v" id="alt">–</dd>
+        <dt class="k">terrain</dt><dd class="v" id="biome">–</dd>
+        <dt class="k">position</dt><dd class="v" id="coord">–</dd>
+        <dt class="k">chunks</dt><dd class="v" id="chunks">–</dd>
+        <dt class="k">mode</dt><dd class="v" id="mode">–</dd>
+    </dl>
+
+    <div id="overlay">
+        <div class="sheet">
+            <p class="eyebrow">survey // endless ground</p>
+            <h1>Strata</h1>
+            <p>The land is made as you reach it. Each 16&times;16 column of the world is carved in a background worker from one seed, so the same word always grows the same continents, forests and seas, in any direction, for as long as you care to walk.</p>
+            <div class="field">
+                <label for="seed-input">seed</label>
+                <input id="seed-input" autocomplete="off" spellcheck="false">
+                <button id="reroll" type="button">new</button>
+            </div>
+            <div class="field">
+                <label for="radius">view distance</label>
+                <select id="radius">
+                    <option value="6">near (6 chunks)</option>
+                    <option value="8">mid (8 chunks)</option>
+                    <option value="11">far (11 chunks)</option>
+                    <option value="14">horizon (14 chunks)</option>
+                </select>
+            </div>
+            <dl class="controls">
+                <dt><kbd data-key="W" data-esdf="E">W</kbd><kbd data-key="A" data-esdf="S">A</kbd><kbd data-key="S" data-esdf="D">S</kbd><kbd data-key="D" data-esdf="F">D</kbd></dt><dd>walk (or arrows)</dd>
+                <dt><kbd>Shift</kbd></dt><dd>run</dd>
+                <dt><kbd>Space</kbd></dt><dd>jump, or rise when flying or swimming</dd>
+                <dt><kbd>V</kbd></dt><dd>toggle flight, <kbd>C</kbd> to descend</dd>
+                <dt>mouse</dt><dd>look &middot; <kbd>Esc</kbd> releases</dd>
+            </dl>
+            <button id="enter">Set out</button>
+            <p class="foot">Add <code>?keys=esdf</code> for an ESDF layout. Nothing is uploaded; there is no server.</p>
+        </div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html>
