@@ -1,7 +1,7 @@
 import { fbm, ridged, hash2, fbm3, hash3 } from './noise.js';
 import { KINDS, surfaceAt } from './planet.js';
-import { AIR, STONE, DIRT, GRASS, SAND, WATER, SNOW, LOG, LEAF, NEEDLE, GRAVEL, TUNDRA, CLAY,
-    CHUNK, HEIGHT, SEA, PALETTE, isSolid } from './blocks.js';
+import { AIR, STONE, DIRT, GRASS, SAND, WATER, SNOW, LOG, LEAF, NEEDLE, GRAVEL, TUNDRA, CLAY, ICE, BASALT, LAVA, RUST,
+    CHUNK, HEIGHT, SEA, PALETTE, isSolid, isLiquid } from './blocks.js';
 
 const PAD = 3, P = CHUNK + PAD * 2;
 
@@ -48,11 +48,38 @@ function surface( biome, depth, x, z, seed ) {
         case 6: return depth === 0 ? TUNDRA : DIRT;
         case 7: return depth === 0 && hash2( x, z, seed + 5 ) < 0.25 ? TUNDRA : STONE;
         case 8: return depth === 0 ? SNOW : STONE;
+        case 9: return depth === 0 ? ( hash2( x, z, seed + 7 ) < 0.3 ? RUST : BASALT ) : BASALT;
+        case 10: return depth === 0 ? SNOW : ICE;
+        case 11: return BASALT;
+        case 12: return ICE;
     }
     return STONE;
 }
 
-const DENSITY = [ 0, 0, 0.007, 0.08, 0.004, 0.001, 0.05, 0.012, 0 ];
+const BASE = 64;
+
+function planetColumn( t ) {
+    const k = KINDS[ t.planet ];
+    const seaR = k.sea ? t.radius * ( 1 + k.seaLevel * k.amp * 4 ) : -1;
+    const { up, u, w } = t;
+    return ( x, z, seed ) => {
+        const d = [ up[ 0 ] * t.radius + u[ 0 ] * x + w[ 0 ] * z, up[ 1 ] * t.radius + u[ 1 ] * x + w[ 1 ] * z, up[ 2 ] * t.radius + u[ 2 ] * x + w[ 2 ] * z ];
+        const dl = Math.hypot( ...d ); d[ 0 ] /= dl; d[ 1 ] /= dl; d[ 2 ] /= dl;
+        const { r } = surfaceAt( t.planet, k, d, t.seed, t.radius, 8 );
+        const cosA = d[ 0 ] * up[ 0 ] + d[ 1 ] * up[ 1 ] + d[ 2 ] * up[ 2 ];
+        const h = Math.max( 1, Math.min( HEIGHT - 12, Math.round( cosA * r - t.R0 + BASE + fbm( x / 9, z / 9, seed + 5, 2 ) * 1.2 ) ) );
+        const sea = seaR > 0 ? Math.round( cosA * seaR - t.R0 + BASE ) : -1;
+        const wet = h < sea - 2, shore = h <= sea + 1;
+        let biome;
+        if ( t.planet === 'lush' ) biome = wet ? 0 : shore ? 1 : fbm( x / 160, z / 160, seed + 21, 3 ) > 0 ? 3 : 2;
+        else if ( t.planet === 'icy' ) biome = wet ? 12 : 10;
+        else if ( t.planet === 'ember' ) biome = wet ? 11 : 9;
+        else biome = fbm( x / 200, z / 200, seed + 23, 3 ) > 0.1 ? 4 : 7;
+        return { h, biome, sea, liquid: t.planet === 'ember' ? LAVA : t.planet === 'icy' ? ICE : WATER };
+    };
+}
+
+const DENSITY = [ 0, 0, 0.007, 0.08, 0.004, 0.001, 0.05, 0.012, 0, 0, 0, 0, 0 ];
 
 function stampTree( vol, px, pz, h, biome, x, z, seed ) {
     const r = hash2( x, z, seed + 77 );
@@ -82,21 +109,22 @@ function stampTree( vol, px, pz, h, biome, x, z, seed ) {
     }
 }
 
-function generate( cx, cz, seed ) {
+function generate( cx, cz, seed, terrain ) {
     const vol = new Uint8Array( P * P * HEIGHT );
     const cols = new Array( P * P );
     const ox = cx * CHUNK - PAD, oz = cz * CHUNK - PAD;
+    const colAt = terrain && terrain.planet ? planetColumn( terrain ) : ( x, z, sd ) => ( { ...column( x, z, sd ), sea: SEA, liquid: WATER } );
     for ( let px = 0; px < P; px++ ) for ( let pz = 0; pz < P; pz++ ) {
         const x = ox + px, z = oz + pz;
-        const col = column( x, z, seed );
+        const col = colAt( x, z, seed );
         cols[ px * P + pz ] = col;
         const base = ( px * P + pz ) * HEIGHT;
         for ( let y = 0; y <= col.h; y++ ) vol[ base + y ] = surface( col.biome, col.h - y, x, z, seed );
-        for ( let y = col.h + 1; y <= SEA; y++ ) vol[ base + y ] = WATER;
+        for ( let y = col.h + 1; y <= Math.min( col.sea, HEIGHT - 1 ); y++ ) vol[ base + y ] = col.liquid;
     }
     for ( let px = 0; px < P; px++ ) for ( let pz = 0; pz < P; pz++ ) {
         const col = cols[ px * P + pz ], x = ox + px, z = oz + pz;
-        if ( col.h > SEA + 1 && hash2( x, z, seed + 99 ) < DENSITY[ col.biome ] ) stampTree( vol, px, pz, col.h, col.biome, x, z, seed );
+        if ( col.h > col.sea + 1 && hash2( x, z, seed + 99 ) < DENSITY[ col.biome ] ) stampTree( vol, px, pz, col.h, col.biome, x, z, seed );
     }
     return { vol, cols };
 }
@@ -147,10 +175,10 @@ function mesh( vol, cx, cz, seed ) {
     for ( let x = 0; x < CHUNK; x++ ) for ( let z = 0; z < CHUNK; z++ ) for ( let y = 0; y < HEIGHT; y++ ) {
         const b = at( x, y, z );
         if ( b === AIR ) continue;
-        if ( b === WATER ) {
+        if ( isLiquid( b ) ) {
             if ( at( x, y + 1, z ) === AIR ) {
                 ao.fill( 3 );
-                water.quad( x, y - 0.15, z, DIRS[ 2 ], PALETTE[ WATER ], ao );
+                water.quad( x, y - 0.15, z, DIRS[ 2 ], PALETTE[ b ], ao );
             }
             continue;
         }
@@ -328,33 +356,100 @@ function rock( { size, seed } ) {
     return m;
 }
 
-function ship( { seed } ) {
-    const L = 18, W = 9, H = 5, half = Math.ceil( W / 2 );
-    const hull = [ [ 0xd8, 0xd4, 0xca ], [ 0x4a, 0x4e, 0x58 ], [ 0xb8, 0xa8, 0x8a ] ][ seed % 3 ];
-    const accent = [ [ 0xc8, 0x40, 0x2e ], [ 0x2d, 0x4e, 0x80 ], [ 0xe0, 0xa0, 0x30 ] ][ ( seed >> 2 ) % 3 ];
+const SHIP_CLASSES = {
+    small:   { L: 18, W: 9, H: 5, engines: 1 },
+    medium:  { L: 40, W: 17, H: 9, engines: 2 },
+    capital: { L: 96, W: 34, H: 18, engines: 4 },
+};
+
+function ship( { seed, cls = 'small' } ) {
+    const { L, W, H, engines } = SHIP_CLASSES[ cls ], half = Math.ceil( W / 2 );
+    const hull = [ [ 0xd8, 0xd4, 0xca ], [ 0x4a, 0x4e, 0x58 ], [ 0xb8, 0xa8, 0x8a ], [ 0x7a, 0x82, 0x8c ] ][ seed % 4 ];
+    const accent = [ [ 0xc8, 0x40, 0x2e ], [ 0x2d, 0x4e, 0x80 ], [ 0xe0, 0xa0, 0x30 ], [ 0x3f, 0x7a, 0x5a ] ][ ( seed >> 2 ) % 4 ];
     const grid = new Uint8Array( L * W * H );
-    const at = ( x, y, z ) => grid[ ( z * W + x ) * H + y ];
+    const put = ( x, y, z, k ) => { if ( x >= 0 && x < W && y >= 0 && y < H && z >= 0 && z < L ) grid[ ( z * W + x ) * H + y ] = k; };
+    const sym = ( dx, y, z, k ) => { put( half - 1 + dx, y, z, k ); put( half - 1 - dx, y, z, k ); };
+    const nose = 0.3 + hash2( seed, 2, 3 ) * 0.3, wingAt = 0.45 + hash2( seed, 3, 3 ) * 0.25;
     for ( let z = 0; z < L; z++ ) {
-        const taper = 1 - Math.pow( Math.abs( z / ( L - 1 ) - 0.4 ) / 0.6, 1.6 );
-        const w = Math.max( 1, Math.round( half * ( 0.35 + 0.65 * taper ) + ( hash2( z, 1, seed ) - 0.5 ) * 1.5 ) );
+        const f = z / ( L - 1 );
+        const taper = 1 - Math.pow( Math.abs( f - nose ) / Math.max( nose, 1 - nose ), 1.5 );
+        const w = Math.max( 1, Math.round( half * ( 0.3 + 0.7 * taper ) + ( hash2( z, 1, seed ) - 0.5 ) * ( cls === 'capital' ? 3 : 1.5 ) ) );
         const h = Math.max( 1, Math.round( H * ( 0.3 + 0.6 * taper ) ) );
-        for ( let x = 0; x < w; x++ ) for ( let y = 0; y < h; y++ ) {
-            const hole = hash3( x, y, z, seed ) < 0.08;
-            if ( hole ) continue;
+        const y0 = Math.floor( ( H - h ) / 2 );
+        for ( let x = 0; x < w; x++ ) for ( let y = y0; y < y0 + h; y++ ) {
+            if ( hash3( x, y, z, seed ) < 0.06 ) continue;
             let kind = 1;
-            if ( y === h - 1 && z > L * 0.55 && z < L * 0.75 && x < 2 ) kind = 2;
-            if ( z === 0 && y < 2 && x < 2 ) kind = 3;
-            if ( ( z === 2 || z === 3 ) && x === w - 1 ) kind = 4;
-            grid[ ( z * W + ( half - 1 + x ) ) * H + y ] = kind;
-            grid[ ( z * W + ( half - 1 - x ) ) * H + y ] = kind;
+            if ( y === y0 + h - 1 && z > L * 0.5 && z < L * 0.7 && x < Math.max( 1, w * 0.3 ) ) kind = 2;
+            if ( ( z === Math.floor( L * 0.2 ) || z === Math.floor( L * 0.21 ) ) && x === w - 1 ) kind = 4;
+            sym( x, y, z, kind );
         }
+        if ( cls !== 'small' && Math.abs( f - wingAt ) < 0.12 ) {
+            const span = Math.round( half * ( 1.6 - Math.abs( f - wingAt ) * 8 ) );
+            for ( let x = w; x < span; x++ ) sym( x, Math.floor( H / 2 ), z, x === span - 1 ? 4 : 1 );
+        }
+    }
+    if ( cls === 'capital' ) {
+        const bz = Math.floor( L * 0.62 );
+        for ( let z = bz; z < bz + 8; z++ ) for ( let y = H - 4; y < H; y++ ) for ( let x = 0; x < 3; x++ ) sym( x, y, z, y === H - 1 ? 2 : 1 );
+        for ( let z = Math.floor( L * 0.3 ); z < L * 0.6; z += 6 ) for ( let x = 0; x < half - 2; x += 4 ) sym( x, 1, z, 4 );
+    }
+    const spread = Math.max( 1, Math.floor( half * 0.5 ) );
+    for ( let e = 0; e < engines; e++ ) {
+        const ex = engines === 1 ? 0 : Math.round( ( e / ( engines - 1 ) - 0.5 ) * 2 * spread ) ;
+        const ey = Math.floor( H / 2 ) + ( engines > 2 && e % 2 ? 2 : -1 );
+        for ( let dy = 0; dy < 2; dy++ ) for ( let dx = 0; dx < 2; dx++ ) { put( half - 1 + ex + dx - 1, ey + dy, 0, 3 ); put( half - 1 + ex + dx - 1, ey + dy, 1, 1 ); }
     }
     const colors = { 1: hull, 2: [ 0x1a, 0x24, 0x34 ], 3: [ 0xff, 0x9a, 0x3a ], 4: accent };
     return meshVolume( W, H, L, ( x, y, z ) => {
-        const k = at( x, y, z );
+        const k = grid[ ( z * W + x ) * H + y ];
         if ( ! k ) return null;
         const j = 0.9 + hash3( x, y, z, seed + 1 ) * 0.2;
         return colors[ k ].map( ( c ) => c * j );
+    } );
+}
+
+function station( { seed } ) {
+    const N = 60, H = 26, c = N / 2, cy = H / 2;
+    const grid = new Uint8Array( N * H * N );
+    const put = ( x, y, z, k ) => { if ( x >= 0 && x < N && y >= 0 && y < H && z >= 0 && z < N ) grid[ ( z * N + x ) * H + y ] = k; };
+    const rings = 1 + ( hash2( seed, 1, 9 ) < 0.4 ? 1 : 0 ), spokes = 3 + Math.floor( hash2( seed, 2, 9 ) * 3 );
+    const hull = [ [ 0xd4, 0xd2, 0xca ], [ 0xb9, 0xb3, 0xa6 ], [ 0x8e, 0x94, 0x9c ] ][ seed % 3 ];
+    for ( let ri = 0; ri < rings; ri++ ) {
+        const R = 27 - ri * 9, tube = ri ? 2.6 : 3.6, yoff = ri ? ( hash2( seed, 4, 9 ) - 0.5 ) * 8 : 0;
+        for ( let x = 0; x < N; x++ ) for ( let z = 0; z < N; z++ ) {
+            const d = Math.hypot( x - c + 0.5, z - c + 0.5 ) - R;
+            for ( let y = 0; y < H; y++ ) {
+                const dy = y - cy - yoff + 0.5;
+                if ( d * d + dy * dy <= tube * tube ) put( x, y, z, hash3( x, y, z, seed + 3 ) < 0.08 ? 3 : 1 );
+            }
+        }
+    }
+    for ( let y = 2; y < H - 2; y++ ) for ( let x = 0; x < N; x++ ) for ( let z = 0; z < N; z++ ) {
+        const d = Math.hypot( x - c + 0.5, z - c + 0.5 );
+        if ( d <= ( y % 7 === 0 ? 7 : 5.5 ) ) put( x, y, z, d > 4.5 && hash3( x, y, z, seed + 5 ) < 0.15 ? 3 : 1 );
+    }
+    for ( let si = 0; si < spokes; si++ ) {
+        const a = si / spokes * Math.PI * 2 + hash2( seed, 6, 9 ) * 1.5;
+        for ( let r = 5; r < 27; r++ ) for ( let t = -1; t <= 1; t++ ) {
+            const x = Math.round( c + Math.cos( a ) * r + Math.sin( a ) * t ), z = Math.round( c + Math.sin( a ) * r - Math.cos( a ) * t );
+            put( x, Math.floor( cy ), z, 1 ); put( x, Math.floor( cy ) - 1, z, 1 );
+        }
+    }
+    const panels = 2 + Math.floor( hash2( seed, 7, 9 ) * 3 );
+    for ( let pi = 0; pi < panels; pi++ ) {
+        const a = pi / panels * Math.PI * 2 + 0.3, y = Math.floor( cy ) + ( pi % 2 ? 5 : -5 );
+        for ( let r = 7; r < 24; r++ ) for ( let t = -3; t <= 3; t++ ) {
+            const x = Math.round( c + Math.cos( a ) * r + Math.sin( a ) * t ), z = Math.round( c + Math.sin( a ) * r - Math.cos( a ) * t );
+            put( x, y, z, r % 5 === 2 ? 1 : 2 );
+        }
+    }
+    for ( let y = 0; y < H; y++ ) for ( let dx = -1; dx <= 1; dx++ ) for ( let dz = -1; dz <= 1; dz++ ) put( c + dx, y, c + dz, 1 );
+    const colors = { 1: hull, 2: [ 0x1e, 0x2c, 0x4a ], 3: [ 0xff, 0xb0, 0x50 ] };
+    return meshVolume( N, H, N, ( x, y, z ) => {
+        const k = grid[ ( z * N + x ) * H + y ];
+        if ( ! k ) return null;
+        const j = 0.9 + hash3( x, y, z, seed + 1 ) * 0.2;
+        return colors[ k ].map( ( c0 ) => c0 * j );
     } );
 }
 
@@ -367,8 +462,9 @@ self.onmessage = ( { data } ) => {
     if ( type === 'patch' ) { const b = patch( data ); return self.postMessage( { ...data, ...b }, buffersOf( b ) ); }
     if ( type === 'rock' ) { const r = rock( data ); return self.postMessage( { ...data, ...r }, buffersOf( r ) ); }
     if ( type === 'ship' ) { const r = ship( data ); return self.postMessage( { ...data, ...r }, buffersOf( r ) ); }
+    if ( type === 'station' ) { const r = station( data ); return self.postMessage( { ...data, ...r }, buffersOf( r ) ); }
     const { cx, cz, seed } = data;
-    const { vol, cols } = generate( cx, cz, seed );
+    const { vol, cols } = generate( cx, cz, seed, data.terrain );
     const { solid, water } = mesh( vol, cx, cz, seed );
     const { blocks, biomes } = inner( vol, cols );
     self.postMessage( { ...data, solid, water, blocks, biomes }, [ ...buffersOf( solid ), ...buffersOf( water ), blocks.buffer, biomes.buffer ] );

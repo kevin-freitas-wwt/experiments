@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { Pool } from './pool.js';
-import { World } from './world.js';
+import { Shell, BASE } from './shell.js';
 import { FarField } from './far.js';
 import { Space } from './space.js';
 import { Player } from './player.js';
 import { Crumbs } from './crumbs.js';
-import { BIOMES, SEA } from './blocks.js';
-import { tickFades } from './materials.js';
+import { BIOMES, SEA, CHUNK } from './blocks.js';
+import { tickFades, hole } from './materials.js';
 
 const params = new URLSearchParams( location.search );
 const seedWord = params.get( 'seed' ) || randomWord();
@@ -56,10 +56,11 @@ fill.position.copy( sunDir ).negate();
 scene.add( sun, fill, hemi, new THREE.AmbientLight( 0x50586c, 0.6 ) );
 
 const pool = new Pool();
-const world = new World( scene, pool, seed, radius );
+const home = new Shell( scene, pool, seed, radius );
+const world = home.world;
 const far = new FarField( scene, pool, seed, radius );
 const space = new Space( scene, pool, seed, radius, sunDir );
-const player = new Player( camera, world, canvas );
+const player = new Player( camera, home, canvas );
 const crumbs = new Crumbs( scene, spacing );
 
 const hud = {};
@@ -90,6 +91,7 @@ function lookAt( target ) {
 }
 
 function travel( kind, index = 0 ) {
+    leaveShell();
     player.vel.set( 0, 0, 0 );
     player.flying = true;
     const away = ( from, pos, dist ) => {
@@ -112,13 +114,18 @@ function travel( kind, index = 0 ) {
     } else if ( kind === 'ship' ) {
         const sh = space.nearestShip( player.pos );
         const side = new THREE.Vector3( 1, 0.35, 0 ).applyQuaternion( sh.group.quaternion ).normalize();
-        player.pos.copy( sh.group.position ).addScaledVector( side, 60 * sh.voxel );
+        const span = sh.cls === 'capital' ? 130 : sh.cls === 'medium' ? 70 : 60;
+        player.pos.copy( sh.group.position ).addScaledVector( side, span * sh.voxel );
         lookAt( sh.group.position );
+    } else if ( kind === 'station' ) {
+        const st = space.nearestStation( player.pos );
+        player.pos.copy( away( st.group.position, player.pos, 90 * st.voxel ) );
+        lookAt( st.group.position );
     }
     crumbs.last = null;
 }
 
-const NAV = { Digit1: [ 'planet', 0 ], Digit2: [ 'planet', 1 ], Digit3: [ 'planet', 2 ], Digit4: [ 'planet', 3 ], Digit5: [ 'planet', 4 ], Digit6: [ 'rock' ], Digit7: [ 'ship' ], Digit0: [ 'home' ] };
+const NAV = { Digit1: [ 'planet', 0 ], Digit2: [ 'planet', 1 ], Digit3: [ 'planet', 2 ], Digit4: [ 'planet', 3 ], Digit5: [ 'planet', 4 ], Digit6: [ 'rock' ], Digit7: [ 'ship' ], Digit8: [ 'station' ], Digit0: [ 'home' ] };
 document.addEventListener( 'keydown', ( e ) => {
     if ( e.repeat || ! overlay.classList.contains( 'hidden' ) ) return;
     if ( e.code === 'KeyB' ) crumbs.toggle();
@@ -127,7 +134,7 @@ document.addEventListener( 'keydown', ( e ) => {
 } );
 const nav = document.getElementById( 'nav' );
 const navItems = [ ...space.bodies.map( ( b, i ) => [ `${i + 1}`, `${b.name}`, `${b.kind}, ${( b.radius / 1000 ).toFixed( 1 )} km`, [ 'planet', i ] ] ),
-    [ '6', 'Nearest asteroid', 'belt and strays', [ 'rock' ] ], [ '7', 'Nearest ship', 'in orbit', [ 'ship' ] ], [ '0', 'Home', 'the spawn shore', [ 'home' ] ] ];
+    [ '6', 'Nearest asteroid', 'belt and strays', [ 'rock' ] ], [ '7', 'Nearest ship', 'skiffs to capitals', [ 'ship' ] ], [ '8', 'Nearest station', 'in orbit', [ 'station' ] ], [ '0', 'Home', 'the spawn shore', [ 'home' ] ] ];
 for ( const [ key, name, sub, args ] of navItems ) {
     const b = document.createElement( 'button' );
     b.type = 'button';
@@ -167,6 +174,47 @@ if ( pose ) {
 }
 
 const fmtDist = ( m ) => m < 1000 ? `${m.toFixed( 0 )} m` : m < 100000 ? `${( m / 1000 ).toFixed( 1 ) } km` : `${( m / 1000 ).toFixed( 0 ) } km`;
+const retiring = [];
+
+function enterShell( body ) {
+    const wp = player.worldPos;
+    const dir = body.group.worldToLocal( wp.clone() ).normalize();
+    const shell = new Shell( scene, pool, seed, radius, body, dir );
+    const old = player.shell;
+    player.moveTo( shell );
+    shell.world.update( player.pos.x, player.pos.z );
+    if ( old.planet ) retiring.push( { shell: old, t: 0 } );
+}
+
+function leaveShell() {
+    if ( ! player.shell.planet ) return;
+    const old = player.shell;
+    player.moveTo( home );
+    old.dispose();
+    hole.r1.value = -1;
+}
+
+function manageShells( dt ) {
+    for ( let i = retiring.length - 1; i >= 0; i-- ) {
+        const r = retiring[ i ];
+        r.t += dt;
+        if ( r.t > 4 || player.world.loaded( player.pos.x, player.pos.z ) ) { r.shell.dispose(); retiring.splice( i, 1 ); }
+    }
+    if ( player.shell.planet ) {
+        const sh = player.shell, alt = player.pos.y - BASE, horiz = Math.hypot( player.pos.x, player.pos.z );
+        if ( alt > 350 || horiz > radius * CHUNK + 32 ) { leaveShell(); return; }
+        if ( horiz > 64 ) enterShell( sh.body );
+        sh.originWorld( hole.center.value );
+        hole.r0.value = radius * CHUNK - 24; hole.r1.value = radius * CHUNK + 8;
+    } else if ( player.inSpace ) {
+        for ( const b of space.bodies ) {
+            if ( b.kind === 'gas' ) continue;
+            const wp = player.pos, d = wp.distanceTo( b.pos );
+            if ( d < b.radius * 1.3 && d - space.surfaceRadius( b, wp ) < 220 ) { enterShell( b ); break; }
+        }
+    }
+}
+
 const timer = new THREE.Timer();
 let hudTimer = 0;
 const lastPos = new THREE.Vector3();
@@ -175,17 +223,19 @@ function frame() {
     requestAnimationFrame( frame );
     timer.update();
     const dt = Math.min( 0.05, timer.getDelta() );
-    const alt = player.pos.y - SEA;
-    if ( ! spawned || alt < 400 ) world.update( player.pos.x, player.pos.z );
+    const worldPos = player.worldPos;
+    const alt = worldPos.y - SEA;
+    if ( ! spawned || ( player.shell === home && ! player.inSpace ) ) world.update( player.pos.x, player.pos.z );
     world.absorb( 3 );
-    far.update( dt, player.pos, world );
+    if ( player.shell.planet ) { player.world.update( player.pos.x, player.pos.z ); player.world.absorb( 4 ); }
+    far.update( dt, worldPos, world );
     tickFades( dt );
-    lastPos.copy( player.pos );
+    lastPos.copy( worldPos );
     if ( ! spawned ) {
         if ( world.loaded( 8, 8 ) ) { player.place( 8, 8 ); spawned = true; }
         if ( spawned && ! pose ) crumbs.last = null;
-    } else if ( ! pose ) { player.step( dt, space ); crumbs.step( player.pos ); }
-    else { camera.position.set( player.pos.x, player.pos.y + 1.62, player.pos.z ); camera.rotation.set( 0, 0, 0 ); camera.rotateY( player.yaw ); camera.rotateX( player.pitch ); }
+    } else if ( ! pose ) { manageShells( dt ); player.step( dt, space ); crumbs.step( player.worldPos ); }
+    else player.placeCamera();
     const spaceness = Math.min( 1, Math.max( 0, ( alt - 1500 ) / 9000 ) );
     skyMat.uniforms.space.value = spaceness;
     hemi.intensity = 1.15 - spaceness * 1.0;
@@ -195,17 +245,18 @@ function frame() {
     tint.classList.toggle( 'on', under );
     hudTimer += dt;
     if ( hudTimer > 0.15 ) {
-        const speed = lastPos.distanceTo( player.pos ) / dt;
+        const speed = lastPos.distanceTo( player.worldPos ) / dt;
         hudTimer = 0;
-        const b = world.biome( player.pos.x, player.pos.z );
-        hud.alt.textContent = fmtDist( alt );
-        hud.biome.textContent = alt > 2000 ? ( spaceness >= 1 ? 'open space' : 'upper air' ) : b < 0 ? '…' : BIOMES[ b ];
-        hud.coord.textContent = `${player.pos.x.toFixed( 0 )}, ${player.pos.z.toFixed( 0 )}`;
-        const s = world.stats, f = far.stats;
+        const onPlanet = player.shell.planet;
+        const b = player.world.biome( player.pos.x, player.pos.z );
+        hud.alt.textContent = onPlanet ? fmtDist( player.pos.y - ( player.shell.seaLevel ?? BASE ) ) : fmtDist( alt );
+        hud.biome.textContent = onPlanet ? ( b < 0 ? '…' : BIOMES[ b ] ) : alt > 2000 ? ( spaceness >= 1 ? 'open space' : 'upper air' ) : b < 0 ? '…' : BIOMES[ b ];
+        hud.coord.textContent = `${worldPos.x.toFixed( 0 )}, ${worldPos.z.toFixed( 0 )}`;
+        const s = player.world.stats, f = far.stats;
         hud.chunks.textContent = `${s.loaded}${s.pending ? ` +${s.pending}` : ''} · ${f.fine + f.coarse} tiles`;
-        hud.mode.textContent = player.flying ? 'flying' : under ? 'under' : player.inWater() ? 'swimming' : 'on foot';
+        hud.mode.textContent = ( player.flying ? 'flying' : under ? 'under' : player.inWater() ? 'swimming' : 'on foot' ) + ( onPlanet ? ` on ${player.shell.body.name}` : '' );
         hud.speed.textContent = speed < 1000 ? `${speed.toFixed( 0 )} m/s` : `${( speed / 1000 ).toFixed( 1 )} km/s`;
-        const n = space.nearest( player.pos );
+        const n = space.nearest( worldPos );
         hud.body.textContent = n ? `${n.name} (${n.kind}) ${fmtDist( Math.max( 0, n.d ) )}` : '–';
         hud.crumbs.textContent = crumbs.on ? `every ${crumbs.spacing} m · ${crumbs.count}` : crumbs.count ? `off · ${crumbs.count}` : 'off';
     }
@@ -213,4 +264,4 @@ function frame() {
 }
 frame();
 
-window.__strata = { world, far, space, player, crumbs, pool, seed, renderer, scene, travel };
+window.__strata = { world, home, far, space, player, crumbs, pool, seed, renderer, scene, travel, enterShell, leaveShell };

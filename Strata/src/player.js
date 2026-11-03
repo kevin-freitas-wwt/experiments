@@ -1,14 +1,15 @@
 import * as THREE from 'three';
-import { WATER, SEA } from './blocks.js';
+import { SEA, CHUNK, isLiquid } from './blocks.js';
 
 const KEYS = { fwd: [ 'KeyE', 'ArrowUp' ], back: [ 'KeyD', 'ArrowDown' ], left: [ 'KeyS', 'ArrowLeft' ], right: [ 'KeyF', 'ArrowRight' ], up: [ 'KeyA' ], down: [ 'KeyZ' ] };
 
 const HALF = 0.3, TALL = 1.8, EYE = 1.62, GRAVITY = 26, JUMP = 8.6;
 
 export class Player {
-    constructor( camera, world, canvas ) {
+    constructor( camera, shell, canvas ) {
         this.camera = camera;
-        this.world = world;
+        this.shell = shell;
+        this.home = shell;
         this.keys = KEYS;
         this.down = new Set();
         this.pos = new THREE.Vector3( 8, 90, 8 );
@@ -17,7 +18,8 @@ export class Player {
         this.flying = false;
         this.grounded = false;
         this.locked = false;
-        this.fly = new THREE.Vector3();
+        this.q = new THREE.Quaternion();
+        this.euler = new THREE.Euler( 0, 0, 0, 'YXZ' );
 
         canvas.addEventListener( 'click', () => { if ( ! this.locked ) canvas.requestPointerLock(); } );
         document.addEventListener( 'pointerlockchange', () => { this.locked = document.pointerLockElement === canvas; } );
@@ -33,6 +35,31 @@ export class Player {
         } );
         document.addEventListener( 'keyup', ( e ) => this.down.delete( e.code ) );
         window.addEventListener( 'blur', () => this.down.clear() );
+    }
+
+    get world() {
+        return this.shell.world;
+    }
+
+    get worldPos() {
+        return this.shell.toWorld( this.pos );
+    }
+
+    forward( out = new THREE.Vector3() ) {
+        out.set( -Math.sin( this.yaw ) * Math.cos( this.pitch ), Math.sin( this.pitch ), -Math.cos( this.yaw ) * Math.cos( this.pitch ) );
+        return out.applyQuaternion( this.shell.quaternion( this.q ) );
+    }
+
+    moveTo( shell ) {
+        if ( shell === this.shell ) return;
+        const wp = this.worldPos, wf = this.forward(), wv = this.vel.clone().applyQuaternion( this.shell.quaternion( this.q ) );
+        this.shell = shell;
+        shell.toLocal( wp, this.pos );
+        const inv = shell.quaternion( this.q ).invert();
+        const f = wf.applyQuaternion( inv );
+        this.yaw = Math.atan2( -f.x, -f.z );
+        this.pitch = Math.max( -1.55, Math.min( 1.55, Math.asin( Math.max( -1, Math.min( 1, f.y ) ) ) ) );
+        this.vel.copy( wv.applyQuaternion( inv ) );
     }
 
     any( codes ) {
@@ -54,21 +81,29 @@ export class Player {
     }
 
     inWater() {
-        return this.world.block( Math.floor( this.pos.x ), Math.floor( this.pos.y + 0.9 ), Math.floor( this.pos.z ) ) === WATER;
+        return isLiquid( this.world.block( Math.floor( this.pos.x ), Math.floor( this.pos.y + 0.9 ), Math.floor( this.pos.z ) ) );
     }
 
     eyeInWater() {
-        return this.world.block( Math.floor( this.pos.x ), Math.floor( this.pos.y + EYE ), Math.floor( this.pos.z ) ) === WATER;
+        return isLiquid( this.world.block( Math.floor( this.pos.x ), Math.floor( this.pos.y + EYE ), Math.floor( this.pos.z ) ) );
+    }
+
+    get inSpace() {
+        return this.shell === this.home && ( this.pos.y > 400 || Math.hypot( this.pos.x, this.pos.z ) > this.world.radius * CHUNK + 200 );
     }
 
     step( dt, space ) {
-        const high = this.pos.y > 400;
+        const high = this.inSpace;
         if ( ! high && ! this.world.loaded( this.pos.x, this.pos.z ) ) return;
         if ( high && ! this.flying ) this.vel.y = Math.max( this.vel.y, -60 );
         const run = this.any( [ 'ShiftLeft', 'ShiftRight' ] );
         const swim = this.inWater() && ! this.flying;
-        let clearance = Math.max( 0, this.pos.y - SEA - 40 );
-        if ( space ) { const n = space.nearest( this.pos ); if ( n ) clearance = Math.min( clearance, Math.max( 0, n.d ) ); }
+        let clearance;
+        if ( this.shell.planet ) clearance = Math.max( 0, this.pos.y - this.world.top( Math.floor( this.pos.x ), Math.floor( this.pos.z ) ) - 3 );
+        else {
+            clearance = Math.max( 0, this.pos.y - SEA - 40 );
+            if ( space ) { const n = space.nearest( this.pos ); if ( n ) clearance = Math.min( clearance, Math.max( 0, n.d ) ); }
+        }
         const flySpeed = Math.min( 9000, 14 * ( 1 + clearance / 120 ) );
         const speed = this.flying ? flySpeed * ( run ? 3 : 1 ) : swim ? 3 : ( run ? 9 : 5 );
         const sin = Math.sin( this.yaw ), cos = Math.cos( this.yaw );
@@ -114,9 +149,12 @@ export class Player {
         }
         this.pos.copy( next );
 
-        this.camera.position.set( this.pos.x, this.pos.y + EYE, this.pos.z );
-        this.camera.rotation.set( 0, 0, 0 );
-        this.camera.rotateY( this.yaw );
-        this.camera.rotateX( this.pitch );
+        this.placeCamera();
+    }
+
+    placeCamera() {
+        this.shell.toWorld( new THREE.Vector3( this.pos.x, this.pos.y + EYE, this.pos.z ), this.camera.position );
+        this.euler.set( this.pitch, this.yaw, 0 );
+        this.camera.quaternion.setFromEuler( this.euler ).premultiply( this.shell.quaternion( this.q ) );
     }
 }

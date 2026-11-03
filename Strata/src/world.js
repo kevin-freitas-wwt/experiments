@@ -5,11 +5,13 @@ import { solidMat, waterMat, fadeIn } from './materials.js';
 const key = ( cx, cz ) => `${cx},${cz}`;
 
 export class World {
-    constructor( scene, pool, seed, radius ) {
+    constructor( scene, pool, seed, radius, terrain = null ) {
         this.scene = scene;
         this.pool = pool;
         this.seed = seed;
         this.radius = radius;
+        this.terrain = terrain;
+        this.tag = 'chunk' + ( terrain ? Math.random().toString( 36 ).slice( 2, 7 ) : '' );
         this.chunks = new Map();
         this.pending = new Set();
         this.inbox = [];
@@ -24,7 +26,7 @@ export class World {
             const dx = p.cx - cx, dz = p.cz - cz;
             return dx * dx + dz * dz <= r * r + r;
         };
-        this.pool.cancel( 'chunk', inRing );
+        this.pool.cancel( this.tag, inRing );
         for ( const k of this.pending ) {
             const [ pcx, pcz ] = k.split( ',' ).map( Number );
             if ( ! inRing( { cx: pcx, cz: pcz } ) ) this.pending.delete( k );
@@ -35,7 +37,7 @@ export class World {
             const k = key( cx + dx, cz + dz );
             if ( this.chunks.has( k ) || this.pending.has( k ) ) continue;
             this.pending.add( k );
-            this.pool.submit( { type: 'chunk', cx: cx + dx, cz: cz + dz, seed: this.seed }, { priority: d2, tag: 'chunk' } )
+            this.pool.submit( { type: 'chunk', cx: cx + dx, cz: cz + dz, seed: this.seed, terrain: this.terrain }, { priority: d2 + ( this.terrain ? -1000 : 0 ), tag: this.tag } )
                 .then( ( data ) => this.inbox.push( data ) );
         }
         for ( const [ k, c ] of this.chunks ) {
@@ -68,6 +70,13 @@ export class World {
         }
         this.scene.add( group );
         this.chunks.set( k, { cx: data.cx, cz: data.cz, group, blocks: data.blocks, biomes: data.biomes } );
+    }
+
+    dispose() {
+        this.pool.cancel( this.tag );
+        this.pending.clear();
+        this.inbox.length = 0;
+        for ( const k of [ ...this.chunks.keys() ] ) this.unload( k );
     }
 
     unload( k ) {

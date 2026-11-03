@@ -1,5 +1,6 @@
 export const AIR = 0, STONE = 1, DIRT = 2, GRASS = 3, SAND = 4, WATER = 5,
-    SNOW = 6, LOG = 7, LEAF = 8, NEEDLE = 9, GRAVEL = 10, TUNDRA = 11, CLAY = 12;
+    SNOW = 6, LOG = 7, LEAF = 8, NEEDLE = 9, GRAVEL = 10, TUNDRA = 11, CLAY = 12,
+    ICE = 13, BASALT = 14, LAVA = 15, RUST = 16;
 
 export const CHUNK = 16, HEIGHT = 128, SEA = 46;
 
@@ -16,10 +17,18 @@ export const PALETTE = {
     [ GRAVEL ]: [ 0x9a, 0x94, 0x88 ],
     [ TUNDRA ]: [ 0x9a, 0xa0, 0x6a ],
     [ CLAY ]:   [ 0xb4, 0x6a, 0x4a ],
+    [ ICE ]:    [ 0xbf, 0xdc, 0xea ],
+    [ BASALT ]: [ 0x3a, 0x34, 0x36 ],
+    [ LAVA ]:   [ 0xf0, 0x6a, 0x22 ],
+    [ RUST ]:   [ 0x8a, 0x4e, 0x3a ],
 };
 
-export const BIOMES = [ 'open sea', 'shore', 'plains', 'forest', 'dry basin', 'tundra', 'taiga', 'highlands', 'snowfield' ];
+export const BIOMES = [ 'open sea', 'shore', 'plains', 'forest', 'dry basin', 'tundra', 'taiga', 'highlands', 'snowfield', 'ember field', 'ice sheet', 'lava sea', 'frozen sea' ];
 
 export function isSolid( b ) {
-    return b !== AIR && b !== WATER;
+    return b !== AIR && b !== WATER && b !== LAVA;
+}
+
+export function isLiquid( b ) {
+    return b === WATER || b === LAVA;
 }

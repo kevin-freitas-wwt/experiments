@@ -4,7 +4,33 @@ export const CURVE_RADIUS = 90000;
 
 // Drops vertices by d²/2R in local y, so curved meshes must carry no rotation.
 // With `edge`, fragments inside edge.r0 of edge.center are dithered away and fade in by edge.r1.
+export const hole = { center: { value: new THREE.Vector3() }, r0: { value: -1 }, r1: { value: -1 } };
+
+// Dithers away fragments within hole.r0 of hole.center (world space), fading in by hole.r1.
+export function holed( material ) {
+    material.userData.patch = holed;
+    material.onBeforeCompile = ( shader ) => {
+        shader.uniforms.holeCenter = hole.center;
+        shader.uniforms.holeR0 = hole.r0;
+        shader.uniforms.holeR1 = hole.r1;
+        shader.vertexShader = shader.vertexShader
+            .replace( '#include <common>', '#include <common>\nvarying vec3 vHoleW;' )
+            .replace( '#include <begin_vertex>', '#include <begin_vertex>\nvHoleW = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;' );
+        shader.fragmentShader = shader.fragmentShader
+            .replace( '#include <common>', '#include <common>\nuniform vec3 holeCenter; uniform float holeR0; uniform float holeR1; varying vec3 vHoleW;' )
+            .replace( '#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+                if ( holeR1 > holeR0 ) {
+                    float holeT = smoothstep( holeR0, holeR1, length( vHoleW - holeCenter ) );
+                    float holeH = fract( sin( dot( gl_FragCoord.xy, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+                    if ( holeH > holeT ) discard;
+                }` );
+    };
+    material.customProgramCacheKey = () => 'holed';
+    return material;
+}
+
 export function curved( material, edge = null ) {
+    material.userData.patch = ( m ) => curved( m, edge );
     material.userData.curved = true;
     material.userData.edge = edge;
     material.onBeforeCompile = ( shader ) => {
@@ -41,7 +67,7 @@ export const waterMat = curved( new THREE.MeshLambertMaterial( { vertexColors: t
 export const fineTileMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() );
 export const coarseTileMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() );
 export const oceanMat = curved( new THREE.MeshLambertMaterial( { color: 0x2d4e80 } ) );
-export const bodyMat = new THREE.MeshLambertMaterial( { vertexColors: true } );
+export const bodyMat = holed( new THREE.MeshLambertMaterial( { vertexColors: true } ) );
 export const rockMat = new THREE.MeshLambertMaterial( { vertexColors: true } );
 
 const fades = [];
@@ -49,7 +75,7 @@ const fades = [];
 export function fadeIn( mesh, duration = 0.6, onDone = null ) {
     const base = mesh.material;
     const m = base.clone();
-    if ( base.userData.curved ) curved( m, base.userData.edge );
+    if ( base.userData.patch ) base.userData.patch( m );
     m.alphaHash = true;
     m.opacity = 0;
     mesh.material = m;

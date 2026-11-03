@@ -56,7 +56,7 @@ export class Space {
             group.position.copy( pos );
             const mesh = new THREE.Mesh( new THREE.IcosahedronGeometry( radius, 1 ), bodyMat );
             group.add( mesh );
-            const body = { i, kind, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: 0.004 + this.rnd( i, 5 ) * 0.01, seed: this.seed + i * 17, patch: null, patchWant: 0 };
+            const body = { i, kind, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: 0.00015 + this.rnd( i, 5 ) * 0.0003, seed: this.seed + i * 17, patch: null, patchWant: 0 };
             if ( kind !== 'rocky' && kind !== 'ember' ) {
                 const shellR = gas ? radius * 1.045 : radius * ( 1 + SURFACE[ kind ].amp * 2 ) * 1.015;
                 const rim = new THREE.Mesh( new THREE.SphereGeometry( shellR, 48, 32 ), rimMaterial( gas ? 0xf0cc8a : kind === 'icy' ? 0xbfe0ff : 0x7fb4ff ) );
@@ -173,34 +173,65 @@ export class Space {
     makeShips() {
         this.ships = [];
         const spriteMat = new THREE.SpriteMaterial( { map: this.glow, color: 0xffb070, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true } );
-        for ( let i = 0; i < 10; i++ ) {
-            const host = this.bodies[ 1 + ( i % 4 ) ];
+        const classes = [ 'small', 'small', 'small', 'small', 'small', 'small', 'small', 'medium', 'medium', 'medium', 'medium', 'capital', 'capital' ];
+        classes.forEach( ( cls, i ) => {
+            const host = cls === 'capital' ? this.bodies[ i % 2 ] : this.bodies[ 1 + ( i % 4 ) ];
+            const voxel = cls === 'small' ? 2 + this.rnd( i, 44 ) * 2 : cls === 'medium' ? 3 + this.rnd( i, 44 ) * 2 : 5 + this.rnd( i, 44 ) * 2;
+            const speed = cls === 'small' ? 80 + this.rnd( i, 43 ) * 160 : cls === 'medium' ? 60 + this.rnd( i, 43 ) * 80 : 30 + this.rnd( i, 43 ) * 30;
             const ship = {
-                i, host, group: new THREE.Group(), mesh: null,
+                i, cls, host, group: new THREE.Group(), mesh: null, voxel, speed,
                 orbitR: host.radius * ( 1.35 + this.rnd( i, 40 ) * 0.9 ), angle: this.rnd( i, 41 ) * Math.PI * 2,
-                tilt: ( this.rnd( i, 42 ) - 0.5 ) * 1.2, speed: 80 + this.rnd( i, 43 ) * 160, voxel: 2 + this.rnd( i, 44 ) * 2.5,
+                tilt: ( this.rnd( i, 42 ) - 0.5 ) * 1.2,
             };
             ship.omega = ship.speed / ship.orbitR;
             const sprite = new THREE.Sprite( spriteMat );
-            sprite.scale.setScalar( 60 );
             ship.sprite = sprite;
             ship.group.add( sprite );
             this.scene.add( ship.group );
             this.ships.push( ship );
-            this.pool.submit( { type: 'ship', seed: this.seed * 7 + i }, { priority: 40, tag: 'ship' } ).then( ( data ) => {
-                const g = new THREE.BufferGeometry();
-                g.setAttribute( 'position', new THREE.BufferAttribute( data.pos, 3 ) );
-                g.setAttribute( 'color', new THREE.BufferAttribute( data.col, 3, true ) );
-                g.setAttribute( 'normal', new THREE.BufferAttribute( data.nrm, 3, true ) );
-                g.setIndex( new THREE.BufferAttribute( data.idx, 1 ) );
-                g.computeBoundingSphere();
-                const m = new THREE.Mesh( g, rockMat );
-                m.scale.setScalar( ship.voxel );
+            this.pool.submit( { type: 'ship', seed: this.seed * 7 + i, cls }, { priority: 40, tag: 'ship' } ).then( ( data ) => {
+                const m = new THREE.Mesh( this.voxelGeometry( data ), rockMat );
+                m.scale.setScalar( voxel );
                 ship.mesh = m;
-                sprite.position.set( 0, 0, -9 * ship.voxel );
+                sprite.position.set( 0, 0, -( cls === 'capital' ? 48 : cls === 'medium' ? 20 : 9 ) * voxel );
                 ship.group.add( m );
             } );
+        } );
+        this.stations = [];
+        for ( let i = 0; i < 3; i++ ) {
+            const host = this.bodies[ 1 + i ];
+            const st = { i, host, name: `${host.name} Station`, group: new THREE.Group(), mesh: null, voxel: 7 + this.rnd( i, 50 ) * 3,
+                orbitR: host.radius * ( 1.9 + this.rnd( i, 51 ) * 0.5 ), angle: this.rnd( i, 52 ) * Math.PI * 2, tilt: ( this.rnd( i, 53 ) - 0.5 ) * 0.8, spin: 0.015 + this.rnd( i, 54 ) * 0.02 };
+            st.omega = 25 / st.orbitR;
+            this.scene.add( st.group );
+            this.stations.push( st );
+            this.pool.submit( { type: 'station', seed: this.seed * 11 + i }, { priority: 45, tag: 'ship' } ).then( ( data ) => {
+                const m = new THREE.Mesh( this.voxelGeometry( data ), rockMat );
+                m.scale.setScalar( st.voxel );
+                st.mesh = m;
+                st.group.add( m );
+            } );
         }
+    }
+
+    voxelGeometry( data ) {
+        const g = new THREE.BufferGeometry();
+        g.setAttribute( 'position', new THREE.BufferAttribute( data.pos, 3 ) );
+        g.setAttribute( 'color', new THREE.BufferAttribute( data.col, 3, true ) );
+        g.setAttribute( 'normal', new THREE.BufferAttribute( data.nrm, 3, true ) );
+        g.setIndex( new THREE.BufferAttribute( data.idx, 1 ) );
+        g.computeBoundingSphere();
+        return g;
+    }
+
+    orbitPoint( o, angle, out ) {
+        return out.set( Math.cos( angle ) * o.orbitR, Math.sin( angle ) * o.orbitR * Math.sin( o.tilt ), Math.sin( angle ) * o.orbitR * Math.cos( o.tilt ) ).add( o.host.pos );
+    }
+
+    nearestStation( pos ) {
+        let best = null;
+        for ( const s of this.stations ) { const d = s.group.position.distanceTo( pos ); if ( ! best || d < best.d ) best = { station: s, d }; }
+        return best.station;
     }
 
     makeSky( sunDir ) {
@@ -266,16 +297,19 @@ export class Space {
             b.group.rotation.y += b.spin * dt;
             if ( b.rim ) b.rim.material.uniforms.fade.value = Math.min( 1, Math.max( 0, ( camPos.distanceTo( b.pos ) - b.rim.userData.shellR ) / ( b.radius * 0.4 ) ) );
         }
+        const ahead = new THREE.Vector3();
         for ( const s of this.ships ) {
             s.angle += s.omega * dt;
-            const h = s.host;
-            const local = new THREE.Vector3( Math.cos( s.angle ) * s.orbitR, Math.sin( s.angle ) * s.orbitR * Math.sin( s.tilt ), Math.sin( s.angle ) * s.orbitR * Math.cos( s.tilt ) );
-            const next = new THREE.Vector3( Math.cos( s.angle + 0.01 ) * s.orbitR, Math.sin( s.angle + 0.01 ) * s.orbitR * Math.sin( s.tilt ), Math.sin( s.angle + 0.01 ) * s.orbitR * Math.cos( s.tilt ) );
-            s.group.position.copy( h.pos ).add( local );
-            s.group.lookAt( h.pos.clone().add( next ) );
+            this.orbitPoint( s, s.angle, s.group.position );
+            s.group.lookAt( this.orbitPoint( s, s.angle + 0.01, ahead ) );
             const d = s.group.position.distanceTo( camPos );
-            s.group.visible = d < 120000;
-            s.sprite.scale.setScalar( Math.max( 40, d * 0.004 ) );
+            s.group.visible = d < 150000;
+            s.sprite.scale.setScalar( Math.max( 12 * s.voxel, d * 0.004 ) );
+        }
+        for ( const st of this.stations ) {
+            st.angle += st.omega * dt;
+            this.orbitPoint( st, st.angle, st.group.position );
+            st.group.rotation.y += st.spin * dt;
         }
         for ( const r of this.rocks ) if ( r.mesh ) { r.rot.x += r.spin.x * dt; r.rot.y += r.spin.y * dt; r.rot.z += r.spin.z * dt; r.mesh.rotation.copy( r.rot ); }
         this.timer -= dt;
