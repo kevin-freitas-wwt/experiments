@@ -52,6 +52,23 @@ body {
     width: 6px;
 }
 
+#prompt {
+    background: var(--vermilion);
+    border-radius: 2px;
+    bottom: 22px;
+    color: var(--paper);
+    font-family: var(--mono);
+    font-size: 12px;
+    left: 50%;
+    letter-spacing: 0.1em;
+    padding: 7px 12px;
+    pointer-events: none;
+    position: fixed;
+    text-transform: uppercase;
+    transform: translateX(-50%);
+}
+#prompt:empty { display: none; }
+
 #hud {
     bottom: 22px;
     display: grid;

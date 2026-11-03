@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Pool } from './pool.js';
-import { Shell, BASE } from './shell.js';
+import { Shell, BASE, InteriorShell, RockFrame } from './shell.js';
 import { FarField } from './far.js';
 import { Space } from './space.js';
 import { Player } from './player.js';
@@ -53,7 +53,8 @@ sun.position.copy( sunDir );
 const hemi = new THREE.HemisphereLight( 0xdcd8ea, 0x7a6a50, 1.15 );
 const fill = new THREE.DirectionalLight( 0x8090b8, 0.45 );
 fill.position.copy( sunDir ).negate();
-scene.add( sun, fill, hemi, new THREE.AmbientLight( 0x50586c, 0.6 ) );
+const ambient = new THREE.AmbientLight( 0x50586c, 0.6 );
+scene.add( sun, fill, hemi, ambient );
 
 const pool = new Pool();
 const home = new Shell( scene, pool, seed, radius );
@@ -66,7 +67,7 @@ const crumbs = new Crumbs( scene, spacing );
 const hud = {};
 for ( const id of [ 'alt', 'biome', 'coord', 'chunks', 'seed', 'mode', 'crumbs', 'speed', 'body' ] ) hud[ id ] = document.getElementById( id );
 const overlay = document.getElementById( 'overlay' ), seedInput = document.getElementById( 'seed-input' );
-const tint = document.getElementById( 'tint' );
+const tint = document.getElementById( 'tint' ), prompt = document.getElementById( 'prompt' );
 hud.seed.textContent = seedWord;
 seedInput.value = seedWord;
 document.getElementById( 'seed-stamp' ).textContent = seed.toString().padStart( 5, '0' );
@@ -131,6 +132,7 @@ document.addEventListener( 'keydown', ( e ) => {
     if ( e.code === 'KeyB' ) crumbs.toggle();
     if ( e.code === 'KeyX' ) crumbs.clear();
     if ( NAV[ e.code ] ) travel( ...NAV[ e.code ] );
+    if ( e.code === 'Enter' ) useAirlock();
 } );
 const nav = document.getElementById( 'nav' );
 const navItems = [ ...space.bodies.map( ( b, i ) => [ `${i + 1}`, `${b.name}`, `${b.kind}, ${( b.radius / 1000 ).toFixed( 1 )} km`, [ 'planet', i ] ] ),
@@ -187,11 +189,51 @@ function enterShell( body ) {
 }
 
 function leaveShell() {
-    if ( ! player.shell.planet ) return;
+    if ( player.shell === home ) return;
     const old = player.shell;
     player.moveTo( home );
     old.dispose();
     hole.r1.value = -1;
+}
+
+function enterInterior( vessel ) {
+    leaveShell();
+    const shell = new InteriorShell( pool, seed, vessel );
+    player.shell = shell;
+    player.pos.copy( shell.spawn );
+    player.vel.set( 0, 0, 0 );
+    player.yaw = vessel.cls ? Math.PI / 2 : 0;
+    player.pitch = 0;
+    player.flying = false;
+    shell.world.update( player.pos.x, player.pos.z );
+}
+
+function exitInterior() {
+    const shell = player.shell, vessel = shell.vessel;
+    const lock = space.airlockPoint( vessel ), centre = vessel.group.getWorldPosition( new THREE.Vector3() );
+    const out = lock.clone().sub( centre ).normalize();
+    player.shell = home;
+    shell.dispose();
+    player.pos.copy( lock ).addScaledVector( out, 7 );
+    player.vel.set( 0, 0, 0 );
+    player.flying = true;
+    lookAt( centre );
+}
+
+function nearDoor() {
+    const sh = player.shell;
+    return sh.interior && player.pos.distanceTo( sh.door ) < 4.5;
+}
+
+function nearAirlock() {
+    if ( player.shell !== home || ! player.inSpace ) return null;
+    const a = space.nearestAirlock( player.pos );
+    return a && a.d < 45 ? a : null;
+}
+
+function useAirlock() {
+    if ( nearDoor() ) exitInterior();
+    else { const a = nearAirlock(); if ( a ) enterInterior( a.vessel ); }
 }
 
 function manageShells( dt ) {
@@ -206,18 +248,27 @@ function manageShells( dt ) {
         if ( horiz > 64 ) enterShell( sh.body );
         sh.originWorld( hole.center.value );
         hole.r0.value = radius * CHUNK - 24; hole.r1.value = radius * CHUNK + 8;
-    } else if ( player.inSpace ) {
+    } else if ( player.shell.radial ) {
+        const rk = player.shell.rock;
+        if ( ! rk.mesh || player.pos.length() > rk.radius * 3 + 80 ) leaveShell();
+    } else if ( player.shell === home && player.inSpace ) {
         for ( const b of space.bodies ) {
-            if ( b.kind === 'gas' ) continue;
             const wp = player.pos, d = wp.distanceTo( b.pos );
-            if ( d < b.radius * 1.3 && d - space.surfaceRadius( b, wp ) < 220 ) { enterShell( b ); break; }
+            if ( d < b.radius * 1.3 && d - space.surfaceRadius( b, wp ) < 220 ) { enterShell( b ); return; }
+        }
+        const rk = space.nearestRock( player.pos, true );
+        if ( rk && rk.pos.distanceTo( player.pos ) < rk.radius * 2.5 + 25 ) {
+            const frame = new RockFrame( rk, player.pos );
+            player.moveTo( frame );
         }
     }
+    const a = nearAirlock();
+    prompt.textContent = nearDoor() ? 'airlock · Enter to go outside' : a ? `${a.vessel.name || a.vessel.cls + ' ship'} airlock · Enter to board` : '';
 }
 
 const timer = new THREE.Timer();
 let hudTimer = 0;
-const lastPos = new THREE.Vector3();
+const lastPos = new THREE.Vector3(), homePos = new THREE.Vector3( 8, 60, 8 );
 
 function frame() {
     requestAnimationFrame( frame );
@@ -227,8 +278,10 @@ function frame() {
     const alt = worldPos.y - SEA;
     if ( ! spawned || ( player.shell === home && ! player.inSpace ) ) world.update( player.pos.x, player.pos.z );
     world.absorb( 3 );
-    if ( player.shell.planet ) { player.world.update( player.pos.x, player.pos.z ); player.world.absorb( 4 ); }
-    far.update( dt, worldPos, world );
+    if ( player.shell.planet || player.shell.interior ) { player.world.update( player.pos.x, player.pos.z ); player.world.absorb( 4 ); }
+    if ( player.shell === home ) homePos.copy( worldPos );
+    far.update( dt, homePos, world );
+    ambient.intensity = player.shell.interior ? 2.2 : 0.6;
     tickFades( dt );
     lastPos.copy( worldPos );
     if ( ! spawned ) {
@@ -250,11 +303,12 @@ function frame() {
         const onPlanet = player.shell.planet;
         const b = player.world.biome( player.pos.x, player.pos.z );
         hud.alt.textContent = onPlanet ? fmtDist( player.pos.y - ( player.shell.seaLevel ?? BASE ) ) : fmtDist( alt );
-        hud.biome.textContent = onPlanet ? ( b < 0 ? '…' : BIOMES[ b ] ) : alt > 2000 ? ( spaceness >= 1 ? 'open space' : 'upper air' ) : b < 0 ? '…' : BIOMES[ b ];
+        hud.biome.textContent = onPlanet || player.shell.interior ? ( b < 0 ? '…' : BIOMES[ b ] ) : player.shell.radial ? 'asteroid' : alt > 2000 ? ( spaceness >= 1 ? 'open space' : 'upper air' ) : b < 0 ? '…' : BIOMES[ b ];
         hud.coord.textContent = `${worldPos.x.toFixed( 0 )}, ${worldPos.z.toFixed( 0 )}`;
         const s = player.world.stats, f = far.stats;
         hud.chunks.textContent = `${s.loaded}${s.pending ? ` +${s.pending}` : ''} · ${f.fine + f.coarse} tiles`;
-        hud.mode.textContent = ( player.flying ? 'flying' : under ? 'under' : player.inWater() ? 'swimming' : 'on foot' ) + ( onPlanet ? ` on ${player.shell.body.name}` : '' );
+        const where = onPlanet ? ` on ${player.shell.body.name}` : player.shell.radial ? ' on an asteroid' : player.shell.interior ? ` aboard ${player.shell.vessel.name || player.shell.vessel.cls + ' ship'}` : '';
+        hud.mode.textContent = ( player.flying ? 'flying' : under ? 'under' : player.inWater() ? 'swimming' : 'on foot' ) + where;
         hud.speed.textContent = speed < 1000 ? `${speed.toFixed( 0 )} m/s` : `${( speed / 1000 ).toFixed( 1 )} km/s`;
         const n = space.nearest( worldPos );
         hud.body.textContent = n ? `${n.name} (${n.kind}) ${fmtDist( Math.max( 0, n.d ) )}` : '–';
@@ -264,4 +318,4 @@ function frame() {
 }
 frame();
 
-window.__strata = { world, home, far, space, player, crumbs, pool, seed, renderer, scene, travel, enterShell, leaveShell };
+window.__strata = { world, home, far, space, player, crumbs, pool, seed, renderer, scene, travel, enterShell, leaveShell, enterInterior, exitInterior, useAirlock };

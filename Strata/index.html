@@ -31,6 +31,7 @@
     <canvas id="view"></canvas>
     <div id="tint" aria-hidden="true"></div>
     <div id="crosshair" aria-hidden="true"></div>
+    <div id="prompt" aria-live="polite"></div>
 
     <div id="stamp-block" aria-hidden="true">
         <div id="seed-stamp"></div>
@@ -54,7 +55,7 @@
             <h1>Strata</h1>
             <details class="more">
                 <summary><span>An endless voxel world grown from one seed, with a small solar system above it.</span><i class="arrow" aria-hidden="true"></i></summary>
-                <p>Each 16&times;16 column of ground is carved in a background worker as you reach it, so the same word always grows the same continents, forests and seas. Climb and the ground coarsens into heightfield tiles, the sky thins to stars, and the same seed hangs five planets, an asteroid belt, ships from skiffs to capitals and ring stations overhead, each rendered in more detail the closer you fly. Drop onto any rocky planet and it becomes voxels under your feet, with its own gravity.</p>
+                <p>Each 16&times;16 column of ground is carved in a background worker as you reach it, so the same word always grows the same continents, forests and seas. Climb and the ground coarsens into heightfield tiles, the sky thins to stars, and the same seed hangs five planets, an asteroid belt, ships from skiffs to capitals and ring stations overhead, each rendered in more detail the closer you fly. Drop onto any planet, or an asteroid, and it becomes voxels under your feet with its own gravity; find the beacon on a ship or station and step inside.</p>
             </details>
             <div class="field">
                 <label for="seed-input">seed</label>
@@ -93,6 +94,7 @@
                 <dt><kbd>V</kbd></dt><dd>toggle flight</dd>
                 <dt><kbd>B</kbd></dt><dd>breadcrumbs on/off, <kbd>X</kbd> clears the trail</dd>
                 <dt><kbd>1</kbd>&ndash;<kbd>8</kbd> <kbd>0</kbd></dt><dd>jump to a planet, the nearest asteroid, ship or station, or home</dd>
+                <dt><kbd>Enter</kbd></dt><dd>use an airlock: board a ship or station at its beacon, or step back out at the door</dd>
                 <dt>mouse</dt><dd>look &middot; <kbd>Esc</kbd> releases</dd>
             </dl>
             </details>

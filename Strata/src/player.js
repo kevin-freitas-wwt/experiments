@@ -72,6 +72,13 @@ export class Player {
     }
 
     collides( p ) {
+        if ( this.shell.radial ) {
+            const t = new THREE.Vector3();
+            for ( const [ dx, dz ] of [ [ -HALF, -HALF ], [ HALF, -HALF ], [ HALF, HALF ], [ -HALF, HALF ], [ 0, 0 ] ] )
+                for ( const dy of [ 0.05, TALL * 0.5, TALL - 0.05 ] )
+                    if ( this.shell.solidAtLocal( t.set( p.x + dx, p.y + dy, p.z + dz ) ) ) return true;
+            return false;
+        }
         const x0 = Math.floor( p.x - HALF ), x1 = Math.floor( p.x + HALF );
         const z0 = Math.floor( p.z - HALF ), z1 = Math.floor( p.z + HALF );
         const y0 = Math.floor( p.y ), y1 = Math.floor( p.y + TALL - 0.01 );
@@ -99,7 +106,9 @@ export class Player {
         const run = this.any( [ 'ShiftLeft', 'ShiftRight' ] );
         const swim = this.inWater() && ! this.flying;
         let clearance;
-        if ( this.shell.planet ) clearance = Math.max( 0, this.pos.y - this.world.top( Math.floor( this.pos.x ), Math.floor( this.pos.z ) ) - 3 );
+        const radial = this.shell.radial;
+        if ( radial ) clearance = Math.max( 0, this.pos.length() - this.shell.rock.radius - 2 );
+        else if ( this.shell.planet || this.shell.interior ) clearance = Math.max( 0, this.pos.y - this.world.top( Math.floor( this.pos.x ), Math.floor( this.pos.z ) ) - 3 );
         else {
             clearance = Math.max( 0, this.pos.y - SEA - 40 );
             if ( space ) { const n = space.nearest( this.pos ); if ( n ) clearance = Math.min( clearance, Math.max( 0, n.d ) ); }
@@ -125,8 +134,9 @@ export class Player {
         } else if ( swim ) {
             this.vel.y += ( ( up ? 3.5 : -1.2 ) - this.vel.y ) * Math.min( 1, 4 * dt );
         } else {
-            this.vel.y = Math.max( -60, this.vel.y - GRAVITY * dt );
-            if ( up && this.grounded ) this.vel.y = JUMP;
+            const g = radial ? 4 : GRAVITY, j = radial ? 3.2 : JUMP;
+            this.vel.y = Math.max( -60, this.vel.y - g * dt );
+            if ( up && this.grounded ) this.vel.y = j;
         }
 
         this.grounded = false;
@@ -148,6 +158,11 @@ export class Player {
             if ( ! this.grounded && ! this.flying && ! swim && this.vel.y === 0 && this.collides( next.clone().setY( next.y - 0.05 ) ) ) this.grounded = true;
         }
         this.pos.copy( next );
+        if ( radial ) {
+            const vr = this.vel.clone().applyQuaternion( this.shell.q );
+            this.shell.retarget( this.pos );
+            this.vel.copy( vr.applyQuaternion( this.shell.q.clone().invert() ) );
+        }
 
         this.placeCamera();
     }

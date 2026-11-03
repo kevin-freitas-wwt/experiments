@@ -1,7 +1,7 @@
 import { fbm, ridged, hash2, fbm3, hash3 } from './noise.js';
 import { KINDS, surfaceAt } from './planet.js';
-import { AIR, STONE, DIRT, GRASS, SAND, WATER, SNOW, LOG, LEAF, NEEDLE, GRAVEL, TUNDRA, CLAY, ICE, BASALT, LAVA, RUST,
-    CHUNK, HEIGHT, SEA, PALETTE, isSolid, isLiquid } from './blocks.js';
+import { AIR, STONE, DIRT, GRASS, SAND, WATER, SNOW, LOG, LEAF, NEEDLE, GRAVEL, TUNDRA, CLAY, ICE, BASALT, LAVA, RUST, CLOUD,
+    PLATE, PANEL, FLOOR, GLASS, LIGHT, CORE, DOOR, CHUNK, HEIGHT, SEA, PALETTE, isSolid, isLiquid, isOpaque } from './blocks.js';
 
 const PAD = 3, P = CHUNK + PAD * 2;
 
@@ -52,6 +52,7 @@ function surface( biome, depth, x, z, seed ) {
         case 10: return depth === 0 ? SNOW : ICE;
         case 11: return BASALT;
         case 12: return ICE;
+        case 13: return CLOUD;
     }
     return STONE;
 }
@@ -71,6 +72,11 @@ function planetColumn( t ) {
         const sea = seaR > 0 ? Math.round( cosA * seaR - t.R0 + BASE ) : -1;
         const wet = h < sea - 2, shore = h <= sea + 1;
         let biome;
+        if ( t.planet === 'gas' ) {
+            const puff = fbm( x / 22, z / 22, seed + 31, 4 );
+            const hh = Math.max( 1, Math.min( HEIGHT - 12, Math.round( cosA * t.radius - t.R0 + BASE + puff * 9 ) ) );
+            return { h: puff < -0.42 ? 1 : hh, biome: 13, sea: -1, liquid: WATER };
+        }
         if ( t.planet === 'lush' ) biome = wet ? 0 : shore ? 1 : fbm( x / 160, z / 160, seed + 21, 3 ) > 0 ? 3 : 2;
         else if ( t.planet === 'icy' ) biome = wet ? 12 : 10;
         else if ( t.planet === 'ember' ) biome = wet ? 11 : 9;
@@ -79,7 +85,7 @@ function planetColumn( t ) {
     };
 }
 
-const DENSITY = [ 0, 0, 0.007, 0.08, 0.004, 0.001, 0.05, 0.012, 0, 0, 0, 0, 0 ];
+const DENSITY = [ 0, 0, 0.007, 0.08, 0.004, 0.001, 0.05, 0.012, 0, 0, 0, 0, 0, 0, 0 ];
 
 function stampTree( vol, px, pz, h, biome, x, z, seed ) {
     const r = hash2( x, z, seed + 77 );
@@ -113,6 +119,15 @@ function generate( cx, cz, seed, terrain ) {
     const vol = new Uint8Array( P * P * HEIGHT );
     const cols = new Array( P * P );
     const ox = cx * CHUNK - PAD, oz = cz * CHUNK - PAD;
+    if ( terrain && terrain.interior ) {
+        const lay = interiorLayout( terrain );
+        for ( let px = 0; px < P; px++ ) for ( let pz = 0; pz < P; pz++ ) {
+            const base = ( px * P + pz ) * HEIGHT;
+            cols[ px * P + pz ] = { h: 1, biome: 14, sea: -1 };
+            for ( let y = 0; y <= lay.H; y++ ) vol[ base + y ] = lay.blockAt( ox + px, y, oz + pz );
+        }
+        return { vol, cols };
+    }
     const colAt = terrain && terrain.planet ? planetColumn( terrain ) : ( x, z, sd ) => ( { ...column( x, z, sd ), sea: SEA, liquid: WATER } );
     for ( let px = 0; px < P; px++ ) for ( let pz = 0; pz < P; pz++ ) {
         const x = ox + px, z = oz + pz;
@@ -170,7 +185,7 @@ class Builder {
 function mesh( vol, cx, cz, seed ) {
     const solid = new Builder(), water = new Builder();
     const at = ( x, y, z ) => ( y < 0 || y >= HEIGHT ) ? AIR : vol[ ( ( x + PAD ) * P + z + PAD ) * HEIGHT + y ];
-    const occ = ( x, y, z ) => isSolid( at( x, y, z ) ) ? 1 : 0;
+    const occ = ( x, y, z ) => isOpaque( at( x, y, z ) ) ? 1 : 0;
     const ao = new Array( 4 ), rgb = [ 0, 0, 0 ];
     for ( let x = 0; x < CHUNK; x++ ) for ( let z = 0; z < CHUNK; z++ ) for ( let y = 0; y < HEIGHT; y++ ) {
         const b = at( x, y, z );
@@ -182,11 +197,16 @@ function mesh( vol, cx, cz, seed ) {
             }
             continue;
         }
+        if ( b === GLASS ) {
+            ao.fill( 3 );
+            for ( const d of DIRS ) if ( at( x + d.n[ 0 ], y + d.n[ 1 ], z + d.n[ 2 ] ) === AIR ) water.quad( x, y, z, d, PALETTE[ GLASS ].map( ( c ) => c * d.shade ), ao );
+            continue;
+        }
         const wx = cx * CHUNK + x, wz = cz * CHUNK + z;
         const jitter = 0.93 + hash2( wx * 7 + y, wz * 13 - y, seed ) * 0.14;
         for ( const d of DIRS ) {
             const nx = x + d.n[ 0 ], ny = y + d.n[ 1 ], nz = z + d.n[ 2 ];
-            if ( isSolid( at( nx, ny, nz ) ) ) continue;
+            if ( isOpaque( at( nx, ny, nz ) ) ) continue;
             const src = ( d.n[ 1 ] === 0 && ( b === GRASS || b === TUNDRA ) ) ? DIRT : b;
             const base = PALETTE[ src ];
             const s = d.shade * jitter;
@@ -353,7 +373,69 @@ function rock( { size, seed } ) {
         const j = 0.85 + hash3( x, y, z, seed ) * 0.3;
         return [ base[ 0 ] * j, base[ 1 ] * j, base[ 2 ] * j ];
     } );
-    return m;
+    return { ...m, vol };
+}
+
+const INTERIOR = {
+    small:   { W: 14, H: 4, L: 40 },
+    medium:  { W: 24, H: 5, L: 80 },
+    capital: { W: 40, H: 6, L: 150 },
+    station: { R: 90, H: 5 },
+};
+
+function interiorLayout( t ) {
+    const seed = t.seed, r = ( i, j ) => hash2( i, j, seed );
+    if ( t.cls === 'station' ) {
+        const { R, H } = INTERIOR.station, hub = 16, segs = 10 + Math.floor( r( 1, 1 ) * 6 ), spokes = 3 + Math.floor( r( 2, 1 ) * 3 );
+        return { H, blockAt: ( x, y, z ) => {
+            const rad = Math.hypot( x, z ), a = Math.atan2( z, x );
+            const seg = ( ( a / ( Math.PI * 2 ) * segs ) % 1 + 1 ) % 1, segI = Math.floor( ( a / ( Math.PI * 2 ) + 1 ) * segs ) % segs;
+            const spoke = ( () => { for ( let i = 0; i < spokes; i++ ) { const sa = i / spokes * Math.PI * 2; const t2 = Math.abs( x * Math.sin( sa ) - z * Math.cos( sa ) ), along = x * Math.cos( sa ) + z * Math.sin( sa ); if ( along > 0 && t2 < 4 && along < R ) return t2; } return 9; } )();
+            const inHub = rad < hub + 2, inRing = rad > R - 5 && rad < R + 14, inSpoke = spoke < 4;
+            if ( ! inHub && ! inRing && ! inSpoke ) return AIR;
+            if ( y === 0 ) return FLOOR;
+            if ( y >= H ) return ( inRing && rad > R - 3 && rad < R + 3 && Math.floor( a * R ) % 7 === 0 ) ? LIGHT : PLATE;
+            if ( inHub ) {
+                if ( rad > hub ) return y === 2 && Math.floor( a * 10 ) % 2 ? GLASS : PLATE;
+                if ( x >= 0 && x < 1 && z >= 0 && z < 1 ) return y <= 2 ? DOOR : AIR;
+                if ( rad > 4 && rad < 5.2 && y < 3 && Math.abs( Math.sin( a * 2 ) ) > 0.75 ) return CORE;
+                return ( rad > 8 && rad < 9 && Math.floor( a * 3 ) % 2 && y < 2 ) ? PANEL : AIR;
+            }
+            if ( inSpoke && rad < R - 3 ) return spoke > 2 ? ( y === 2 && Math.floor( rad ) % 6 === 0 ? GLASS : PLATE ) : AIR;
+            if ( rad >= R - 3 && rad <= R + 3 ) return AIR;
+            if ( rad < R - 3 ) return PLATE;
+            if ( rad > R + 12 ) return ( y === 2 || y === 3 ) && ( segI % 2 === 0 ) ? GLASS : PLATE;
+            const wall = seg < 0.5 / segs || seg > 1 - 0.5 / segs;
+            if ( wall ) return PANEL;
+            if ( rad > R + 3 && rad < R + 5 ) return Math.abs( seg - 0.5 ) < 0.4 / segs && y < 3 ? AIR : PANEL;
+            if ( r( Math.floor( x / 2 ), Math.floor( z / 2 ) ) < 0.05 && y < 2 ) return PANEL;
+            return AIR;
+        } };
+    }
+    const { W, H, L } = INTERIOR[ t.cls ], mid = Math.floor( W / 2 ), door = Math.floor( L / 2 );
+    const bounds = [];
+    for ( let z = 2; z < L - 14; ) { const len = 6 + Math.floor( r( z, 9 ) * 7 ); bounds.push( z + len ); z += len; }
+    const isWall = ( z ) => bounds.includes( z );
+    return { H, blockAt: ( x, y, z ) => {
+        if ( x < 0 || x >= W || z < 0 || z >= L || y > H ) return AIR;
+        if ( y === 0 ) return FLOOR;
+        if ( y === H ) return ( Math.abs( x - mid ) <= 1 && z % 4 === 0 ) || ( z > L - 14 && z % 5 === 0 && x % 5 === 0 ) ? LIGHT : PLATE;
+        if ( z === L - 1 ) return y >= 1 && y <= H - 1 && x > 1 && x < W - 2 ? GLASS : PLATE;
+        if ( x === W - 1 && z === door && y <= 2 ) return DOOR;
+        if ( x === 0 || x === W - 1 ) return ( y === 2 && z % 6 === 3 && z > 12 ) ? GLASS : PLATE;
+        if ( z === 0 ) return PLATE;
+        if ( z > L - 14 ) return ( z === L - 14 && Math.abs( x - mid ) > 1 ) ? PANEL : ( z === L - 6 && ( x === mid - 3 || x === mid + 3 ) && y < 2 ? PANEL : AIR );
+        if ( Math.abs( x - mid ) <= 1 ) return AIR;
+        if ( z < 12 ) {
+            if ( z === 11 && Math.abs( x - mid ) > 1 && ! ( Math.abs( x - mid ) === 2 && y < 3 ) ) return PANEL;
+            const dx = Math.abs( x - mid ), core = ( x < mid ? mid - 5 : mid + 5 );
+            return Math.abs( x - core ) <= 1 && z > 4 && z < 9 && y <= 3 ? CORE : dx === 2 ? AIR : AIR;
+        }
+        if ( Math.abs( x - mid ) === 2 ) return ( isWall( z ) || isWall( z + 1 ) ) ? PANEL : ( Math.abs( ( z % 9 ) - 4 ) < 1 && y < 3 ? AIR : PANEL );
+        if ( isWall( z ) ) return PANEL;
+        if ( r( x, z ) < 0.08 && y < 2 ) return PANEL;
+        return AIR;
+    } };
 }
 
 const SHIP_CLASSES = {

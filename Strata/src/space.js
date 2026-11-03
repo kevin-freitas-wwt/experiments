@@ -112,7 +112,7 @@ export class Space {
 
     updatePatch( body, camPos ) {
         const d = camPos.distanceTo( body.pos ), alt = Math.max( 0, d - this.surfaceRadius( body, camPos ) );
-        const wantPatch = d / body.radius < 1.6 * this.scale && body.kind !== 'gas';
+        const wantPatch = d / body.radius < 1.6 * this.scale;
         if ( ! wantPatch ) {
             if ( body.patch ) { body.group.remove( body.patch ); body.patch.geometry.dispose(); body.patch = null; }
             return;
@@ -193,8 +193,11 @@ export class Space {
                 const m = new THREE.Mesh( this.voxelGeometry( data ), rockMat );
                 m.scale.setScalar( voxel );
                 ship.mesh = m;
+                ship.seed = this.seed * 7 + i;
                 sprite.position.set( 0, 0, -( cls === 'capital' ? 48 : cls === 'medium' ? 20 : 9 ) * voxel );
                 ship.group.add( m );
+                const W = cls === 'capital' ? 34 : cls === 'medium' ? 17 : 9;
+                this.airlock( ship, new THREE.Vector3( W / 2 * voxel + 2, 0, 0 ) );
             } );
         } );
         this.stations = [];
@@ -209,9 +212,44 @@ export class Space {
                 const m = new THREE.Mesh( this.voxelGeometry( data ), rockMat );
                 m.scale.setScalar( st.voxel );
                 st.mesh = m;
+                st.seed = this.seed * 11 + i;
                 st.group.add( m );
+                this.airlock( st, new THREE.Vector3( 0, 13 * st.voxel + 2, 0 ) );
             } );
         }
+    }
+
+    airlock( vessel, local ) {
+        const mark = new THREE.Group();
+        mark.position.copy( local );
+        const door = new THREE.Mesh( new THREE.BoxGeometry( 3, 4, 3 ), new THREE.MeshBasicMaterial( { color: 0xe0802a } ) );
+        const beacon = new THREE.Sprite( new THREE.SpriteMaterial( { map: this.glow, color: 0x9fe8ff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true } ) );
+        beacon.scale.setScalar( 14 );
+        mark.add( door, beacon );
+        vessel.group.add( mark );
+        vessel.airlock = mark;
+    }
+
+    nearestAirlock( pos ) {
+        let best = null;
+        const p = new THREE.Vector3();
+        for ( const v of [ ...this.ships, ...this.stations ] ) {
+            if ( ! v.airlock ) continue;
+            v.airlock.getWorldPosition( p );
+            const d = p.distanceTo( pos );
+            if ( ! best || d < best.d ) best = { vessel: v, point: p.clone(), d };
+        }
+        return best;
+    }
+
+    airlockPoint( vessel, out = new THREE.Vector3() ) {
+        return vessel.airlock.getWorldPosition( out );
+    }
+
+    nearestRock( pos, withMesh = false ) {
+        let best = null;
+        for ( const r of this.rocks ) { if ( withMesh && ! r.mesh ) continue; const d = r.pos.distanceTo( pos ); if ( ! best || d < best.d ) best = { rock: r, d }; }
+        return best && best.rock;
     }
 
     voxelGeometry( data ) {
@@ -260,7 +298,7 @@ export class Space {
         for ( const b of this.bodies ) {
             const d = pos.distanceTo( b.pos );
             if ( d > b.radius * 1.4 ) continue;
-            const r = ( b.kind === 'gas' ? b.radius * 1.02 : this.surfaceRadius( b, pos ) ) + 2;
+            const r = this.surfaceRadius( b, pos ) + 2;
             if ( d < r ) { pos.sub( b.pos ).setLength( r ).add( b.pos ); hit = b; }
         }
         return hit;
@@ -270,16 +308,10 @@ export class Space {
         let best = null;
         for ( const b of this.bodies ) {
             let d = pos.distanceTo( b.pos ) - b.radius;
-            if ( d < b.radius * 0.4 && b.kind !== 'gas' ) d = pos.distanceTo( b.pos ) - this.surfaceRadius( b, pos );
+            if ( d < b.radius * 0.4 ) d = pos.distanceTo( b.pos ) - this.surfaceRadius( b, pos );
             if ( ! best || d < best.d ) best = { name: b.name, kind: b.kind, d };
         }
         return best;
-    }
-
-    nearestRock( pos ) {
-        let best = null;
-        for ( const r of this.rocks ) { const d = r.pos.distanceTo( pos ); if ( ! best || d < best.d ) best = { rock: r, d }; }
-        return best.rock;
     }
 
     nearestShip( pos ) {
@@ -311,7 +343,7 @@ export class Space {
             this.orbitPoint( st, st.angle, st.group.position );
             st.group.rotation.y += st.spin * dt;
         }
-        for ( const r of this.rocks ) if ( r.mesh ) { r.rot.x += r.spin.x * dt; r.rot.y += r.spin.y * dt; r.rot.z += r.spin.z * dt; r.mesh.rotation.copy( r.rot ); }
+        for ( const r of this.rocks ) if ( r.mesh ) { r.rot.x += r.spin.x * dt; r.rot.y += r.spin.y * dt; r.rot.z += r.spin.z * dt; r.mesh.rotation.copy( r.rot ); r.frame.rotation.copy( r.rot ); }
         this.timer -= dt;
         if ( this.timer > 0 ) return;
         this.timer = 0.5;
@@ -339,12 +371,15 @@ export class Space {
                     r.mesh = new THREE.Mesh( g, rockMat );
                     r.mesh.position.copy( r.pos );
                     r.mesh.scale.setScalar( r.voxel );
-                    this.scene.add( r.mesh );
+                    r.vol = data.vol;
+                    r.frame = new THREE.Group();
+                    r.frame.position.copy( r.pos );
+                    this.scene.add( r.mesh, r.frame );
                     fadeIn( r.mesh, 0.5 );
                 } );
             } else if ( d > nearR * 2 && r.want ) {
                 r.want = false;
-                if ( r.mesh ) { this.scene.remove( r.mesh ); r.mesh.geometry.dispose(); r.mesh = null; }
+                if ( r.mesh ) { this.scene.remove( r.mesh, r.frame ); r.mesh.geometry.dispose(); r.mesh = null; r.frame = null; }
             }
             dummy.position.copy( r.pos );
             dummy.scale.setScalar( r.mesh ? 0.0001 : r.radius * 0.9 );
