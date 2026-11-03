@@ -39,3 +39,28 @@ export function ridged( x, y, seed, octaves = 5 ) {
     }
     return sum / norm;
 }
+
+export function hash3( x, y, z, seed ) {
+    return hash2( x + z * 7919, y + z * 104729, seed );
+}
+
+export function value3( x, y, z, seed ) {
+    const xi = Math.floor( x ), yi = Math.floor( y ), zi = Math.floor( z );
+    const u = fade( x - xi ), v = fade( y - yi ), w = fade( z - zi );
+    const lerp = ( a, b, t ) => a + ( b - a ) * t;
+    const c = ( dx, dy, dz ) => hash3( xi + dx, yi + dy, zi + dz, seed );
+    const x00 = lerp( c( 0, 0, 0 ), c( 1, 0, 0 ), u ), x10 = lerp( c( 0, 1, 0 ), c( 1, 1, 0 ), u );
+    const x01 = lerp( c( 0, 0, 1 ), c( 1, 0, 1 ), u ), x11 = lerp( c( 0, 1, 1 ), c( 1, 1, 1 ), u );
+    return lerp( lerp( x00, x10, v ), lerp( x01, x11, v ), w );
+}
+
+export function fbm3( x, y, z, seed, octaves = 4, gain = 0.5 ) {
+    let sum = 0, amp = 1, norm = 0, f = 1;
+    for ( let i = 0; i < octaves; i++ ) {
+        sum += ( value3( x * f, y * f, z * f, seed + i * 131 ) * 2 - 1 ) * amp;
+        norm += amp;
+        amp *= gain;
+        f *= 2;
+    }
+    return sum / norm;
+}

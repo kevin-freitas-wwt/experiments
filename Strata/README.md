@@ -1,6 +1,6 @@
 # Strata
 
-An endless voxel landscape that is generated as you walk through it. One seed word grows the same continents, forests and seas every time, in every direction.
+An endless voxel landscape that is generated as you walk through it, and a small solar system above it. One seed word grows the same continents, forests and seas every time, hangs the same five planets, asteroid belt and ships overhead, and everything is rendered in more detail the closer you get.
 
 Live: https://kevin-freitas-wwt.github.io/experiments/Strata/
 
@@ -14,7 +14,7 @@ python3 -m http.server 8765      # from the experiments folder
 
 Open http://localhost:8765/Strata/. Three.js loads from jsDelivr via an importmap; there is no build step.
 
-URL parameters: `?seed=word` picks a world, `?r=11` sets the view distance in chunks (4 to 14), `?crumb=8` sets breadcrumb spacing in metres, and `?pose=x,y,z,yaw,pitch` frames a still with the overlay hidden (used for the thumbnail).
+URL parameters: `?seed=word` picks a world, `?r=11` sets the detail radius in chunks (4 to 14; it also scales the heightfield ranges and the distances at which planets and asteroids step up in detail), `?crumb=8` sets breadcrumb spacing in metres, and `?pose=x,y,z,yaw,pitch` frames a still with the overlay hidden (used for the thumbnail).
 
 ## How it is made
 
@@ -25,7 +25,13 @@ The world is split into 16×16 columns, 128 blocks tall. Each chunk is built in 
 3. **Trees.** A per-column hash places broadleaf canopies or conifers. The worker generates a 3-block apron around every chunk so trees straddling a boundary are complete on both sides.
 4. **Meshing.** Only faces that touch air or water are emitted, each with a palette colour, a face shade, a per-block jitter and baked vertex ambient occlusion (the classic 0-to-3 corner count). Water is a single sheet of top faces, drawn translucent in a second pass. Positions, colours, normals and indices come back as transferable buffers.
 
-The main thread keeps a ring of chunks around the player, installs at most three new chunks per frame, and drops anything more than two chunks outside the ring. Movement is a swept AABB (axis-aligned bounding box) against the block grid: `E S D F` to walk, `Shift` to sprint, `A` to jump or rise, `Z` to descend, `V` to toggle flight. `B` turns on breadcrumbs, bright red dots dropped every few metres (spacing from the start card or `?crumb=`) so a route can be retraced; `X` clears them.
+The main thread keeps a ring of chunks around the player, installs at most three new chunks per frame, and drops anything more than two chunks outside the ring. Above 400 m the ring stops following you; the ground beyond it is carried by two levels of heightfield tiles from the same column function (256 m tiles at 8 m steps out to 3 km, 4 km tiles at 128 m steps out to 40 km), each tile hidden once the finer level fully covers it, with a plain sea disc under everything. There is no fog. Instead a vertex shader drops every ground vertex by d²/2R (R = 90 km), so a horizon appears as you climb and the flat world reads as a small planet from orbit.
+
+## Space
+
+Past 1.5 km the sky thins to black and stars fade in. The same seed places five planets (gas giant with rings, lush, icy, rocky, ember) 36 to 110 km out, each an icosphere displaced and coloured by 3D noise in a worker at three detail levels (320, 5,120 and 81,920 triangles) chosen by distance over radius. 110 asteroids, 80 of them in the gas giant's ring plane, are low-poly instances until you come within a few kilometres, when each is generated as a voxel blob and meshed with the same ambient-occlusion mesher as the ground. Ten procedural voxel ships (mirrored random hulls with an engine glow) orbit the inner planets.
+
+Flight speed scales with clearance: 14 m/s on the deck, growing by that much again for every 120 m of height or distance to the nearest planet surface, up to 9 km/s (`Shift` triples it). Space is under a minute away and the same rule slows you down again on approach, so you can land on a planet without overshooting; planets are solid, nothing else is. Movement on the ground is a swept AABB (axis-aligned bounding box) against the block grid: `E S D F` to walk, `Shift` to sprint, `A` to jump or rise, `Z` to descend, `V` to toggle flight. `B` turns on breadcrumbs, bright red dots dropped every few metres (spacing from the start card or `?crumb=`) so a route can be retraced; `X` clears them.
 
 ## Palette
 
@@ -37,8 +43,12 @@ Woodblock-print tones: Prussian-blue water, cream mist on the horizon, ochre san
 | --- | --- |
 | `src/noise.js` | hash, value noise, FBM, ridged noise |
 | `src/blocks.js` | block ids, palette, biome names, constants |
-| `src/worker.js` | terrain generation and meshing |
-| `src/world.js` | chunk ring, worker pool, block queries |
+| `src/worker.js` | terrain generation and meshing, heightfield tiles, planet spheres, asteroid and ship voxels |
+| `src/pool.js` | priority worker pool shared by everything below |
+| `src/world.js` | chunk ring, block queries |
+| `src/far.js` | heightfield tile levels and the sea disc |
+| `src/space.js` | planets, asteroids, ships, stars, sun, planet collision |
+| `src/materials.js` | shared materials and the horizon-curvature shader patch |
 | `src/player.js` | input, physics, camera |
 | `src/crumbs.js` | breadcrumb trail (one InstancedMesh, unfogged so it reads at distance) |
 | `src/main.js` | scene, sky, lights, HUD, URL parameters |

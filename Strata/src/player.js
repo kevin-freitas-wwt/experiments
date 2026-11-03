@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { WATER } from './blocks.js';
+import { WATER, SEA } from './blocks.js';
 
 const KEYS = { fwd: [ 'KeyE', 'ArrowUp' ], back: [ 'KeyD', 'ArrowDown' ], left: [ 'KeyS', 'ArrowLeft' ], right: [ 'KeyF', 'ArrowRight' ], up: [ 'KeyA' ], down: [ 'KeyZ' ] };
 
@@ -61,11 +61,16 @@ export class Player {
         return this.world.block( Math.floor( this.pos.x ), Math.floor( this.pos.y + EYE ), Math.floor( this.pos.z ) ) === WATER;
     }
 
-    step( dt ) {
-        if ( ! this.world.loaded( this.pos.x, this.pos.z ) ) return;
+    step( dt, space ) {
+        const high = this.pos.y > 400;
+        if ( ! high && ! this.world.loaded( this.pos.x, this.pos.z ) ) return;
+        if ( high && ! this.flying ) this.vel.y = Math.max( this.vel.y, -60 );
         const run = this.any( [ 'ShiftLeft', 'ShiftRight' ] );
         const swim = this.inWater() && ! this.flying;
-        const speed = this.flying ? ( run ? 28 : 14 ) : swim ? 3 : ( run ? 9 : 5 );
+        let clearance = Math.max( 0, this.pos.y - SEA - 40 );
+        if ( space ) { const n = space.nearest( this.pos ); if ( n ) clearance = Math.min( clearance, Math.max( 0, n.d ) ); }
+        const flySpeed = Math.min( 9000, 14 * ( 1 + clearance / 120 ) );
+        const speed = this.flying ? flySpeed * ( run ? 3 : 1 ) : swim ? 3 : ( run ? 9 : 5 );
         const sin = Math.sin( this.yaw ), cos = Math.cos( this.yaw );
         let fx = 0, fz = 0;
         if ( this.any( this.keys.fwd ) ) { fx -= sin; fz -= cos; }
@@ -84,23 +89,28 @@ export class Player {
         } else if ( swim ) {
             this.vel.y += ( ( up ? 3.5 : -1.2 ) - this.vel.y ) * Math.min( 1, 4 * dt );
         } else {
-            this.vel.y -= GRAVITY * dt;
+            this.vel.y = Math.max( -60, this.vel.y - GRAVITY * dt );
             if ( up && this.grounded ) this.vel.y = JUMP;
         }
 
         this.grounded = false;
         const next = this.pos.clone();
-        next.x += this.vel.x * dt;
-        if ( this.collides( next ) ) { next.x = this.pos.x; this.vel.x = 0; }
-        next.z += this.vel.z * dt;
-        if ( this.collides( next ) ) { next.z = this.pos.z; this.vel.z = 0; }
-        next.y += this.vel.y * dt;
-        if ( this.collides( next ) ) {
-            if ( this.vel.y < 0 ) this.grounded = true;
-            next.y = this.pos.y;
-            this.vel.y = 0;
+        if ( high ) {
+            next.addScaledVector( this.vel, dt );
+            if ( space && space.resolve( next ) ) this.vel.set( 0, 0, 0 );
+        } else {
+            next.x += this.vel.x * dt;
+            if ( this.collides( next ) ) { next.x = this.pos.x; this.vel.x = 0; }
+            next.z += this.vel.z * dt;
+            if ( this.collides( next ) ) { next.z = this.pos.z; this.vel.z = 0; }
+            next.y += this.vel.y * dt;
+            if ( this.collides( next ) ) {
+                if ( this.vel.y < 0 ) this.grounded = true;
+                next.y = this.pos.y;
+                this.vel.y = 0;
+            }
+            if ( ! this.grounded && ! this.flying && ! swim && this.vel.y === 0 && this.collides( next.clone().setY( next.y - 0.05 ) ) ) this.grounded = true;
         }
-        if ( ! this.grounded && ! this.flying && ! swim && this.vel.y === 0 && this.collides( next.clone().setY( next.y - 0.05 ) ) ) this.grounded = true;
         this.pos.copy( next );
 
         this.camera.position.set( this.pos.x, this.pos.y + EYE, this.pos.z );

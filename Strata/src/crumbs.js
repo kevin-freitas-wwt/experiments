@@ -9,7 +9,7 @@ export class Crumbs {
         this.count = 0;
         this.last = null;
         this.mesh = new THREE.InstancedMesh(
-            new THREE.SphereGeometry( 0.3, 10, 8 ),
+            new THREE.SphereGeometry( 0.22, 10, 8 ),
             new THREE.MeshBasicMaterial( { color: 0xff2614, fog: false } ),
             CAP
         );
@@ -35,7 +35,7 @@ export class Crumbs {
         if ( ! this.on || this.count >= CAP ) return;
         if ( this.last && Math.hypot( pos.x - this.last.x, pos.z - this.last.z ) < this.spacing ) return;
         this.last = pos.clone();
-        this.dummy.position.set( pos.x, pos.y + 0.3, pos.z );
+        this.dummy.position.set( pos.x, pos.y + 0.22, pos.z );
         this.dummy.updateMatrix();
         this.mesh.setMatrixAt( this.count++, this.dummy.matrix );
         this.mesh.count = this.count;

@@ -1,5 +1,8 @@
 import * as THREE from 'three';
+import { Pool } from './pool.js';
 import { World } from './world.js';
+import { FarField } from './far.js';
+import { Space } from './space.js';
 import { Player } from './player.js';
 import { Crumbs } from './crumbs.js';
 import { BIOMES, SEA } from './blocks.js';
@@ -24,40 +27,40 @@ function hashSeed( s ) {
 }
 
 const canvas = document.getElementById( 'view' );
-const renderer = new THREE.WebGLRenderer( { canvas, antialias: false, powerPreference: 'high-performance' } );
+const renderer = new THREE.WebGLRenderer( { canvas, antialias: false, powerPreference: 'high-performance', logarithmicDepthBuffer: true } );
 renderer.setPixelRatio( Math.min( devicePixelRatio, 1.5 ) );
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-const HORIZON = new THREE.Color( 0xeadfca ), ZENITH = new THREE.Color( 0x5d73a3 );
+const HORIZON = new THREE.Color( 0xeadfca ), ZENITH = new THREE.Color( 0x5d73a3 ), BLACK = new THREE.Color( 0x02030a );
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog( HORIZON, radius * 16 * 0.45, radius * 16 * 0.95 );
+const camera = new THREE.PerspectiveCamera( 72, 1, 0.1, 500000 );
 
-const camera = new THREE.PerspectiveCamera( 72, 1, 0.1, radius * 16 * 1.6 );
-
-const sky = new THREE.Mesh(
-    new THREE.SphereGeometry( radius * 16 * 1.4, 24, 12 ),
-    new THREE.ShaderMaterial( {
-        side: THREE.BackSide, depthWrite: false, fog: false,
-        uniforms: { top: { value: ZENITH }, bottom: { value: HORIZON } },
-        vertexShader: 'varying float h; void main(){ h = normalize( position ).y; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }',
-        fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying float h; void main(){ float t = smoothstep( -0.02, 0.75, h ); gl_FragColor = vec4( mix( bottom, top, t ), 1.0 ); }',
-    } )
-);
+const skyMat = new THREE.ShaderMaterial( {
+    side: THREE.BackSide, depthWrite: false, depthTest: false,
+    uniforms: { top: { value: ZENITH.clone() }, bottom: { value: HORIZON.clone() }, space: { value: 0 } },
+    vertexShader: 'varying float h; void main(){ h = normalize( position ).y; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }',
+    fragmentShader: 'uniform vec3 top; uniform vec3 bottom; uniform float space; varying float h; void main(){ float t = smoothstep( -0.02, 0.75, h ); vec3 c = mix( bottom, top, t ); float up = smoothstep( -0.25, 0.15, h ); c = mix( c, vec3( 0.008, 0.012, 0.04 ), space * up + space * space * ( 1.0 - up ) ); gl_FragColor = vec4( c, 1.0 ); }',
+} );
+const sky = new THREE.Mesh( new THREE.SphereGeometry( 300000, 32, 16 ), skyMat );
+sky.frustumCulled = false;
+sky.renderOrder = -10;
 scene.add( sky );
 
+const sunDir = new THREE.Vector3( 0.6, 0.55, 0.35 );
 const sun = new THREE.DirectionalLight( 0xfff1d6, 2.4 );
-sun.position.set( 0.6, 0.8, 0.35 );
-scene.add( sun, new THREE.HemisphereLight( 0xdcd8ea, 0x7a6a50, 1.15 ) );
+sun.position.copy( sunDir );
+const hemi = new THREE.HemisphereLight( 0xdcd8ea, 0x7a6a50, 1.15 );
+scene.add( sun, hemi, new THREE.AmbientLight( 0x50586c, 0.6 ) );
 
-const world = new World( scene, seed, radius );
+const pool = new Pool();
+const world = new World( scene, pool, seed, radius );
+const far = new FarField( scene, pool, seed, radius );
+const space = new Space( scene, pool, seed, radius, sunDir );
 const player = new Player( camera, world, canvas );
 const crumbs = new Crumbs( scene, spacing );
 
-const hud = {
-    alt: document.getElementById( 'alt' ), biome: document.getElementById( 'biome' ),
-    coord: document.getElementById( 'coord' ), chunks: document.getElementById( 'chunks' ),
-    seed: document.getElementById( 'seed' ), mode: document.getElementById( 'mode' ), crumbs: document.getElementById( 'crumbs' ),
-};
+const hud = {};
+for ( const id of [ 'alt', 'biome', 'coord', 'chunks', 'seed', 'mode', 'crumbs', 'speed', 'body' ] ) hud[ id ] = document.getElementById( id );
 const overlay = document.getElementById( 'overlay' ), seedInput = document.getElementById( 'seed-input' );
 const tint = document.getElementById( 'tint' );
 hud.seed.textContent = seedWord;
@@ -111,39 +114,49 @@ if ( pose ) {
     spawned = true;
 }
 
+const fmtDist = ( m ) => m < 1000 ? `${m.toFixed( 0 )} m` : m < 100000 ? `${( m / 1000 ).toFixed( 1 ) } km` : `${( m / 1000 ).toFixed( 0 ) } km`;
 const timer = new THREE.Timer();
 let hudTimer = 0;
+const lastPos = new THREE.Vector3();
 
 function frame() {
     requestAnimationFrame( frame );
     timer.update();
     const dt = Math.min( 0.05, timer.getDelta() );
-    world.update( player.pos.x, player.pos.z );
+    const alt = player.pos.y - SEA;
+    if ( ! spawned || alt < 400 ) world.update( player.pos.x, player.pos.z );
     world.absorb( 3 );
+    far.update( dt, player.pos, world );
+    lastPos.copy( player.pos );
     if ( ! spawned ) {
         if ( world.loaded( 8, 8 ) ) { player.place( 8, 8 ); spawned = true; }
-    } else if ( ! pose ) { player.step( dt ); crumbs.step( player.pos ); }
+    } else if ( ! pose ) { player.step( dt, space ); crumbs.step( player.pos ); }
     else { camera.position.set( player.pos.x, player.pos.y + 1.62, player.pos.z ); camera.rotation.set( 0, 0, 0 ); camera.rotateY( player.yaw ); camera.rotateX( player.pitch ); }
+    const spaceness = Math.min( 1, Math.max( 0, ( alt - 1500 ) / 9000 ) );
+    skyMat.uniforms.space.value = spaceness;
+    hemi.intensity = 1.15 - spaceness * 1.0;
     sky.position.copy( camera.position );
+    space.update( dt, camera.position, spaceness );
     const under = player.eyeInWater();
     tint.classList.toggle( 'on', under );
-    scene.fog.near = under ? 2 : radius * 16 * 0.45;
-    scene.fog.far = under ? 28 : radius * 16 * 0.95;
-    scene.fog.color.set( under ? 0x1f3d66 : HORIZON );
     hudTimer += dt;
     if ( hudTimer > 0.15 ) {
+        const speed = lastPos.distanceTo( player.pos ) / dt;
         hudTimer = 0;
         const b = world.biome( player.pos.x, player.pos.z );
-        hud.alt.textContent = ( player.pos.y - SEA ).toFixed( 0 );
-        hud.biome.textContent = b < 0 ? '…' : BIOMES[ b ];
+        hud.alt.textContent = fmtDist( alt );
+        hud.biome.textContent = alt > 2000 ? ( spaceness >= 1 ? 'open space' : 'upper air' ) : b < 0 ? '…' : BIOMES[ b ];
         hud.coord.textContent = `${player.pos.x.toFixed( 0 )}, ${player.pos.z.toFixed( 0 )}`;
-        const s = world.stats;
-        hud.chunks.textContent = s.pending ? `${s.loaded} +${s.pending}` : `${s.loaded}`;
+        const s = world.stats, f = far.stats;
+        hud.chunks.textContent = `${s.loaded}${s.pending ? ` +${s.pending}` : ''} · ${f.fine + f.coarse} tiles`;
         hud.mode.textContent = player.flying ? 'flying' : under ? 'under' : player.inWater() ? 'swimming' : 'on foot';
+        hud.speed.textContent = speed < 1000 ? `${speed.toFixed( 0 )} m/s` : `${( speed / 1000 ).toFixed( 1 )} km/s`;
+        const n = space.nearest( player.pos );
+        hud.body.textContent = n ? `${n.name} (${n.kind}) ${fmtDist( Math.max( 0, n.d ) )}` : '–';
         hud.crumbs.textContent = crumbs.on ? `every ${crumbs.spacing} m · ${crumbs.count}` : crumbs.count ? `off · ${crumbs.count}` : 'off';
     }
     renderer.render( scene, camera );
 }
 frame();
 
-window.__strata = { world, player, crumbs, seed };
+window.__strata = { world, far, space, player, crumbs, pool, seed, renderer, scene };

@@ -1,62 +1,46 @@
 import * as THREE from 'three';
 import { CHUNK, HEIGHT, AIR, isSolid } from './blocks.js';
+import { solidMat, waterMat } from './materials.js';
 
 const key = ( cx, cz ) => `${cx},${cz}`;
 
 export class World {
-    constructor( scene, seed, radius ) {
+    constructor( scene, pool, seed, radius ) {
         this.scene = scene;
+        this.pool = pool;
         this.seed = seed;
         this.radius = radius;
         this.chunks = new Map();
         this.pending = new Set();
-        this.queue = [];
         this.inbox = [];
         this.center = null;
-        this.solidMat = new THREE.MeshLambertMaterial( { vertexColors: true } );
-        this.waterMat = new THREE.MeshLambertMaterial( { vertexColors: true, transparent: true, opacity: 0.72, depthWrite: false } );
-        const n = Math.max( 1, Math.min( 4, ( navigator.hardwareConcurrency || 4 ) - 1 ) );
-        this.workers = Array.from( { length: n }, () => {
-            const w = new Worker( new URL( './worker.js', import.meta.url ), { type: 'module' } );
-            w.busy = false;
-            w.onmessage = ( { data } ) => {
-                w.busy = false;
-                this.inbox.push( data );
-                this.pump();
-            };
-            return w;
-        } );
     }
 
     update( x, z ) {
         const cx = Math.floor( x / CHUNK ), cz = Math.floor( z / CHUNK );
         if ( this.center && this.center.cx === cx && this.center.cz === cz ) return;
         this.center = { cx, cz };
-        const r = this.radius, wanted = [];
+        const r = this.radius, inRing = ( p ) => {
+            const dx = p.cx - cx, dz = p.cz - cz;
+            return dx * dx + dz * dz <= r * r + r;
+        };
+        this.pool.cancel( 'chunk', inRing );
+        for ( const k of this.pending ) {
+            const [ pcx, pcz ] = k.split( ',' ).map( Number );
+            if ( ! inRing( { cx: pcx, cz: pcz } ) ) this.pending.delete( k );
+        }
         for ( let dx = -r; dx <= r; dx++ ) for ( let dz = -r; dz <= r; dz++ ) {
             const d2 = dx * dx + dz * dz;
             if ( d2 > r * r + r ) continue;
             const k = key( cx + dx, cz + dz );
-            if ( ! this.chunks.has( k ) && ! this.pending.has( k ) ) wanted.push( { cx: cx + dx, cz: cz + dz, d2 } );
+            if ( this.chunks.has( k ) || this.pending.has( k ) ) continue;
+            this.pending.add( k );
+            this.pool.submit( { type: 'chunk', cx: cx + dx, cz: cz + dz, seed: this.seed }, { priority: d2, tag: 'chunk' } )
+                .then( ( data ) => this.inbox.push( data ) );
         }
-        wanted.sort( ( a, b ) => a.d2 - b.d2 );
-        this.queue = wanted;
         for ( const [ k, c ] of this.chunks ) {
             const dx = c.cx - cx, dz = c.cz - cz;
             if ( dx * dx + dz * dz > ( r + 2 ) * ( r + 2 ) ) this.unload( k );
-        }
-        this.pump();
-    }
-
-    pump() {
-        for ( const w of this.workers ) {
-            if ( w.busy || ! this.queue.length ) continue;
-            const job = this.queue.shift();
-            const k = key( job.cx, job.cz );
-            if ( this.chunks.has( k ) ) continue;
-            this.pending.add( k );
-            w.busy = true;
-            w.postMessage( { cx: job.cx, cz: job.cz, seed: this.seed } );
         }
     }
 
@@ -66,11 +50,11 @@ export class World {
 
     install( data ) {
         const k = key( data.cx, data.cz );
+        if ( ! this.pending.has( k ) || this.chunks.has( k ) ) return;
         this.pending.delete( k );
-        if ( this.chunks.has( k ) ) return;
         const group = new THREE.Group();
         group.position.set( data.cx * CHUNK, 0, data.cz * CHUNK );
-        for ( const [ part, mat ] of [ [ data.solid, this.solidMat ], [ data.water, this.waterMat ] ] ) {
+        for ( const [ part, mat ] of [ [ data.solid, solidMat ], [ data.water, waterMat ] ] ) {
             if ( ! part.idx.length ) continue;
             const g = new THREE.BufferGeometry();
             g.setAttribute( 'position', new THREE.BufferAttribute( part.pos, 3 ) );
@@ -78,9 +62,7 @@ export class World {
             g.setAttribute( 'normal', new THREE.BufferAttribute( part.nrm, 3, true ) );
             g.setIndex( new THREE.BufferAttribute( part.idx, 1 ) );
             g.computeBoundingSphere();
-            const m = new THREE.Mesh( g, mat );
-            m.frustumCulled = true;
-            group.add( m );
+            group.add( new THREE.Mesh( g, mat ) );
         }
         this.scene.add( group );
         this.chunks.set( k, { cx: data.cx, cz: data.cz, group, blocks: data.blocks, biomes: data.biomes } );
@@ -102,8 +84,7 @@ export class World {
         if ( y < 0 || y >= HEIGHT ) return AIR;
         const c = this.chunkAt( x, z );
         if ( ! c ) return undefined;
-        const lx = x - c.cx * CHUNK, lz = z - c.cz * CHUNK;
-        return c.blocks[ ( lx * CHUNK + lz ) * HEIGHT + y ];
+        return c.blocks[ ( ( x - c.cx * CHUNK ) * CHUNK + ( z - c.cz * CHUNK ) ) * HEIGHT + y ];
     }
 
     solidAt( x, y, z ) {
@@ -127,6 +108,6 @@ export class World {
     }
 
     get stats() {
-        return { loaded: this.chunks.size, pending: this.pending.size + this.queue.length };
+        return { loaded: this.chunks.size, pending: this.pending.size };
     }
 }

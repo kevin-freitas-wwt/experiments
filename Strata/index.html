@@ -41,7 +41,9 @@
         <dt class="k">above sea</dt><dd class="v" id="alt">–</dd>
         <dt class="k">terrain</dt><dd class="v" id="biome">–</dd>
         <dt class="k">position</dt><dd class="v" id="coord">–</dd>
-        <dt class="k">chunks</dt><dd class="v" id="chunks">–</dd>
+        <dt class="k">speed</dt><dd class="v" id="speed">–</dd>
+        <dt class="k">nearest</dt><dd class="v" id="body">–</dd>
+        <dt class="k">loaded</dt><dd class="v" id="chunks">–</dd>
         <dt class="k">mode</dt><dd class="v" id="mode">–</dd>
         <dt class="k">crumbs</dt><dd class="v" id="crumbs">off</dd>
     </dl>
@@ -50,7 +52,7 @@
         <div class="sheet">
             <p class="eyebrow">survey // endless ground</p>
             <h1>Strata</h1>
-            <p>The land is made as you reach it. Each 16&times;16 column of the world is carved in a background worker from one seed, so the same word always grows the same continents, forests and seas, in any direction, for as long as you care to walk.</p>
+            <p>The land is made as you reach it. Each 16&times;16 column of the world is carved in a background worker from one seed, so the same word always grows the same continents, forests and seas. Climb and the ground coarsens into heightfield tiles, the sky thins to stars, and the same seed hangs five planets, an asteroid belt and a handful of ships overhead, each rendered in more detail the closer you fly.</p>
             <div class="field">
                 <label for="seed-input">seed</label>
                 <input id="seed-input" autocomplete="off" spellcheck="false">
@@ -78,7 +80,7 @@
                 <dt><kbd>E</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd></dt><dd>walk (or arrows)</dd>
                 <dt><kbd>Shift</kbd></dt><dd>sprint</dd>
                 <dt><kbd>A</kbd></dt><dd>jump; rise when swimming or flying</dd>
-                <dt><kbd>Z</kbd></dt><dd>descend when flying</dd>
+                <dt><kbd>Z</kbd></dt><dd>descend when flying; flight speed grows with clearance, so space is a minute away</dd>
                 <dt><kbd>V</kbd></dt><dd>toggle flight</dd>
                 <dt><kbd>B</kbd></dt><dd>breadcrumbs on/off, <kbd>X</kbd> clears the trail</dd>
                 <dt>mouse</dt><dd>look &middot; <kbd>Esc</kbd> releases</dd>
