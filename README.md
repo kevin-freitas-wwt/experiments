@@ -25,6 +25,8 @@ locally, or visit the live site at
 - **[Pixel Pics](https://kevin-freitas-wwt.github.io/experiments/Pixel%20Pics/)** — pixel art tool
 - **[Vid Stacker Web](https://kevin-freitas-wwt.github.io/experiments/Vid%20Stacker%20Web/)** — web version of the Vid Stacker frame stacker
 - **[Innertris](https://kevin-freitas-wwt.github.io/experiments/Innertris/)** — first-person Tetris, fly into the well and bump pieces to move them, fire a laser to spin them
+- **[Strata](https://kevin-freitas-wwt.github.io/experiments/Strata/)** — endless voxel landscape generated chunk by chunk in workers as you walk: one seed word, nine biomes, forests and seas, baked vertex AO, walk/swim/fly. Three.js, no build step
+- **[Scatter](https://kevin-freitas-wwt.github.io/experiments/Scatter/)** — storage with no server: files are Reed–Solomon split into one shard per browser in a shared vault, any k of n rebuild them, peers repair each other. WebRTC via Trystero on public Nostr relays (handshake only), BroadcastChannel for local tabs
 
 ## Adding a new project
 
