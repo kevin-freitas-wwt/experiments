@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scatter</title>
+    <meta name="description" content="A storage system with no server: files are erasure-coded into shards that live only in the browsers of a shared vault, any k of n rebuild the file, and peers repair each other.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="experiments by Kevin">
+    <meta property="og:title" content="Scatter">
+    <meta property="og:description" content="A storage system with no server: files are erasure-coded into shards that live only in the browsers of a shared vault, any k of n rebuild the file, and peers repair each other.">
+    <meta property="og:url" content="https://kevin-freitas-wwt.github.io/experiments/Scatter/">
+    <meta property="og:image" content="https://kevin-freitas-wwt.github.io/experiments/Scatter/thumb.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Scatter">
+    <meta name="twitter:description" content="Storage with no server: erasure-coded shards that live only in browsers.">
+    <meta name="twitter:image" content="https://kevin-freitas-wwt.github.io/experiments/Scatter/thumb.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./scatter.css" />
+</head>
+<body>
+    <main class="panel">
+        <header class="top">
+            <div class="brand">
+                <h1>Scatter</h1>
+                <p>Storage with no server. A file is erasure-coded into one shard per browser in the vault; any <em>k</em> of <em>n</em> shards rebuild it, so peers can vanish and the file survives. Relays carry only an encrypted handshake, never a byte of data.</p>
+            </div>
+            <section class="module vault">
+                <h2>Vault</h2>
+                <div class="row">
+                    <input id="vault" autocomplete="off" spellcheck="false" aria-label="vault name">
+                    <button id="join">join</button>
+                    <button id="new-vault" class="ghost" title="random vault name">new</button>
+                </div>
+                <dl class="leds">
+                    <div><i class="led" id="led-local"></i><dt>you</dt><dd id="self-id">–</dd></div>
+                    <div><i class="led" id="led-relay"></i><dt>nostr relays</dt><dd id="relay-count">0/0</dd></div>
+                </dl>
+                <p class="hint">Share the URL to let another browser in. <button id="spawn" class="link">Open a second peer in this browser</button></p>
+            </section>
+        </header>
+
+        <section class="module peers-mod">
+            <h2>Peers <span class="count" id="peer-count">0</span></h2>
+            <div id="peers" class="peers"></div>
+        </section>
+
+        <section class="module store-mod">
+            <h2>Store <span class="count" id="file-count">0</span></h2>
+            <label id="drop" class="drop">
+                <input id="pick" type="file" multiple hidden>
+                <span class="big">Drop files</span>
+                <span class="sub">or click to choose &middot; 32 MB cap for the demo</span>
+            </label>
+            <div class="scheme">
+                <label for="tolerate">tolerate losing</label>
+                <input id="tolerate" type="range" min="0" max="0" value="1">
+                <output id="scheme"></output>
+            </div>
+            <div id="files" class="files"></div>
+        </section>
+
+        <section class="module log-mod">
+            <h2>Log</h2>
+            <div id="log" class="log"></div>
+        </section>
+
+        <footer class="foot">
+            Reed&ndash;Solomon over GF(256), shards in IndexedDB (Indexed Database), peers over WebRTC (Web Real-Time Communication) via <a href="https://github.com/dmotz/trystero">Trystero</a> on public Nostr relays, same-machine tabs over BroadcastChannel. Close tabs to watch redundancy fall; press repair to rebuild lost shards onto whoever is left.
+        </footer>
+    </main>
+    <script type="module" src="./app.js"></script>
+</body>
+</html>
