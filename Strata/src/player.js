@@ -72,19 +72,20 @@ export class Player {
         const flySpeed = Math.min( 9000, 14 * ( 1 + clearance / 120 ) );
         const speed = this.flying ? flySpeed * ( run ? 3 : 1 ) : swim ? 3 : ( run ? 9 : 5 );
         const sin = Math.sin( this.yaw ), cos = Math.cos( this.yaw );
-        let fx = 0, fz = 0;
-        if ( this.any( this.keys.fwd ) ) { fx -= sin; fz -= cos; }
-        if ( this.any( this.keys.back ) ) { fx += sin; fz += cos; }
+        const cp = this.flying ? Math.cos( this.pitch ) : 1, sp = this.flying ? Math.sin( this.pitch ) : 0;
+        let fx = 0, fy = 0, fz = 0;
+        if ( this.any( this.keys.fwd ) ) { fx -= sin * cp; fy += sp; fz -= cos * cp; }
+        if ( this.any( this.keys.back ) ) { fx += sin * cp; fy -= sp; fz += cos * cp; }
         if ( this.any( this.keys.left ) ) { fx -= cos; fz += sin; }
         if ( this.any( this.keys.right ) ) { fx += cos; fz -= sin; }
-        const len = Math.hypot( fx, fz ) || 1;
+        const len = Math.hypot( fx, fy, fz ) || 1;
         const accel = this.flying || swim ? 6 : ( this.grounded ? 14 : 3 );
         this.vel.x += ( fx / len * speed - this.vel.x ) * Math.min( 1, accel * dt );
         this.vel.z += ( fz / len * speed - this.vel.z ) * Math.min( 1, accel * dt );
 
         const up = this.any( this.keys.up ), dn = this.any( this.keys.down );
         if ( this.flying ) {
-            const target = ( up ? speed : 0 ) - ( dn ? speed : 0 );
+            const target = fy / len * speed + ( up ? speed : 0 ) - ( dn ? speed : 0 );
             this.vel.y += ( target - this.vel.y ) * Math.min( 1, 6 * dt );
         } else if ( swim ) {
             this.vel.y += ( ( up ? 3.5 : -1.2 ) - this.vel.y ) * Math.min( 1, 4 * dt );
