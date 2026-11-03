@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { World } from './world.js';
 import { Player } from './player.js';
+import { Crumbs } from './crumbs.js';
 import { BIOMES, SEA } from './blocks.js';
 
 const params = new URLSearchParams( location.search );
@@ -8,6 +9,7 @@ const seedWord = params.get( 'seed' ) || randomWord();
 const seed = hashSeed( seedWord );
 const radius = Math.max( 4, Math.min( 14, parseInt( params.get( 'r' ) || '8', 10 ) ) );
 const pose = params.get( 'pose' );
+const spacing = Math.max( 1, Math.min( 64, parseFloat( params.get( 'crumb' ) || '8' ) ) );
 
 function randomWord() {
     const a = [ 'ash', 'reed', 'moss', 'fen', 'tor', 'kelp', 'dune', 'cairn', 'scree', 'brine', 'loam', 'frost' ];
@@ -49,11 +51,12 @@ scene.add( sun, new THREE.HemisphereLight( 0xdcd8ea, 0x7a6a50, 1.15 ) );
 
 const world = new World( scene, seed, radius );
 const player = new Player( camera, world, canvas );
+const crumbs = new Crumbs( scene, spacing );
 
 const hud = {
     alt: document.getElementById( 'alt' ), biome: document.getElementById( 'biome' ),
     coord: document.getElementById( 'coord' ), chunks: document.getElementById( 'chunks' ),
-    seed: document.getElementById( 'seed' ), mode: document.getElementById( 'mode' ),
+    seed: document.getElementById( 'seed' ), mode: document.getElementById( 'mode' ), crumbs: document.getElementById( 'crumbs' ),
 };
 const overlay = document.getElementById( 'overlay' ), seedInput = document.getElementById( 'seed-input' );
 const tint = document.getElementById( 'tint' );
@@ -71,6 +74,13 @@ document.getElementById( 'enter' ).addEventListener( 'click', () => {
     }
     overlay.classList.add( 'hidden' );
     canvas.requestPointerLock();
+} );
+document.getElementById( 'crumb-spacing' ).value = String( spacing );
+document.getElementById( 'crumb-spacing' ).addEventListener( 'change', ( e ) => { crumbs.spacing = parseFloat( e.target.value ); } );
+document.addEventListener( 'keydown', ( e ) => {
+    if ( e.repeat || ! overlay.classList.contains( 'hidden' ) ) return;
+    if ( e.code === 'KeyB' ) crumbs.toggle();
+    if ( e.code === 'KeyX' ) crumbs.clear();
 } );
 document.getElementById( 'reroll' ).addEventListener( 'click', () => { seedInput.value = randomWord(); } );
 document.getElementById( 'radius' ).value = String( radius );
@@ -112,7 +122,7 @@ function frame() {
     world.absorb( 3 );
     if ( ! spawned ) {
         if ( world.loaded( 8, 8 ) ) { player.place( 8, 8 ); spawned = true; }
-    } else if ( ! pose ) player.step( dt );
+    } else if ( ! pose ) { player.step( dt ); crumbs.step( player.pos ); }
     else { camera.position.set( player.pos.x, player.pos.y + 1.62, player.pos.z ); camera.rotation.set( 0, 0, 0 ); camera.rotateY( player.yaw ); camera.rotateX( player.pitch ); }
     sky.position.copy( camera.position );
     const under = player.eyeInWater();
@@ -130,9 +140,10 @@ function frame() {
         const s = world.stats;
         hud.chunks.textContent = s.pending ? `${s.loaded} +${s.pending}` : `${s.loaded}`;
         hud.mode.textContent = player.flying ? 'flying' : under ? 'under' : player.inWater() ? 'swimming' : 'on foot';
+        hud.crumbs.textContent = crumbs.on ? `every ${crumbs.spacing} m · ${crumbs.count}` : crumbs.count ? `off · ${crumbs.count}` : 'off';
     }
     renderer.render( scene, camera );
 }
 frame();
 
-window.__strata = { world, player, seed };
+window.__strata = { world, player, crumbs, seed };

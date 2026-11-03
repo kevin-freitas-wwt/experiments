@@ -43,6 +43,7 @@
         <dt class="k">position</dt><dd class="v" id="coord">–</dd>
         <dt class="k">chunks</dt><dd class="v" id="chunks">–</dd>
         <dt class="k">mode</dt><dd class="v" id="mode">–</dd>
+        <dt class="k">crumbs</dt><dd class="v" id="crumbs">off</dd>
     </dl>
 
     <div id="overlay">
@@ -64,12 +65,22 @@
                     <option value="14">horizon (14 chunks)</option>
                 </select>
             </div>
+            <div class="field">
+                <label for="crumb-spacing">breadcrumb spacing</label>
+                <select id="crumb-spacing">
+                    <option value="4">every 4 m</option>
+                    <option value="8">every 8 m</option>
+                    <option value="16">every 16 m</option>
+                    <option value="32">every 32 m</option>
+                </select>
+            </div>
             <dl class="controls">
                 <dt><kbd>E</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd></dt><dd>walk (or arrows)</dd>
                 <dt><kbd>Shift</kbd></dt><dd>sprint</dd>
                 <dt><kbd>A</kbd></dt><dd>jump; rise when swimming or flying</dd>
                 <dt><kbd>Z</kbd></dt><dd>descend when flying</dd>
                 <dt><kbd>V</kbd></dt><dd>toggle flight</dd>
+                <dt><kbd>B</kbd></dt><dd>breadcrumbs on/off, <kbd>X</kbd> clears the trail</dd>
                 <dt>mouse</dt><dd>look &middot; <kbd>Esc</kbd> releases</dd>
             </dl>
             <button id="enter">Set out</button>

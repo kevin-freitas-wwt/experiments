@@ -14,7 +14,7 @@ python3 -m http.server 8765      # from the experiments folder
 
 Open http://localhost:8765/Strata/. Three.js loads from jsDelivr via an importmap; there is no build step.
 
-URL parameters: `?seed=word` picks a world, `?r=11` sets the view distance in chunks (4 to 14), and `?pose=x,y,z,yaw,pitch` frames a still with the overlay hidden (used for the thumbnail).
+URL parameters: `?seed=word` picks a world, `?r=11` sets the view distance in chunks (4 to 14), `?crumb=8` sets breadcrumb spacing in metres, and `?pose=x,y,z,yaw,pitch` frames a still with the overlay hidden (used for the thumbnail).
 
 ## How it is made
 
@@ -25,7 +25,7 @@ The world is split into 16×16 columns, 128 blocks tall. Each chunk is built in 
 3. **Trees.** A per-column hash places broadleaf canopies or conifers. The worker generates a 3-block apron around every chunk so trees straddling a boundary are complete on both sides.
 4. **Meshing.** Only faces that touch air or water are emitted, each with a palette colour, a face shade, a per-block jitter and baked vertex ambient occlusion (the classic 0-to-3 corner count). Water is a single sheet of top faces, drawn translucent in a second pass. Positions, colours, normals and indices come back as transferable buffers.
 
-The main thread keeps a ring of chunks around the player, installs at most three new chunks per frame, and drops anything more than two chunks outside the ring. Movement is a swept AABB (axis-aligned bounding box) against the block grid: `E S D F` to walk, `Shift` to sprint, `A` to jump or rise, `Z` to descend, `V` to toggle flight.
+The main thread keeps a ring of chunks around the player, installs at most three new chunks per frame, and drops anything more than two chunks outside the ring. Movement is a swept AABB (axis-aligned bounding box) against the block grid: `E S D F` to walk, `Shift` to sprint, `A` to jump or rise, `Z` to descend, `V` to toggle flight. `B` turns on breadcrumbs, bright red dots dropped every few metres (spacing from the start card or `?crumb=`) so a route can be retraced; `X` clears them.
 
 ## Palette
 
@@ -40,4 +40,5 @@ Woodblock-print tones: Prussian-blue water, cream mist on the horizon, ochre san
 | `src/worker.js` | terrain generation and meshing |
 | `src/world.js` | chunk ring, worker pool, block queries |
 | `src/player.js` | input, physics, camera |
+| `src/crumbs.js` | breadcrumb trail (one InstancedMesh, unfogged so it reads at distance) |
 | `src/main.js` | scene, sky, lights, HUD, URL parameters |
