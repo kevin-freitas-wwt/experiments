@@ -7,7 +7,6 @@ const params = new URLSearchParams( location.search );
 const seedWord = params.get( 'seed' ) || randomWord();
 const seed = hashSeed( seedWord );
 const radius = Math.max( 4, Math.min( 14, parseInt( params.get( 'r' ) || '8', 10 ) ) );
-const layout = params.get( 'keys' ) === 'esdf' ? 'esdf' : 'wasd';
 const pose = params.get( 'pose' );
 
 function randomWord() {
@@ -49,7 +48,7 @@ sun.position.set( 0.6, 0.8, 0.35 );
 scene.add( sun, new THREE.HemisphereLight( 0xdcd8ea, 0x7a6a50, 1.15 ) );
 
 const world = new World( scene, seed, radius );
-const player = new Player( camera, world, canvas, layout );
+const player = new Player( camera, world, canvas );
 
 const hud = {
     alt: document.getElementById( 'alt' ), biome: document.getElementById( 'biome' ),
@@ -61,7 +60,6 @@ const tint = document.getElementById( 'tint' );
 hud.seed.textContent = seedWord;
 seedInput.value = seedWord;
 document.getElementById( 'seed-stamp' ).textContent = seed.toString().padStart( 5, '0' );
-document.querySelectorAll( '[data-key]' ).forEach( ( el ) => { el.textContent = layout === 'esdf' ? el.dataset.esdf : el.dataset.key; } );
 
 document.getElementById( 'enter' ).addEventListener( 'click', () => {
     const want = seedInput.value.trim();

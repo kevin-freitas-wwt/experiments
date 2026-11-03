@@ -1,18 +1,15 @@
 import * as THREE from 'three';
 import { WATER } from './blocks.js';
 
-const LAYOUTS = {
-    wasd: { fwd: [ 'KeyW', 'ArrowUp' ], back: [ 'KeyS', 'ArrowDown' ], left: [ 'KeyA', 'ArrowLeft' ], right: [ 'KeyD', 'ArrowRight' ] },
-    esdf: { fwd: [ 'KeyE', 'ArrowUp' ], back: [ 'KeyD', 'ArrowDown' ], left: [ 'KeyS', 'ArrowLeft' ], right: [ 'KeyF', 'ArrowRight' ] },
-};
+const KEYS = { fwd: [ 'KeyE', 'ArrowUp' ], back: [ 'KeyD', 'ArrowDown' ], left: [ 'KeyS', 'ArrowLeft' ], right: [ 'KeyF', 'ArrowRight' ], up: [ 'KeyA' ], down: [ 'KeyZ' ] };
 
 const HALF = 0.3, TALL = 1.8, EYE = 1.62, GRAVITY = 26, JUMP = 8.6;
 
 export class Player {
-    constructor( camera, world, canvas, layout = 'wasd' ) {
+    constructor( camera, world, canvas ) {
         this.camera = camera;
         this.world = world;
-        this.keys = LAYOUTS[ layout ] || LAYOUTS.wasd;
+        this.keys = KEYS;
         this.down = new Set();
         this.pos = new THREE.Vector3( 8, 90, 8 );
         this.vel = new THREE.Vector3();
@@ -80,7 +77,7 @@ export class Player {
         this.vel.x += ( fx / len * speed - this.vel.x ) * Math.min( 1, accel * dt );
         this.vel.z += ( fz / len * speed - this.vel.z ) * Math.min( 1, accel * dt );
 
-        const up = this.down.has( 'Space' ), dn = this.any( [ 'KeyC', 'ControlLeft' ] );
+        const up = this.any( this.keys.up ), dn = this.any( this.keys.down );
         if ( this.flying ) {
             const target = ( up ? speed : 0 ) - ( dn ? speed : 0 );
             this.vel.y += ( target - this.vel.y ) * Math.min( 1, 6 * dt );
