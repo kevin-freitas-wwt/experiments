@@ -8,6 +8,15 @@ const KINDS = [ 'lush', 'icy', 'rocky', 'ember' ];
 const NAMES = [ 'Oriel', 'Tamsin', 'Halvard', 'Nerys', 'Cordan', 'Ilse', 'Brannoc', 'Sable', 'Ysolde', 'Marrow', 'Quill', 'Vesper', 'Ashdown', 'Lorn', 'Kestrel', 'Pembray', 'Solenne', 'Thackery', 'Wren', 'Ismay' ];
 const STAR_NAMES = [ 'Aldric', 'Bellane', 'Corvane', 'Dunmore', 'Elsinor', 'Fairweather', 'Galloway', 'Harrow', 'Inverleith', 'Jessamy', 'Kinloch', 'Lammas', 'Morrow', 'Nethercote', 'Orrin', 'Penhallow', 'Quenby', 'Rosslyn', 'Sorrel', 'Tarrant' ];
 const DETAILS = [ 2, 4, 6, 7 ];
+// Main-sequence spectral classes: share of stars, luminosity range (Sun = 1), colour, visual radius. Habitable-zone distance scales with sqrt(L).
+const STARS = [
+    { cls: 'M', share: 0.72, lum: [ 0.03, 0.1 ], color: 0xffb080, radius: 3500, name: 'red dwarf' },
+    { cls: 'K', share: 0.12, lum: [ 0.15, 0.5 ], color: 0xffd0a0, radius: 5000, name: 'orange dwarf' },
+    { cls: 'G', share: 0.08, lum: [ 0.6, 1.5 ], color: 0xfff3dc, radius: 6000, name: 'yellow dwarf' },
+    { cls: 'F', share: 0.05, lum: [ 1.6, 4.5 ], color: 0xf4f6ff, radius: 7500, name: 'white star' },
+    { cls: 'A', share: 0.03, lum: [ 5, 20 ], color: 0xbfd4ff, radius: 10000, name: 'blue-white star' },
+];
+const HZ_BASE = 42000;
 const PATCH_N = 97;
 export const CELL = 500000;
 
@@ -57,32 +66,61 @@ class System {
     }
 
     makeStar() {
-        const warm = this.rnd( 0, 1 );
-        const color = warm < 0.2 ? 0xbfd4ff : warm < 0.6 ? 0xfff3dc : warm < 0.85 ? 0xffd9a0 : 0xffb080;
-        this.starColor = color;
+        let roll = this.home ? 0.9 : this.rnd( 0, 1 ), type = STARS[ 2 ];
+        if ( ! this.home ) for ( const t of STARS ) { if ( roll < t.share ) { type = t; break; } roll -= t.share; }
+        this.starType = type;
+        this.lum = type.lum[ 0 ] + this.rnd( 0, 2 ) * ( type.lum[ 1 ] - type.lum[ 0 ] );
+        this.hz = HZ_BASE * Math.sqrt( this.lum );
+        this.frost = this.hz * 2.7;
+        this.starRadius = type.radius * ( 0.85 + this.rnd( 0, 3 ) * 0.3 );
+        this.starColor = type.color;
         this.starPos = this.home ? this.center.clone().addScaledVector( this.space.sunDir, 300000 ) : this.center.clone();
-        this.star = new THREE.Sprite( new THREE.SpriteMaterial( { map: this.space.glow, color, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true } ) );
-        this.star.scale.setScalar( this.home ? 26000 : 40000 );
+        this.star = new THREE.Sprite( new THREE.SpriteMaterial( { map: this.space.glow, color: type.color, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true } ) );
+        this.star.scale.setScalar( this.starRadius * ( 3 + Math.sqrt( this.lum ) ) );
         this.star.position.copy( this.starPos );
-        this.starBall = new THREE.Mesh( new THREE.SphereGeometry( this.home ? 6000 : 11000, 24, 16 ), new THREE.MeshBasicMaterial( { color } ) );
+        this.starBall = new THREE.Mesh( new THREE.SphereGeometry( this.starRadius, 24, 16 ), new THREE.MeshBasicMaterial( { color: type.color } ) );
         this.starBall.position.copy( this.starPos );
         this.scene.add( this.star, this.starBall );
     }
 
+    // Kind by equilibrium temperature: inside half the habitable distance things are molten or baked bare,
+    // the habitable band holds lush worlds if they are big enough to keep air, cold rocky worlds sit between
+    // there and the frost line, and everything beyond the frost line is ice. Rings favour the cold outer planets.
+    planetKind( q, radius ) {
+        if ( q < 0.45 ) return this.rnd( Math.round( q * 100 ), 13 ) < 0.6 ? 'ember' : 'rocky';
+        if ( q < 0.8 ) return 'rocky';
+        if ( q < 1.6 ) return radius > 2400 ? 'lush' : 'rocky';
+        if ( q < 2.7 ) return this.rnd( Math.round( q * 100 ), 14 ) < 0.5 ? 'rocky' : 'icy';
+        return 'icy';
+    }
+
     makeBodies() {
-        const n = this.home ? 4 + Math.floor( this.rnd( 1, 1 ) * 4 ) : 2 + Math.floor( this.rnd( 1, 1 ) * 7 );
+        const maxN = this.starType.cls === 'M' ? 7 : this.starType.cls === 'K' ? 8 : 8;
+        const n = Math.min( maxN, ( this.home ? 4 : 2 ) + Math.floor( this.rnd( 1, 1 ) * ( this.home ? 4 : 7 ) ) );
         this.rings = [];
+        const inner = this.home ? this.hz * 0.9 : Math.max( this.hz * 0.22, this.starRadius * 4 );
+        const spread = this.home ? 1.5 : this.starType.cls === 'M' ? 1.45 : 1.7;
+        const plane = new THREE.Vector3( ( this.rnd( 1, 2 ) - 0.5 ) * 0.4, 1, ( this.rnd( 1, 3 ) - 0.5 ) * 0.4 ).normalize();
+        const pu = new THREE.Vector3( 1, 0, 0 ).cross( plane ).normalize(), pv = plane.clone().cross( pu );
         for ( let i = 0; i < n; i++ ) {
-            const kind = KINDS[ Math.floor( this.rnd( i, 2 ) * KINDS.length ) ];
-            const radius = 1400 + this.rnd( i, 3 ) * ( this.rnd( i, 12 ) < 0.25 ? 9000 : 5200 );
-            const dist = ( this.home ? 36000 : 60000 ) + i * ( this.home ? 16000 : 38000 ) + this.rnd( i, 4 ) * 12000;
-            const az = ( i / n ) * Math.PI * 2 + this.rnd( i, 5 ) * 1.1, el = this.home ? 0.14 + this.rnd( i, 6 ) * 0.6 : ( this.rnd( i, 6 ) - 0.5 ) * 0.5;
-            const pos = new THREE.Vector3( Math.cos( az ) * Math.cos( el ) * dist, Math.sin( el ) * dist + ( this.home ? radius : 0 ), Math.sin( az ) * Math.cos( el ) * dist ).add( this.center );
+            const dist = Math.min( 320000, inner * Math.pow( spread, i ) * ( 0.88 + this.rnd( i, 4 ) * 0.24 ) );
+            const q = dist / this.hz;
+            const radius = q > 2.7 ? 2200 + this.rnd( i, 3 ) * 7000 : 1300 + this.rnd( i, 3 ) * ( this.rnd( i, 12 ) < 0.3 ? 5500 : 3500 );
+            const kind = this.planetKind( q, radius );
+            const az = this.rnd( i, 5 ) * Math.PI * 2;
+            let pos;
+            if ( this.home ) {
+                const el = 0.14 + this.rnd( i, 6 ) * 0.6;
+                pos = new THREE.Vector3( Math.cos( az ) * Math.cos( el ) * dist, Math.sin( el ) * dist + radius, Math.sin( az ) * Math.cos( el ) * dist ).add( this.center );
+            } else {
+                const tilt = ( this.rnd( i, 6 ) - 0.5 ) * 0.12 * dist;
+                pos = this.starPos.clone().addScaledVector( pu, Math.cos( az ) * dist ).addScaledVector( pv, Math.sin( az ) * dist ).addScaledVector( plane, tilt );
+            }
             const group = new THREE.Group();
             group.position.copy( pos );
             const mesh = new THREE.Mesh( new THREE.IcosahedronGeometry( radius, 1 ), bodyMat );
             group.add( mesh );
-            const body = { i, kind, system: this, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: 0.00015 + this.rnd( i, 7 ) * 0.0003, seed: this.seed + i * 17, patch: null, patchWant: 0 };
+            const body = { i, kind, q, system: this, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: 0.00015 + this.rnd( i, 7 ) * 0.0003, seed: this.seed + i * 17, patch: null, patchWant: 0 };
             if ( kind !== 'rocky' && kind !== 'ember' ) {
                 const shellR = radius * ( 1 + SURFACE[ kind ].amp * 2 ) * 1.015;
                 const rim = new THREE.Mesh( new THREE.SphereGeometry( shellR, 48, 32 ), rimMaterial( kind === 'icy' ? 0xbfe0ff : 0x7fb4ff ) );
@@ -93,7 +131,7 @@ class System {
             this.scene.add( group );
             this.bodies.push( body );
             this.space.requestBody( body, 0 );
-            if ( this.rnd( i, 8 ) < ( this.home && i === 0 ? 1 : 0.4 ) ) {
+            if ( this.rnd( i, 8 ) < ( this.home && i === 0 ? 1 : q > 2.7 ? 0.55 : 0.15 ) ) {
                 body.rings = new RingField( this.space, body, ( this.seed * 13 + i * 101 ) % 1000003 );
                 body.ringNormal = body.rings.normal;
                 this.rings.push( body.rings );
@@ -103,7 +141,8 @@ class System {
 
     makeRocks() {
         const n = 30 + Math.floor( this.rnd( 3, 1 ) * 190 );
-        const host = this.bodies.find( ( b ) => b.ringNormal ) || this.bodies.reduce( ( a, b ) => ( b.radius > a.radius ? b : a ) );
+        const ringed = this.bodies.find( ( b ) => b.ringNormal );
+        const host = this.home && ringed ? ringed : { pos: this.starPos, radius: this.frost / 2.7 * 0.8 };
         const normal = host.ringNormal || new THREE.Vector3( this.rnd( 3, 2 ) - 0.5, 1, this.rnd( 3, 3 ) - 0.5 ).normalize();
         const u = new THREE.Vector3( 1, 0, 0 ).cross( normal ).normalize(), v = normal.clone().cross( u );
         const beltShare = 0.5 + this.rnd( 3, 4 ) * 0.4;
@@ -399,7 +438,7 @@ export class Space {
             if ( d < r ) { pos.sub( b.pos ).setLength( r ).add( b.pos ); hit = b; }
         }
         for ( const s of this.systems.values() ) {
-            const r = ( s.home ? 6000 : 11000 ) * 1.5, d = pos.distanceTo( s.starPos );
+            const r = s.starRadius * 1.5, d = pos.distanceTo( s.starPos );
             if ( d < r ) { pos.sub( s.starPos ).setLength( r ).add( s.starPos ); hit = s; }
         }
         return hit;
@@ -413,8 +452,8 @@ export class Space {
             if ( ! best || d < best.d ) best = { name: b.name, kind: b.kind, d };
         }
         for ( const s of this.systems.values() ) {
-            const d = pos.distanceTo( s.starPos ) - ( s.home ? 6000 : 11000 );
-            if ( ! best || d < best.d ) best = { name: s.name, kind: 'star', d };
+            const d = pos.distanceTo( s.starPos ) - s.starRadius;
+            if ( ! best || d < best.d ) best = { name: s.name, kind: s.starType.name, d };
         }
         return best;
     }

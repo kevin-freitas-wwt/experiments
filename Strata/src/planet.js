@@ -36,9 +36,9 @@ export function classify( kind, k, v, e, seed ) {
 // Voxel ground carries baked ambient occlusion and side shading, so the smooth versions are dimmed to match.
 const AO = 0.88, dim = ( c, f = AO ) => c.map( ( v ) => v * f );
 const BIOME_RGB = {
-    0: PALETTE[ WATER ], 1: dim( PALETTE[ SAND ] ), 2: dim( PALETTE[ GRASS ] ), 3: dim( mix( PALETTE[ GRASS ], PALETTE[ LEAF ], 0.9 ), 0.8 ),
+    0: mix( PALETTE[ WATER ], PALETTE[ GRAVEL ], 0.12 ), 1: dim( PALETTE[ SAND ] ), 2: dim( PALETTE[ GRASS ] ), 3: dim( mix( PALETTE[ GRASS ], PALETTE[ LEAF ], 0.9 ), 0.8 ),
     4: dim( mix( PALETTE[ SAND ], PALETTE[ CLAY ], 0.3 ) ), 7: dim( mix( PALETTE[ STONE ], PALETTE[ TUNDRA ], 0.25 ) ), 8: dim( PALETTE[ SNOW ] ),
-    9: dim( mix( PALETTE[ BASALT ], PALETTE[ RUST ], 0.3 ) ), 10: dim( PALETTE[ SNOW ] ), 11: PALETTE[ LAVA ], 12: dim( PALETTE[ ICE ] ),
+    9: dim( mix( PALETTE[ BASALT ], PALETTE[ RUST ], 0.3 ) ), 10: dim( PALETTE[ SNOW ] ), 11: mix( PALETTE[ LAVA ], PALETTE[ BASALT ], 0.14 ), 12: dim( PALETTE[ ICE ] ),
     15: dim( mix( PALETTE[ STONE ], PALETTE[ GRAVEL ], 0.35 ) ),
 };
 

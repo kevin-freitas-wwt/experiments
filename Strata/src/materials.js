@@ -63,7 +63,7 @@ export function curved( material, edge = null ) {
 const edgeUniforms = () => ( { center: { value: new THREE.Vector2() }, r0: { value: -1 }, r1: { value: -1 } } );
 
 export const solidMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ) );
-export const waterMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true, transparent: true, opacity: 0.72, depthWrite: false } ) );
+export const waterMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true, transparent: true, opacity: 0.86, depthWrite: false } ) );
 export const fineTileMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() );
 export const midTileMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() );
 export const coarseTileMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() );

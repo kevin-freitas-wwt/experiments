@@ -34,7 +34,7 @@ const renderer = new THREE.WebGLRenderer( { canvas, antialias: false, powerPrefe
 renderer.setPixelRatio( Math.min( devicePixelRatio, 1.5 ) );
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-const HORIZON = new THREE.Color( 0xeadfca ), ZENITH = new THREE.Color( 0x5d73a3 ), UP_Y = new THREE.Vector3( 0, 1, 0 );
+const HORIZON = new THREE.Color( 0xeadfca ), ZENITH = new THREE.Color( 0x5d73a3 ), UP_Y = new THREE.Vector3( 0, 1, 0 ), WHITE = new THREE.Color( 0xffffff ), starTint = new THREE.Color();
 const ATMOS = Object.fromEntries( Object.entries( KINDS ).map( ( [ k, v ] ) => [ k, v.atmosphere && { zenith: new THREE.Color( v.atmosphere.zenith ), horizon: new THREE.Color( v.atmosphere.horizon ) } ] ) );
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera( 72, 1, 0.1, 500000 );
@@ -178,7 +178,7 @@ let navSystem = null;
 function buildNav( sys ) {
     navSystem = sys;
     nav.innerHTML = '';
-    document.getElementById( 'nav-title' ).textContent = `${sys.name} system · ${sys.bodies.length} planet${sys.bodies.length === 1 ? '' : 's'}, ${sys.rocks.length} asteroids, ${sys.ships.length} ships, ${sys.stations.length} station${sys.stations.length === 1 ? '' : 's'}`;
+    document.getElementById( 'nav-title' ).textContent = `${sys.name}, a ${sys.starType.name} (${sys.starType.cls}) · ${sys.bodies.length} planet${sys.bodies.length === 1 ? '' : 's'}, ${sys.rocks.length} asteroids, ${sys.ships.length} ships, ${sys.stations.length} station${sys.stations.length === 1 ? '' : 's'}`;
     const items = [ ...sys.bodies.slice( 0, 7 ).map( ( b, i ) => [ `${i + 1}`, b.name, `${b.kind}, ${( b.radius / 1000 ).toFixed( 1 )} km`, [ 'planet', i ] ] ),
         [ '8', 'Nearest asteroid', 'belt and strays', [ 'rock' ] ], [ '9', 'Nearest ship', 'skiffs to capitals', [ 'ship' ] ] ];
     if ( sys.stations.length ) items.push( [ '-', 'Nearest station', 'in orbit', [ 'station' ] ] );
@@ -374,6 +374,7 @@ function frame() {
     }
     const nearSys = space.nearestSystem( player.worldPos );
     if ( nearSys && nearSys !== navSystem ) buildNav( nearSys );
+    if ( nearSys ) sun.color.lerp( starTint.set( nearSys.starColor ).lerp( WHITE, 0.4 ), 1 - Math.exp( -dt * 2 ) );
     let spaceness = Math.min( 1, Math.max( 0, ( alt - 1500 ) / 9000 ) );
     let skyUp = UP_Y, skyTop = ZENITH, skyBottom = HORIZON;
     for ( const b of space.bodies ) {

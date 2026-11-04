@@ -268,7 +268,7 @@ function tile( { x0, z0, size, step, seed } ) {
         pos[ i * 3 ] = gx * step; pos[ i * 3 + 1 ] = h - 1; pos[ i * 3 + 2 ] = gz * step;
         let rgb = PALETTE[ wet ? WATER : surface( c.biome, 0, x, z, seed ) ];
         if ( ! wet && ( c.biome === 3 || c.biome === 6 ) ) rgb = PALETTE[ c.biome === 3 ? LEAF : NEEDLE ];
-        if ( wet && c.h < SEA - 6 ) rgb = [ 0x24, 0x40, 0x6c ];
+        if ( wet ) { const bed = PALETTE[ c.h < SEA - 6 ? GRAVEL : SAND ], k = c.h < SEA - 3 ? 0.1 : 0.16; rgb = rgb.map( ( v, i ) => v * ( 1 - k ) + bed[ i ] * k ); }
         const j = ( wet ? 1 : 0.9 ) * ( 0.95 + hash2( x, z, seed + 17 ) * 0.1 );
         col[ i * 3 ] = rgb[ 0 ] * j; col[ i * 3 + 1 ] = rgb[ 1 ] * j; col[ i * 3 + 2 ] = rgb[ 2 ] * j;
         i++;
