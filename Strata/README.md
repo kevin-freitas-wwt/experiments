@@ -57,6 +57,6 @@ Woodblock-print tones: Prussian-blue water, cream mist on the horizon, ochre san
 | `src/rings.js` | procedural ring systems: lane shader disc and cell-generated particle field |
 | `src/materials.js` | shared materials, horizon-curvature and edge-dither shader patch, hashed-alpha fade-ins |
 | `src/player.js` | input, physics, camera (frame changes eased so a new 'up' rolls in over half a second), moving between frames |
-| `src/flare.js` | screen-space lens flares for stars (ported from Cosmos) |
+| `src/flare.js` | screen-space lens flares for stars (ported from Cosmos), occluded by whatever is in the depth buffer via GPU occlusion queries |
 | `src/crumbs.js` | breadcrumb trail (one InstancedMesh, unfogged so it reads at distance) |
 | `src/main.js` | scene, sky, lights, HUD, URL parameters |

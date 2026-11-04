@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 // Screen-space lens flare, ported from the Cosmos experiment: a glow core at the star, a horizontal
 // streak, and discs and rings strung along the line through the screen centre.
-const MAXF = 4, ELEMS = 8;
+const MAXF = 4, ELEMS = 8, SAMPLES = [ [ 0, 0 ], [ 1, 0 ], [ -1, 0 ], [ 0, 1 ], [ 0, -1 ] ];
 const PARAMS = [
     [ 0.0, 0.55, 0.55, 0 ], [ 0.0, 1.9, 0.05, 1 ], [ 0.45, 0.05, 0.05, 2 ], [ 0.75, 0.11, 0.11, 2 ],
     [ 1.05, 0.045, 0.045, 0 ], [ 1.35, 0.17, 0.17, 3 ], [ 1.65, 0.08, 0.08, 2 ], [ 1.95, 0.28, 0.28, 3 ],
@@ -63,25 +63,100 @@ void main() {
         this.mesh.frustumCulled = false;
         this.scene.add( this.mesh );
         this.slots = Array.from( { length: MAXF }, () => ( { s: 0 } ) );
+        this.probes = null;
+    }
+
+    // One 1-px point per star and sample offset, drawn depth-tested with colour writes off inside an
+    // occlusion query, so anything in the depth buffer (voxels, trees, tiles, hulls, rings) hides the flare.
+    initProbes( renderer ) {
+        const gl = renderer.getContext();
+        this.gl = gl;
+        this.probeScene = new THREE.Scene();
+        const mat = new THREE.ShaderMaterial( {
+            colorWrite: false, depthWrite: false, depthTest: true,
+            vertexShader: `#include <common>
+#include <logdepthbuf_pars_vertex>
+void main() {
+    gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+    gl_PointSize = 1.0;
+    #include <logdepthbuf_vertex>
+}`,
+            fragmentShader: `#include <common>
+#include <logdepthbuf_pars_fragment>
+void main() {
+    #include <logdepthbuf_fragment>
+    gl_FragColor = vec4( 1.0 );
+}`,
+        } );
+        this.probes = [];
+        for ( let i = 0; i < MAXF * SAMPLES.length; i++ ) {
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute( 'position', new THREE.BufferAttribute( new Float32Array( 3 ), 3 ) );
+            const pts = new THREE.Points( geo, mat );
+            pts.frustumCulled = false;
+            const probe = { pts, free: Array.from( { length: 8 }, () => gl.createQuery() ), pending: [], seen: 1 };
+            pts.onBeforeRender = () => { const q = probe.free.pop(); probe.active = q || null; if ( q ) gl.beginQuery( gl.ANY_SAMPLES_PASSED, q ); };
+            pts.onAfterRender = () => { if ( probe.active ) { gl.endQuery( gl.ANY_SAMPLES_PASSED ); probe.pending.push( probe.active ); } };
+            this.probeScene.add( pts );
+            this.probes.push( probe );
+        }
+    }
+
+    // Reads last results, then places the probes for this frame's ranked sources and draws them.
+    probe( renderer, camera, ranked ) {
+        if ( ! this.probes ) this.initProbes( renderer );
+        const gl = this.gl, w = renderer.domElement.width, h = renderer.domElement.height;
+        const vis = [];
+        for ( let i = 0; i < MAXF; i++ ) {
+            const r = ranked[ i ];
+            let seen = 0;
+            for ( let j = 0; j < SAMPLES.length; j++ ) {
+                const probe = this.probes[ i * SAMPLES.length + j ];
+                // Results arrive a few frames late; take the newest one that is ready and recycle the rest.
+                for ( let k = probe.pending.length - 1; k >= 0; k-- ) {
+                    const q = probe.pending[ k ];
+                    if ( ! gl.getQueryParameter( q, gl.QUERY_RESULT_AVAILABLE ) ) continue;
+                    probe.seen = gl.getQueryParameter( q, gl.QUERY_RESULT ) ? 1 : 0;
+                    probe.free.push( ...probe.pending.splice( 0, k + 1 ) );
+                    break;
+                }
+                seen += probe.seen;
+                probe.pts.visible = !! ( r && r.target > 0 );
+                if ( ! probe.pts.visible ) { probe.seen = 1; continue; }
+                const nx = Math.max( -0.98, Math.min( 0.98, r.nx + SAMPLES[ j ][ 0 ] * 8 / w ) ), ny = Math.max( -0.98, Math.min( 0.98, r.ny + SAMPLES[ j ][ 1 ] * 8 / h ) );
+                const dir = new THREE.Vector3( nx, ny, 0.5 ).unproject( camera ).sub( camera.position ).normalize();
+                const pos = camera.position.clone().addScaledVector( dir, Math.min( r.dist * 0.9, camera.far * 0.9 ) );
+                probe.pts.geometry.attributes.position.setXYZ( 0, pos.x, pos.y, pos.z );
+                probe.pts.geometry.attributes.position.needsUpdate = true;
+            }
+            vis.push( seen / SAMPLES.length );
+        }
+        const auto = renderer.autoClear;
+        renderer.autoClear = false;
+        renderer.render( this.probeScene, camera );
+        renderer.autoClear = auto;
+        gl.flush();
+        return vis;
     }
 
     // sources: [ { pos, color, bright } ]; bright ~ 1 is a faint flare, ~30 a full one. occluded( pos ) says whether a body blocks it.
-    update( dt, camera, sources, occluded ) {
+    update( dt, camera, sources, occluded, renderer = null ) {
         const fwd = new THREE.Vector3( 0, 0, -1 ).applyQuaternion( camera.quaternion );
         const ranked = sources.map( ( src ) => {
             const dir = src.pos.clone().sub( camera.position );
-            if ( dir.dot( fwd ) <= 0 ) return { src, target: 0, nx: 0, ny: 0 };
+            if ( dir.dot( fwd ) <= 0 ) return { src, target: 0, nx: 0, ny: 0, dist: 1 };
             const p = src.pos.clone().project( camera );
             const edge = Math.min( 1, Math.max( 0, 1.6 - Math.max( Math.abs( p.x ), Math.abs( p.y ) ) ) );
             const t = Math.min( 1, Math.max( 0, Math.log10( Math.max( src.bright, 0.01 ) / 4 ) / 2.4 ) );
             const target = occluded( src.pos ) ? 0 : t * t * ( 3 - 2 * t ) * edge;
-            return { src, target, nx: p.x, ny: p.y };
+            return { src, target, nx: p.x, ny: p.y, dist: dir.length() };
         } ).sort( ( a, b ) => b.target - a.target ).slice( 0, MAXF );
+        const vis = renderer ? this.probe( renderer, camera, ranked ) : null;
         this.uniforms.aspect.value = camera.aspect;
         for ( let i = 0; i < MAXF; i++ ) {
             const r = ranked[ i ], slot = this.slots[ i ];
-            const target = r ? r.target : 0;
-            slot.s += ( target - slot.s ) * Math.min( dt * 4, 1 );
+            const target = r ? r.target * ( vis ? vis[ i ] : 1 ) : 0;
+            slot.s += ( target - slot.s ) * Math.min( dt * ( target < slot.s ? 10 : 4 ), 1 );
             this.uniforms.flares.value[ i ].set( r ? r.nx : 0, r ? r.ny : 0, slot.s, 0 );
             if ( r ) this.uniforms.fcolor.value[ i ].set( r.src.color.r, r.src.color.g, r.src.color.b );
         }

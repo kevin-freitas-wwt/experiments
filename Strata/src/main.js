@@ -474,7 +474,7 @@ function frame() {
             if ( up < -0.02 && below < 2000 ) return true;
         }
         return false;
-    } );
+    }, renderer );
     flares.render( renderer );
     if ( spawned && ! pose ) {
         if ( performance.now() - urlTimer > 1000 ) { urlTimer = performance.now(); shareUrl(); }
@@ -492,4 +492,4 @@ function restoreInterior() {
 }
 frame();
 
-window.__strata = { world, home, far, space, player, crumbs, pool, seed, renderer, scene, travel, enterShell, leaveShell, enterInterior, exitInterior, useAirlock };
+window.__strata = { world, home, far, space, player, crumbs, pool, seed, renderer, scene, camera, flares, travel, enterShell, leaveShell, enterInterior, exitInterior, useAirlock };
