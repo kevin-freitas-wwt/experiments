@@ -87,7 +87,7 @@ export class World {
             group.add( m );
         }
         this.scene.add( group );
-        this.chunks.set( k, { cx: data.cx, cz: data.cz, group, blocks: data.blocks, biomes: data.biomes } );
+        this.chunks.set( k, { cx: data.cx, cz: data.cz, group, blocks: data.blocks, biomes: data.biomes, born: performance.now() } );
     }
 
     fadeOut( duration, onDone ) {
@@ -141,6 +141,21 @@ export class World {
         const c = this.chunkAt( x, z );
         if ( ! c ) return -1;
         return c.biomes[ ( Math.floor( x ) - c.cx * CHUNK ) * CHUNK + ( Math.floor( z ) - c.cz * CHUNK ) ];
+    }
+
+    // Radius around (x, z) within which every chunk is loaded and has finished fading in.
+    coveredRadius( x, z, settle = 650 ) {
+        const cx = Math.floor( x / CHUNK ), cz = Math.floor( z / CHUNK ), now = performance.now(), r = this.radius;
+        let best = ( r + 1 ) * CHUNK;
+        for ( let dx = -r; dx <= r; dx++ ) for ( let dz = -r; dz <= r; dz++ ) {
+            const d2 = dx * dx + dz * dz;
+            if ( d2 > r * r + r ) continue;
+            const c = this.chunks.get( key( cx + dx, cz + dz ) );
+            if ( c && now - c.born > settle ) continue;
+            const d = Math.max( 0, ( Math.sqrt( d2 ) - 0.71 ) * CHUNK );
+            if ( d < best ) best = d;
+        }
+        return best;
     }
 
     get stats() {

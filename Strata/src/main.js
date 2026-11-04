@@ -5,6 +5,7 @@ import { FarField } from './far.js';
 import { Space } from './space.js';
 import { Player } from './player.js';
 import { Crumbs } from './crumbs.js';
+import { Flares } from './flare.js';
 import { BIOMES, SEA, CHUNK, spawnOf } from './blocks.js';
 import { tickFades, hole } from './materials.js';
 import { KINDS } from './planet.js';
@@ -67,6 +68,7 @@ const far = new FarField( home.group, pool, seed, radius );
 const space = new Space( scene, pool, seed, radius, sunDir );
 const player = new Player( camera, home, canvas );
 const crumbs = new Crumbs( home.group, spacing );
+const flares = new Flares();
 
 const hud = {};
 for ( const id of [ 'alt', 'biome', 'coord', 'chunks', 'seed', 'mode', 'crumbs', 'speed', 'body', 'system' ] ) hud[ id ] = document.getElementById( id );
@@ -345,10 +347,9 @@ function manageShells( dt ) {
         if ( alt > 350 ) { leaveShell(); return; }
         const recenter = Math.min( 400, Math.max( 64, sh.body.radius * 0.07 ) );
         if ( horiz > recenter && ! retiring.some( ( r ) => ! r.leaving ) ) enterShell( sh.body );
-        sh.age = ( sh.age || 0 ) + dt;
-        const k = Math.min( 1, sh.age / 1.4 );
+        const covered = Math.min( ringR, sh.world.coveredRadius( player.pos.x, player.pos.z ) );
         hole.center.value.copy( player.worldPos );
-        hole.r0.value = ringR * k - 24; hole.r1.value = ringR * k + 8;
+        hole.r0.value = covered - 24; hole.r1.value = covered + 8;
     } else if ( player.shell.radial ) {
         const rk = player.shell.rock;
         if ( ! rk.mesh || player.pos.length() > rk.radius * 3 + 80 ) leaveShell();
@@ -446,6 +447,25 @@ function frame() {
         hud.crumbs.textContent = crumbs.on ? `every ${crumbs.spacing} m · ${crumbs.count}` : crumbs.count ? `off · ${crumbs.count}` : 'off';
     }
     renderer.render( scene, camera );
+    flares.update( dt, camera, [ ...space.systems.values() ].map( ( sys ) => {
+        const d = sys.starPos.distanceTo( camera.position );
+        return { pos: sys.starPos, color: starTint.set( sys.starColor ).clone(), bright: sys.lum * Math.pow( 250000 / d, 2 ) * 110 };
+    } ), ( pos ) => {
+        if ( player.shell.interior ) return true;
+        const dir = pos.clone().sub( camera.position ), len = dir.length();
+        dir.divideScalar( len );
+        for ( const b of space.bodies ) {
+            const oc = b.pos.clone().sub( camera.position ), t = oc.dot( dir );
+            if ( t <= 0 || t >= len ) continue;
+            if ( oc.lengthSq() - t * t < b.radius * b.radius ) return true;
+        }
+        if ( player.shell === home && ! offHome ) {
+            const up = dir.y, below = homeLocal.y - SEA;
+            if ( up < -0.02 && below < 2000 ) return true;
+        }
+        return false;
+    } );
+    flares.render( renderer );
     if ( spawned && ! pose ) {
         if ( performance.now() - urlTimer > 1000 ) { urlTimer = performance.now(); shareUrl(); }
         if ( inside && ! insideDone ) restoreInterior();
