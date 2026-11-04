@@ -22,6 +22,10 @@ export class Pool {
         } );
     }
 
+    reprioritize( tag, fn ) {
+        for ( const j of this.queue ) if ( j.tag === tag ) j.priority = fn( j.payload );
+    }
+
     cancel( tag, keep = () => false ) {
         this.queue = this.queue.filter( ( j ) => j.tag !== tag || keep( j.payload ) );
     }

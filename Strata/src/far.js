@@ -29,7 +29,7 @@ class Level {
         return `${tx},${tz}`;
     }
 
-    update( px, pz, range = this.range ) {
+    update( px, pz, range = this.range, face = null ) {
         const t0 = Math.floor( ( px - range ) / this.size ), t1 = Math.floor( ( px + range ) / this.size );
         const u0 = Math.floor( ( pz - range ) / this.size ), u1 = Math.floor( ( pz + range ) / this.size );
         const near = ( tx, tz ) => Math.hypot( ( tx + 0.5 ) * this.size - px, ( tz + 0.5 ) * this.size - pz );
@@ -40,7 +40,9 @@ class Level {
             const k = this.key( tx, tz );
             if ( this.tiles.has( k ) ) continue;
             this.tiles.set( k, { tx, tz, mesh: null } );
-            this.pool.submit( { type: 'tile', tx, tz, x0: tx * this.size, z0: tz * this.size, size: this.size, step: this.step, seed: this.seed }, { priority: d, tag: 'tile' + this.size } )
+            const dx = ( tx + 0.5 ) * this.size - px, dz = ( tz + 0.5 ) * this.size - pz;
+            const ahead = face && d > 1 ? ( dx * face.x + dz * face.z ) / d : 0;
+            this.pool.submit( { type: 'tile', tx, tz, x0: tx * this.size, z0: tz * this.size, size: this.size, step: this.step, seed: this.seed }, { priority: d * ( 1.25 - 0.95 * ahead ), tag: 'tile' + this.size } )
                 .then( ( data ) => this.install( data ) );
         }
         for ( const [ k, t ] of this.tiles ) {
@@ -104,7 +106,7 @@ export class FarField {
         this.timer = 0;
     }
 
-    update( dt, pos, world ) {
+    update( dt, pos, world, face = null ) {
         const fe = fineTileMat.userData.edge, me = midTileMat.userData.edge, ce = coarseTileMat.userData.edge;
         const ox = this.parent.position.x, oz = this.parent.position.z;
         if ( world.center && world.chunks.size ) {
@@ -123,11 +125,11 @@ export class FarField {
         this.timer -= dt;
         if ( this.timer > 0 ) return;
         this.timer = 0.4;
-        if ( alt < this.fineCeiling ) this.fine.update( pos.x, pos.z );
+        if ( alt < this.fineCeiling ) this.fine.update( pos.x, pos.z, this.fine.range, face );
         else this.fine.clear();
-        if ( alt < this.midCeiling ) this.mid.update( pos.x, pos.z );
+        if ( alt < this.midCeiling ) this.mid.update( pos.x, pos.z, this.mid.range, face );
         else this.mid.clear();
-        this.coarse.update( pos.x, pos.z );
+        this.coarse.update( pos.x, pos.z, this.coarse.range, face );
         this.cull( world );
     }
 

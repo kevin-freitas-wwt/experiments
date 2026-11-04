@@ -350,12 +350,13 @@ function frame() {
     const worldPos = player.worldPos, homeLocal = home.toLocal( worldPos );
     const offHome = Math.hypot( homeLocal.x - SPAWN.x, homeLocal.z - SPAWN.z ) > 220000;
     const alt = offHome ? 1e9 : homeLocal.y - SEA;
+    const face = { x: -Math.sin( player.yaw ), z: -Math.cos( player.yaw ) };
     if ( ! spawned ) world.update( SPAWN.x, SPAWN.z );
-    else if ( player.shell === home && player.pos.y < 700 && ! offHome ) world.update( player.pos.x, player.pos.z );
+    else if ( player.shell === home && player.pos.y < 700 && ! offHome ) world.update( player.pos.x, player.pos.z, face.x, face.z );
     world.absorb( 3 );
-    if ( player.shell.planet || player.shell.interior ) { player.world.update( player.pos.x, player.pos.z ); player.world.absorb( 4 ); }
+    if ( player.shell.planet || player.shell.interior ) { player.world.update( player.pos.x, player.pos.z, face.x, face.z ); player.world.absorb( 4 ); }
     if ( player.shell === home ) homePos.copy( player.pos );
-    far.update( dt, homePos, world );
+    far.update( dt, homePos, world, player.shell === home ? face : null );
     ambient.intensity = player.shell.interior ? 2.2 : 0.6;
     tickFades( dt );
     lastPos.copy( worldPos );

@@ -18,10 +18,28 @@ export class World {
         this.center = null;
     }
 
-    update( x, z ) {
+    // Chunks ahead of the facing direction are generated first; the queue is re-ranked when the view turns.
+    priority( cx, cz, dx, dz ) {
+        const d = Math.hypot( dx, dz );
+        if ( d < 0.5 ) return -1;
+        const cos = ( dx * this.face.x + dz * this.face.z ) / d;
+        return d * d * ( 1.25 - 0.95 * cos ) + ( this.terrain ? -1000 : 0 );
+    }
+
+    update( x, z, fx = 0, fz = 0 ) {
         const cx = Math.floor( x / CHUNK ), cz = Math.floor( z / CHUNK );
-        if ( this.center && this.center.cx === cx && this.center.cz === cz ) return;
+        if ( fx || fz ) this.face = { x: fx, z: fz };
+        else if ( ! this.face ) this.face = { x: 0, z: -1 };
+        if ( this.center && this.center.cx === cx && this.center.cz === cz ) {
+            const turned = this.queuedFace && ( this.queuedFace.x * this.face.x + this.queuedFace.z * this.face.z ) < 0.85;
+            if ( turned && this.pool.queue.some( ( j ) => j.tag === this.tag ) ) {
+                this.queuedFace = { ...this.face };
+                this.pool.reprioritize( this.tag, ( p ) => this.priority( p.cx, p.cz, p.cx - cx, p.cz - cz ) );
+            }
+            return;
+        }
         this.center = { cx, cz };
+        this.queuedFace = { ...this.face };
         const r = this.radius, inRing = ( p ) => {
             const dx = p.cx - cx, dz = p.cz - cz;
             return dx * dx + dz * dz <= r * r + r;
@@ -37,7 +55,7 @@ export class World {
             const k = key( cx + dx, cz + dz );
             if ( this.chunks.has( k ) || this.pending.has( k ) ) continue;
             this.pending.add( k );
-            this.pool.submit( { type: 'chunk', cx: cx + dx, cz: cz + dz, seed: this.seed, terrain: this.terrain }, { priority: d2 + ( this.terrain ? -1000 : 0 ), tag: this.tag } )
+            this.pool.submit( { type: 'chunk', cx: cx + dx, cz: cz + dz, seed: this.seed, terrain: this.terrain }, { priority: this.priority( cx + dx, cz + dz, dx, dz ), tag: this.tag } )
                 .then( ( data ) => this.inbox.push( data ) );
         }
         for ( const [ k, c ] of this.chunks ) {
