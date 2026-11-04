@@ -32,7 +32,7 @@ export const PALETTE = {
     [ DOOR ]:   [ 0xe0, 0x6a, 0x2a ],
 };
 
-export const BIOMES = [ 'open sea', 'shore', 'plains', 'forest', 'dry basin', 'tundra', 'taiga', 'highlands', 'snowfield', 'ember field', 'ice sheet', 'lava sea', 'frozen sea', 'cloud deck', 'interior' ];
+export const BIOMES = [ 'open sea', 'shore', 'plains', 'forest', 'dry basin', 'tundra', 'taiga', 'highlands', 'snowfield', 'ember field', 'ice sheet', 'lava sea', 'frozen sea', 'cloud deck', 'interior', 'barren highlands' ];
 
 export function isSolid( b ) {
     return b !== AIR && b !== WATER && b !== LAVA;

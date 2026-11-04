@@ -54,6 +54,7 @@ function surface( biome, depth, x, z, seed ) {
         case 11: return BASALT;
         case 12: return ICE;
         case 13: return CLOUD;
+        case 15: return depth === 0 && hash2( x, z, seed + 8 ) < 0.35 ? GRAVEL : STONE;
     }
     return STONE;
 }
@@ -75,7 +76,7 @@ function planetColumn( t ) {
     };
 }
 
-const DENSITY = [ 0, 0, 0.007, 0.08, 0.004, 0.001, 0.05, 0.012, 0, 0, 0, 0, 0, 0, 0 ];
+const DENSITY = [ 0, 0, 0.007, 0.08, 0.004, 0.001, 0.05, 0.012, 0, 0, 0, 0, 0, 0, 0, 0 ];
 
 function stampTree( vol, px, pz, h, biome, x, z, seed ) {
     const r = hash2( x, z, seed + 77 );
@@ -127,7 +128,8 @@ function generate( cx, cz, seed, terrain ) {
         for ( let y = 0; y <= col.h; y++ ) vol[ base + y ] = surface( col.biome, col.h - y, x, z, seed );
         for ( let y = col.h + 1; y <= Math.min( col.sea, HEIGHT - 1 ); y++ ) vol[ base + y ] = col.liquid;
     }
-    for ( let px = 0; px < P; px++ ) for ( let pz = 0; pz < P; pz++ ) {
+    const organic = ! terrain || ! terrain.planet || KINDS[ terrain.planet ].atmosphere;
+    if ( organic ) for ( let px = 0; px < P; px++ ) for ( let pz = 0; pz < P; pz++ ) {
         const col = cols[ px * P + pz ], x = ox + px, z = oz + pz;
         if ( col.h > col.sea + 1 && hash2( x, z, seed + 99 ) < DENSITY[ col.biome ] ) stampTree( vol, px, pz, col.h, col.biome, x, z, seed );
     }

@@ -7,6 +7,7 @@ import { Player } from './player.js';
 import { Crumbs } from './crumbs.js';
 import { BIOMES, SEA, CHUNK, spawnOf } from './blocks.js';
 import { tickFades, hole } from './materials.js';
+import { KINDS } from './planet.js';
 
 const params = new URLSearchParams( location.search );
 const seedWord = params.get( 'seed' ) || randomWord();
@@ -33,14 +34,15 @@ const renderer = new THREE.WebGLRenderer( { canvas, antialias: false, powerPrefe
 renderer.setPixelRatio( Math.min( devicePixelRatio, 1.5 ) );
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-const HORIZON = new THREE.Color( 0xeadfca ), ZENITH = new THREE.Color( 0x5d73a3 ), BLACK = new THREE.Color( 0x02030a );
+const HORIZON = new THREE.Color( 0xeadfca ), ZENITH = new THREE.Color( 0x5d73a3 ), UP_Y = new THREE.Vector3( 0, 1, 0 );
+const ATMOS = Object.fromEntries( Object.entries( KINDS ).map( ( [ k, v ] ) => [ k, v.atmosphere && { zenith: new THREE.Color( v.atmosphere.zenith ), horizon: new THREE.Color( v.atmosphere.horizon ) } ] ) );
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera( 72, 1, 0.1, 500000 );
 
 const skyMat = new THREE.ShaderMaterial( {
     side: THREE.BackSide, depthWrite: false, depthTest: false,
-    uniforms: { top: { value: ZENITH.clone() }, bottom: { value: HORIZON.clone() }, space: { value: 0 } },
-    vertexShader: 'varying float h; void main(){ h = normalize( position ).y; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }',
+    uniforms: { top: { value: ZENITH.clone() }, bottom: { value: HORIZON.clone() }, space: { value: 0 }, up: { value: new THREE.Vector3( 0, 1, 0 ) } },
+    vertexShader: 'uniform vec3 up; varying float h; void main(){ h = dot( normalize( position ), up ); gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }',
     fragmentShader: 'uniform vec3 top; uniform vec3 bottom; uniform float space; varying float h; void main(){ float t = smoothstep( -0.02, 0.75, h ); vec3 c = mix( bottom, top, t ); float up = smoothstep( -0.25, 0.15, h ); c = mix( c, vec3( 0.008, 0.012, 0.04 ), space * up + space * space * ( 1.0 - up ) ); gl_FragColor = vec4( c, 1.0 ); }',
 } );
 const sky = new THREE.Mesh( new THREE.SphereGeometry( 300000, 32, 16 ), skyMat );
@@ -371,11 +373,26 @@ function frame() {
     }
     const nearSys = space.nearestSystem( player.worldPos );
     if ( nearSys && nearSys !== navSystem ) buildNav( nearSys );
-    const spaceness = Math.min( 1, Math.max( 0, ( alt - 1500 ) / 9000 ) );
-    skyMat.uniforms.space.value = spaceness;
-    hemi.intensity = 1.15 - spaceness * 1.0;
+    let spaceness = Math.min( 1, Math.max( 0, ( alt - 1500 ) / 9000 ) );
+    let skyUp = UP_Y, skyTop = ZENITH, skyBottom = HORIZON;
+    for ( const b of space.bodies ) {
+        const atm = ATMOS[ b.kind ];
+        if ( ! atm ) continue;
+        const d = worldPos.distanceTo( b.pos );
+        if ( d > b.radius + 11000 ) continue;
+        const bAlt = d - space.surfaceRadius( b, worldPos );
+        const sp = Math.min( 1, Math.max( 0, ( bAlt - 1500 ) / 9000 ) );
+        if ( sp < spaceness ) { spaceness = sp; skyUp = worldPos.clone().sub( b.pos ).normalize(); skyTop = atm.zenith; skyBottom = atm.horizon; }
+    }
+    const ease = 1 - Math.exp( -dt * 3 );
+    skyMat.uniforms.space.value += ( spaceness - skyMat.uniforms.space.value ) * ease;
+    skyMat.uniforms.up.value.lerp( skyUp, ease ).normalize();
+    skyMat.uniforms.top.value.lerp( skyTop, ease );
+    skyMat.uniforms.bottom.value.lerp( skyBottom, ease );
+    hemi.position.copy( skyMat.uniforms.up.value );
+    hemi.intensity = 1.15 - skyMat.uniforms.space.value * 1.0;
     sky.position.copy( camera.position );
-    space.update( dt, camera.position, spaceness );
+    space.update( dt, camera.position, skyMat.uniforms.space.value );
     const under = player.eyeInWater();
     tint.classList.toggle( 'on', under );
     hudTimer += dt;

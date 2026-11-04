@@ -1,15 +1,15 @@
 import { fbm3 } from './noise.js';
-import { PALETTE, STONE, GRASS, SAND, WATER, SNOW, LEAF, TUNDRA, CLAY, ICE, BASALT, LAVA, RUST } from './blocks.js';
+import { PALETTE, STONE, GRASS, SAND, WATER, SNOW, LEAF, TUNDRA, CLAY, ICE, BASALT, LAVA, RUST, GRAVEL } from './blocks.js';
 
 const mix = ( a, b, t ) => a.map( ( c, i ) => c + ( b[ i ] - c ) * t );
 
 // Amplitude and frequency of the height field; sea level in field units. Colours come from the block palette
 // so the smooth sphere, the high-res patch and the voxel shell agree.
 export const KINDS = {
-    rocky: { amp: 0.06, freq: 2.2, sea: false },
-    lush:  { amp: 0.04, freq: 2.6, sea: true, seaLevel: 0.1 },
-    icy:   { amp: 0.03, freq: 3.0, sea: true, seaLevel: -0.2 },
-    ember: { amp: 0.07, freq: 2.0, sea: true, seaLevel: -0.3 },
+    rocky: { amp: 0.06, freq: 2.2, sea: false, atmosphere: null },
+    lush:  { amp: 0.04, freq: 2.6, sea: true, seaLevel: 0.1, atmosphere: { horizon: 0xdfe8f2, zenith: 0x4f86c6 } },
+    icy:   { amp: 0.03, freq: 3.0, sea: true, seaLevel: -0.2, atmosphere: { horizon: 0xeef3f6, zenith: 0x7f9fbf } },
+    ember: { amp: 0.07, freq: 2.0, sea: true, seaLevel: -0.3, atmosphere: null },
 };
 
 const SHORE = 0.03;
@@ -30,7 +30,7 @@ export function classify( kind, k, v, e, seed ) {
     if ( kind === 'icy' ) return wet ? 12 : ( e > 0.38 ? 7 : 10 );
     if ( kind === 'ember' ) return wet ? 11 : 9;
     if ( polar ) return 8;
-    return patch > 0.1 ? 4 : 7;
+    return patch > 0.1 ? 4 : 15;
 }
 
 // Voxel ground carries baked ambient occlusion and side shading, so the smooth versions are dimmed to match.
@@ -39,6 +39,7 @@ const BIOME_RGB = {
     0: PALETTE[ WATER ], 1: dim( PALETTE[ SAND ] ), 2: dim( PALETTE[ GRASS ] ), 3: dim( mix( PALETTE[ GRASS ], PALETTE[ LEAF ], 0.9 ), 0.8 ),
     4: dim( mix( PALETTE[ SAND ], PALETTE[ CLAY ], 0.3 ) ), 7: dim( mix( PALETTE[ STONE ], PALETTE[ TUNDRA ], 0.25 ) ), 8: dim( PALETTE[ SNOW ] ),
     9: dim( mix( PALETTE[ BASALT ], PALETTE[ RUST ], 0.3 ) ), 10: dim( PALETTE[ SNOW ] ), 11: PALETTE[ LAVA ], 12: dim( PALETTE[ ICE ] ),
+    15: dim( mix( PALETTE[ STONE ], PALETTE[ GRAVEL ], 0.35 ) ),
 };
 
 export function surfaceAt( kind, k, v, seed, radius, octaves ) {
