@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SEA, isLiquid } from './blocks.js';
+import { SEA, isLiquid, spawnOf } from './blocks.js';
 
 const KEYS = { fwd: [ 'KeyE', 'ArrowUp' ], back: [ 'KeyD', 'ArrowDown' ], left: [ 'KeyS', 'ArrowLeft' ], right: [ 'KeyF', 'ArrowRight' ], up: [ 'KeyA' ], down: [ 'KeyZ' ] };
 
@@ -126,11 +126,16 @@ export class Player {
         if ( radial ) clearance = Math.max( 0, this.pos.length() - this.shell.rock.radius - 2 );
         else if ( this.shell.planet || this.shell.interior ) clearance = Math.max( 0, this.pos.y - this.world.top( Math.floor( this.pos.x ), Math.floor( this.pos.z ) ) - 3 );
         else {
-            clearance = Math.max( 0, this.pos.y - SEA - 40 );
+            if ( ! this.spawn ) this.spawn = spawnOf( this.home.world.seed );
+            const onDisc = Math.hypot( this.pos.x - this.spawn.x, this.pos.z - this.spawn.z ) < 200000;
+            clearance = onDisc ? Math.max( 0, this.pos.y - SEA - 40 ) : 1e9;
             if ( space ) { const n = space.nearest( this.worldPos ); if ( n ) clearance = Math.min( clearance, Math.max( 0, n.d ) ); }
         }
-        const flySpeed = Math.min( 400000, 14 * ( 1 + clearance / 120 ) );
-        const speed = this.flying ? flySpeed * ( run ? 3 : 1 ) : swim ? 3 : ( run ? 9 : 5 );
+        const thrusting = this.flying && ( this.any( this.keys.fwd ) || this.any( this.keys.back ) || this.any( this.keys.left ) || this.any( this.keys.right ) );
+        this.boost = thrusting ? Math.min( 8, ( this.boost || 1 ) + dt * 1.75 ) : Math.max( 1, ( this.boost || 1 ) - dt * 12 );
+        const boostK = 1 + ( this.boost - 1 ) * Math.min( 1, clearance / 6000 );
+        const flySpeed = 14 * ( 1 + clearance / 120 ) * ( 1 + clearance / 30000 ) * boostK;
+        const speed = this.flying ? Math.min( 500000, flySpeed * ( run ? 3 : 1 ) ) : swim ? 3 : ( run ? 9 : 5 );
         const sin = Math.sin( this.yaw ), cos = Math.cos( this.yaw );
         const cp = this.flying ? Math.cos( this.pitch ) : 1, sp = this.flying ? Math.sin( this.pitch ) : 0;
         let fx = 0, fy = 0, fz = 0;
@@ -139,14 +144,15 @@ export class Player {
         if ( this.any( this.keys.left ) ) { fx -= cos; fz += sin; }
         if ( this.any( this.keys.right ) ) { fx += cos; fz -= sin; }
         const len = Math.hypot( fx, fy, fz ) || 1;
-        const accel = this.flying || swim ? 6 : ( this.grounded ? 14 : 3 );
+        const slowing = this.flying && Math.hypot( this.vel.x, this.vel.z ) > speed * 1.05;
+        const accel = this.flying ? ( slowing ? 24 : 6 ) : swim ? 6 : ( this.grounded ? 14 : 3 );
         this.vel.x += ( fx / len * speed - this.vel.x ) * Math.min( 1, accel * dt );
         this.vel.z += ( fz / len * speed - this.vel.z ) * Math.min( 1, accel * dt );
 
         const up = this.any( this.keys.up ), dn = this.any( this.keys.down );
         if ( this.flying ) {
             const target = fy / len * speed + ( up ? speed : 0 ) - ( dn ? speed : 0 );
-            this.vel.y += ( target - this.vel.y ) * Math.min( 1, 6 * dt );
+            this.vel.y += ( target - this.vel.y ) * Math.min( 1, ( Math.abs( target ) < Math.abs( this.vel.y ) ? 24 : 6 ) * dt );
         } else if ( swim ) {
             this.vel.y += ( ( up ? 3.5 : -1.2 ) - this.vel.y ) * Math.min( 1, 4 * dt );
         } else {

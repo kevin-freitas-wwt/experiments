@@ -439,7 +439,7 @@ function frame() {
         hud.chunks.textContent = `${s.loaded}${s.pending ? ` +${s.pending}` : ''} · ${f.fine + f.coarse} tiles`;
         const where = onPlanet ? ` on ${player.shell.body.name}` : player.shell.radial ? ' on an asteroid' : player.shell.interior ? ` aboard ${player.shell.vessel.name || player.shell.vessel.cls + ' ship'}` : '';
         hud.mode.textContent = ( player.flying ? 'flying' : under ? 'under' : player.inWater() ? 'swimming' : 'on foot' ) + where;
-        hud.speed.textContent = speed < 1000 ? `${speed.toFixed( 0 )} m/s` : `${( speed / 1000 ).toFixed( 1 )} km/s`;
+        hud.speed.textContent = ( speed < 1000 ? `${speed.toFixed( 0 )} m/s` : `${( speed / 1000 ).toFixed( 1 )} km/s` ) + ( player.flying && player.boost > 1.05 ? ` · boost ${player.boost.toFixed( 1 )}×` : '' );
         const n = space.nearest( worldPos );
         hud.body.textContent = n ? `${n.name} (${n.kind}) ${fmtDist( Math.max( 0, n.d ) )}` : '–';
         hud.system.textContent = navSystem ? `${navSystem.name} · ${fmtDist( navSystem.center.distanceTo( worldPos ) )}` : '–';
