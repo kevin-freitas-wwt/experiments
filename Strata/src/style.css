@@ -247,7 +247,26 @@ body {
     margin: 2px 0 14px;
 }
 .controls-wrap { margin-bottom: 0; }
-.controls-wrap + #enter { margin-top: 18px; }
+.controls-wrap + .row-actions {
+    display: flex;
+    gap: 8px;
+    margin: 14px 0 10px;
+}
+.row-actions .minor {
+    background: transparent;
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    cursor: pointer;
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    padding: 7px;
+    text-transform: uppercase;
+}
+.row-actions .minor:hover { border-color: var(--vermilion); color: var(--vermilion); }
+
+#enter { margin-top: 18px; }
 
 .nav-title {
     color: var(--ink-soft);
@@ -296,6 +315,25 @@ kbd {
     padding: 3px 5px;
     text-align: center;
 }
+
+.row-actions {
+    display: flex;
+    gap: 8px;
+    margin: 14px 0 10px;
+}
+.row-actions .minor {
+    background: transparent;
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    cursor: pointer;
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    padding: 7px;
+    text-transform: uppercase;
+}
+.row-actions .minor:hover { border-color: var(--vermilion); color: var(--vermilion); }
 
 #enter {
     background: var(--ink);

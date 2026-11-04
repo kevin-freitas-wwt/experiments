@@ -13,6 +13,7 @@ const seedWord = params.get( 'seed' ) || randomWord();
 const seed = hashSeed( seedWord );
 const radius = Math.max( 4, Math.min( 14, parseInt( params.get( 'r' ) || '8', 10 ) ) );
 const pose = params.get( 'pose' );
+const at = params.get( 'at' ), inside = params.get( 'in' );
 const spacing = Math.max( 1, Math.min( 64, parseFloat( params.get( 'crumb' ) || '8' ) ) );
 
 function randomWord() {
@@ -137,7 +138,39 @@ document.addEventListener( 'keydown', ( e ) => {
     if ( e.code === 'KeyX' ) crumbs.clear();
     if ( NAV[ e.code ] ) travel( ...NAV[ e.code ] );
     if ( e.code === 'Enter' ) useAirlock();
+    if ( e.code === 'KeyP' ) snapshot();
 } );
+
+function snapshot() {
+    renderer.render( scene, camera );
+    const hl = home.toLocal( player.worldPos );
+    canvas.toBlob( ( blob ) => {
+        const a = document.createElement( 'a' );
+        a.href = URL.createObjectURL( blob );
+        a.download = `strata-${seedWord}-${Math.round( hl.x )}-${Math.round( hl.y )}-${Math.round( hl.z )}.png`;
+        a.click();
+        setTimeout( () => URL.revokeObjectURL( a.href ), 5000 );
+    }, 'image/png' );
+}
+
+let urlTimer = 0, lastUrl = '';
+function shareUrl() {
+    const hl = home.toLocal( player.worldPos );
+    const q = new URLSearchParams( location.search );
+    q.set( 'seed', seedWord );
+    q.set( 'at', [ hl.x.toFixed( 1 ), hl.y.toFixed( 1 ), hl.z.toFixed( 1 ), player.yaw.toFixed( 2 ), player.pitch.toFixed( 2 ), player.flying ? 1 : 0 ].join( ',' ) );
+    if ( player.shell.interior ) { const v = player.shell.vessel; q.set( 'in', `${v.system.key}/${v.cls ? 'ship' : 'station'}/${v.i}` ); } else q.delete( 'in' );
+    q.delete( 'pose' );
+    const url = `${location.pathname}?${q.toString()}`;
+    if ( url !== lastUrl ) { history.replaceState( null, '', url ); lastUrl = url; }
+    return location.href;
+}
+document.getElementById( 'copy-link' ).addEventListener( 'click', async ( e ) => {
+    const url = shareUrl();
+    try { await navigator.clipboard.writeText( url ); e.target.textContent = 'copied'; } catch { e.target.textContent = 'copy failed'; }
+    setTimeout( () => { e.target.textContent = 'copy link'; }, 1600 );
+} );
+document.getElementById( 'snap' ).addEventListener( 'click', () => { overlay.classList.add( 'hidden' ); requestAnimationFrame( () => { snapshot(); overlay.classList.remove( 'hidden' ); } ); } );
 const nav = document.getElementById( 'nav' );
 let navSystem = null;
 function buildNav( sys ) {
@@ -181,6 +214,14 @@ addEventListener( 'resize', resize );
 resize();
 
 let spawned = false;
+if ( at && ! pose ) {
+    const [ x, y, z, yaw, pitch, fly ] = at.split( ',' ).map( Number );
+    if ( [ x, y, z ].every( Number.isFinite ) ) {
+        player.pos.set( x, y, z ); player.yaw = yaw || 0; player.pitch = pitch || 0; player.flying = fly !== 0;
+        world.update( x, z );
+        spawned = true;
+    }
+}
 if ( pose ) {
     const [ x, y, z, yaw, pitch ] = pose.split( ',' ).map( Number );
     player.pos.set( x, y, z ); player.yaw = yaw; player.pitch = pitch; player.flying = true;
@@ -352,6 +393,19 @@ function frame() {
         hud.crumbs.textContent = crumbs.on ? `every ${crumbs.spacing} m · ${crumbs.count}` : crumbs.count ? `off · ${crumbs.count}` : 'off';
     }
     renderer.render( scene, camera );
+    if ( spawned && ! pose ) {
+        if ( performance.now() - urlTimer > 1000 ) { urlTimer = performance.now(); shareUrl(); }
+        if ( inside && ! insideDone ) restoreInterior();
+    }
+}
+let insideDone = false;
+function restoreInterior() {
+    const [ key, kind, idx ] = inside.split( '/' );
+    const sys = space.systems.get( key );
+    if ( ! sys ) { if ( space.stats.systems > 1 || key === '0,0,0' ) insideDone = true; return; }
+    const v = ( kind === 'ship' ? sys.ships : sys.stations )[ Number( idx ) ];
+    insideDone = true;
+    if ( v ) enterInterior( v );
 }
 frame();
 
