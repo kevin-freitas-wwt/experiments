@@ -109,7 +109,7 @@ function travel( kind, index = 0 ) {
     } else if ( kind === 'planet' ) {
         const sys = space.nearestSystem( wp ), b = sys.bodies[ index ];
         if ( ! b ) return;
-        go( away( b.pos, wp, b.radius * 2.6 ) );
+        go( away( b.pos, wp, b.rings ? b.rings.outer * 1.25 : b.radius * 2.6 ) );
         lookAt( b.pos );
     } else if ( kind === 'rock' ) {
         const r = space.nearestRock( wp );

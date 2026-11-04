@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { hash2 } from './noise.js';
-import { bodyMat, rockMat, fadeIn } from './materials.js';
+import { bodyMat, rockMat, instanceMat, fadeIn } from './materials.js';
 import { KINDS as SURFACE, surfaceAt } from './planet.js';
+import { RingField } from './rings.js';
 
-const KINDS = [ 'gas', 'lush', 'icy', 'rocky', 'ember' ];
+const KINDS = [ 'lush', 'icy', 'rocky', 'ember' ];
 const NAMES = [ 'Oriel', 'Tamsin', 'Halvard', 'Nerys', 'Cordan', 'Ilse', 'Brannoc', 'Sable', 'Ysolde', 'Marrow', 'Quill', 'Vesper', 'Ashdown', 'Lorn', 'Kestrel', 'Pembray', 'Solenne', 'Thackery', 'Wren', 'Ismay' ];
 const STAR_NAMES = [ 'Aldric', 'Bellane', 'Corvane', 'Dunmore', 'Elsinor', 'Fairweather', 'Galloway', 'Harrow', 'Inverleith', 'Jessamy', 'Kinloch', 'Lammas', 'Morrow', 'Nethercote', 'Orrin', 'Penhallow', 'Quenby', 'Rosslyn', 'Sorrel', 'Tarrant' ];
 const DETAILS = [ 2, 4, 6, 7 ];
@@ -70,14 +71,10 @@ class System {
 
     makeBodies() {
         const n = this.home ? 4 + Math.floor( this.rnd( 1, 1 ) * 4 ) : 2 + Math.floor( this.rnd( 1, 1 ) * 7 );
-        let gasCount = 0;
+        this.rings = [];
         for ( let i = 0; i < n; i++ ) {
-            let kind = KINDS[ Math.floor( this.rnd( i, 2 ) * KINDS.length ) ];
-            if ( kind === 'gas' && gasCount >= 2 ) kind = 'rocky';
-            if ( this.home && i === 0 ) kind = 'gas';
-            if ( kind === 'gas' ) gasCount++;
-            const gas = kind === 'gas';
-            const radius = gas ? 7000 + this.rnd( i, 3 ) * 4000 : 1400 + this.rnd( i, 3 ) * 5200;
+            const kind = KINDS[ Math.floor( this.rnd( i, 2 ) * KINDS.length ) ];
+            const radius = 1400 + this.rnd( i, 3 ) * ( this.rnd( i, 12 ) < 0.25 ? 9000 : 5200 );
             const dist = ( this.home ? 36000 : 60000 ) + i * ( this.home ? 16000 : 38000 ) + this.rnd( i, 4 ) * 12000;
             const az = ( i / n ) * Math.PI * 2 + this.rnd( i, 5 ) * 1.1, el = this.home ? 0.14 + this.rnd( i, 6 ) * 0.6 : ( this.rnd( i, 6 ) - 0.5 ) * 0.5;
             const pos = new THREE.Vector3( Math.cos( az ) * Math.cos( el ) * dist, Math.sin( el ) * dist + ( this.home ? radius : 0 ), Math.sin( az ) * Math.cos( el ) * dist ).add( this.center );
@@ -87,22 +84,20 @@ class System {
             group.add( mesh );
             const body = { i, kind, system: this, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: 0.00015 + this.rnd( i, 7 ) * 0.0003, seed: this.seed + i * 17, patch: null, patchWant: 0 };
             if ( kind !== 'rocky' && kind !== 'ember' ) {
-                const shellR = gas ? radius * 1.045 : radius * ( 1 + SURFACE[ kind ].amp * 2 ) * 1.015;
-                const rim = new THREE.Mesh( new THREE.SphereGeometry( shellR, 48, 32 ), rimMaterial( gas ? 0xf0cc8a : kind === 'icy' ? 0xbfe0ff : 0x7fb4ff ) );
+                const shellR = radius * ( 1 + SURFACE[ kind ].amp * 2 ) * 1.015;
+                const rim = new THREE.Mesh( new THREE.SphereGeometry( shellR, 48, 32 ), rimMaterial( kind === 'icy' ? 0xbfe0ff : 0x7fb4ff ) );
                 rim.userData.shellR = shellR;
                 group.add( rim );
                 body.rim = rim;
             }
-            if ( gas && this.rnd( i, 8 ) < 0.7 ) {
-                const ring = new THREE.Mesh( new THREE.RingGeometry( radius * 1.5, radius * ( 2 + this.rnd( i, 9 ) * 0.6 ), 128 ), new THREE.MeshBasicMaterial( { color: 0xd9c7a6, side: THREE.DoubleSide, transparent: true, opacity: 0.42, depthWrite: false } ) );
-                ring.rotation.x = Math.PI / 2 + ( this.rnd( i, 10 ) - 0.5 ) * 0.9;
-                ring.rotation.y = this.rnd( i, 11 );
-                group.add( ring );
-                body.ringNormal = new THREE.Vector3( 0, 1, 0 ).applyEuler( ring.rotation );
-            }
             this.scene.add( group );
             this.bodies.push( body );
             this.space.requestBody( body, 0 );
+            if ( this.rnd( i, 8 ) < ( this.home && i === 0 ? 1 : 0.4 ) ) {
+                body.rings = new RingField( this.space, body, ( this.seed * 13 + i * 101 ) % 1000003 );
+                body.ringNormal = body.rings.normal;
+                this.rings.push( body.rings );
+            }
         }
     }
 
@@ -112,7 +107,7 @@ class System {
         const normal = host.ringNormal || new THREE.Vector3( this.rnd( 3, 2 ) - 0.5, 1, this.rnd( 3, 3 ) - 0.5 ).normalize();
         const u = new THREE.Vector3( 1, 0, 0 ).cross( normal ).normalize(), v = normal.clone().cross( u );
         const beltShare = 0.5 + this.rnd( 3, 4 ) * 0.4;
-        this.rockFar = new THREE.InstancedMesh( new THREE.IcosahedronGeometry( 1, 1 ), rockMat, n );
+        this.rockFar = new THREE.InstancedMesh( new THREE.IcosahedronGeometry( 1, 1 ), instanceMat, n );
         this.rockFar.instanceColor = new THREE.InstancedBufferAttribute( new Float32Array( n * 3 ), 3 );
         const d = new THREE.Object3D();
         for ( let i = 0; i < n; i++ ) {
@@ -166,7 +161,7 @@ class System {
                 this.space.airlock( ship, new THREE.Vector3( W / 2 * voxel + 2, 0, 0 ) );
             } );
         }
-        const hosts = this.bodies.filter( ( b ) => b.kind !== 'gas' );
+        const hosts = this.bodies;
         const nSt = hosts.length ? Math.floor( this.rnd( 5, 1 ) * Math.min( 5, hosts.length + 1 ) ) + ( this.home ? 1 : 0 ) : 0;
         for ( let i = 0; i < nSt; i++ ) {
             const host = hosts[ i % hosts.length ];
@@ -192,6 +187,7 @@ class System {
         this.star.position.sub( delta );
         this.starBall.position.sub( delta );
         for ( const b of this.bodies ) { b.pos.sub( delta ); b.group.position.sub( delta ); }
+        for ( const rg of this.rings ) rg.rebase( delta );
         for ( const r of this.rocks ) { r.pos.sub( delta ); if ( r.mesh ) { r.mesh.position.sub( delta ); r.frame.position.sub( delta ); } }
         this.rockDirty = true;
     }
@@ -199,6 +195,7 @@ class System {
     dispose() {
         this.disposed = true;
         this.scene.remove( this.star, this.starBall, this.rockFar );
+        for ( const rg of this.rings ) rg.dispose();
         for ( const b of this.bodies ) { this.scene.remove( b.group ); b.group.traverse( ( o ) => o.geometry && o.geometry.dispose() ); for ( const g of b.geos.values() ) g.dispose(); }
         for ( const r of this.rocks ) if ( r.mesh ) { this.scene.remove( r.mesh, r.frame ); r.mesh.geometry.dispose(); }
         for ( const v of [ ...this.ships, ...this.stations ] ) { this.scene.remove( v.group ); v.group.traverse( ( o ) => o.geometry && o.geometry.dispose() ); }
@@ -220,7 +217,7 @@ export class Space {
     }
 
     get bodies() { return [ ...this.systems.values() ].flatMap( ( s ) => s.bodies ); }
-    get rocks() { return [ ...this.systems.values() ].flatMap( ( s ) => s.rocks ); }
+    get rocks() { return [ ...this.systems.values() ].flatMap( ( s ) => [ ...s.rocks, ...s.rings.flatMap( ( rg ) => rg.rocks ) ] ); }
     get ships() { return [ ...this.systems.values() ].flatMap( ( s ) => s.ships ); }
     get stations() { return [ ...this.systems.values() ].flatMap( ( s ) => s.stations ); }
 
@@ -446,11 +443,13 @@ export class Space {
                 st.group.rotation.y += st.spin * dt;
             }
             for ( const r of sys.rocks ) if ( r.mesh ) { r.rot.x += r.spin.x * dt; r.rot.y += r.spin.y * dt; r.rot.z += r.spin.z * dt; r.mesh.rotation.copy( r.rot ); r.frame.rotation.copy( r.rot ); }
+            for ( const rg of sys.rings ) rg.tick( dt );
         }
         this.timer -= dt;
         if ( this.timer > 0 ) return;
         this.timer = 0.5;
         this.refresh( camPos );
+        for ( const sys of this.systems.values() ) for ( const rg of sys.rings ) rg.update( camPos );
         for ( const b of this.bodies ) {
             const d = camPos.distanceTo( b.pos ) / b.radius, sc = Math.max( 0.75, this.scale );
             const level = d < 3 * sc ? 3 : d < 7 * sc ? 2 : d < 30 * sc ? 1 : 0;

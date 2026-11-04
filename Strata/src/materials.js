@@ -70,6 +70,7 @@ export const coarseTileMat = curved( new THREE.MeshLambertMaterial( { vertexColo
 export const oceanMat = curved( new THREE.MeshLambertMaterial( { color: 0x2d4e80 } ) );
 export const bodyMat = holed( new THREE.MeshLambertMaterial( { vertexColors: true } ) );
 export const rockMat = new THREE.MeshLambertMaterial( { vertexColors: true } );
+export const instanceMat = new THREE.MeshLambertMaterial( { color: 0xffffff } );
 
 const fades = [];
 
