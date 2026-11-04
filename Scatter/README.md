@@ -26,7 +26,7 @@ Tabs in the same browser also find each other over BroadcastChannel, so the demo
 | `net.js` | peer table over two transports: Trystero (Nostr strategy) and BroadcastChannel; one `send()` picks the path per peer |
 | `app.js` | protocol (`state`, `have`, `manifest`, `shard`, `get`, `forget`), distribution, fetch, repair, UI |
 
-No build step. Trystero loads from jsDelivr; if that import fails the page falls back to local tabs only.
+No build step. Trystero is vendored (`../vendor/trystero-0.26.0-nostr.js`, a single-file bundle); if that import fails the page falls back to local tabs only. The only things that leave the browser are the Nostr relay handshakes and STUN lookups.
 
 ## Limits
 

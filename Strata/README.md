@@ -12,7 +12,7 @@ ES modules and workers need `http://`, not `file://`:
 python3 -m http.server 8765      # from the experiments folder
 ```
 
-Open http://localhost:8765/Strata/. Three.js loads from jsDelivr via an importmap; there is no build step.
+Open http://localhost:8765/Strata/. Three.js is vendored at `../vendor/three-0.187.0/three.module.js` and mapped via an importmap; fonts are local too. There is no build step and no network request at all.
 
 URL parameters: `?seed=word` picks a world, `?at=x,y,z,yaw,pitch,fly` is a place in it (the address bar is rewritten every second as you move, so the current URL is always a shareable link to where you stand; `in=` adds the vessel when you are aboard one), `?r=11` sets the detail radius in chunks (4 to 14; it also scales the heightfield ranges and the distances at which planets and asteroids step up in detail), `?crumb=8` sets breadcrumb spacing in metres, and `?pose=x,y,z,yaw,pitch` frames a still with the overlay hidden (used for the thumbnail).
 
