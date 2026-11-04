@@ -69,13 +69,24 @@ export function watery( material ) {
         prev( shader );
         shader.uniforms.time = waterTime;
         shader.fragmentShader = shader.fragmentShader
-            .replace( '#include <common>', '#include <common>\nuniform float time;' )
+            .replace( '#include <common>', `#include <common>
+                uniform float time; varying vec2 vCurveXZ;
+                float wave( vec2 p, float t ) {
+                    return sin( p.x * 1.1 + t * 1.4 ) * sin( p.y * 0.8 - t * 1.1 ) * 0.5
+                         + sin( ( p.x + p.y ) * 1.9 + t * 2.3 ) * 0.3
+                         + sin( ( p.x * 0.6 - p.y * 1.4 ) * 2.7 - t * 1.7 ) * 0.2;
+                }` )
             .replace( '#include <color_fragment>', `#include <color_fragment>
-                float w1 = sin( vCurveXZ.x * 0.9 + time * 1.3 ) * sin( vCurveXZ.y * 0.7 - time * 0.9 );
-                float w2 = sin( ( vCurveXZ.x + vCurveXZ.y ) * 1.7 + time * 2.1 );
-                float ripple = 0.5 + 0.5 * ( w1 * 0.6 + w2 * 0.4 );
-                diffuseColor.rgb *= 0.9 + ripple * 0.18;
-                diffuseColor.rgb += vec3( 0.1 ) * pow( ripple, 8.0 );` );
+                float w0 = wave( vCurveXZ, time );
+                float ripple = 0.5 + 0.5 * w0;
+                float cells = abs( sin( ( vCurveXZ.x * 2.3 + w0 * 2.0 ) ) * sin( ( vCurveXZ.y * 2.1 - w0 * 2.0 + time * 0.6 ) ) );
+                diffuseColor.rgb *= 0.86 + ripple * 0.22;
+                diffuseColor.rgb += vec3( 0.18, 0.2, 0.22 ) * pow( cells, 6.0 ) * ( 0.4 + 0.6 * ripple );` )
+            .replace( '#include <normal_fragment_begin>', `#include <normal_fragment_begin>
+                float eps = 0.35;
+                float wx = wave( vCurveXZ + vec2( eps, 0.0 ), time ) - w0;
+                float wz = wave( vCurveXZ + vec2( 0.0, eps ), time ) - w0;
+                normal = normalize( normal + vec3( -wx, 0.0, -wz ) * 0.9 );` );
     };
     material.customProgramCacheKey = () => 'curved-water';
     material.userData.patch = ( m ) => watery( curved( m ) );

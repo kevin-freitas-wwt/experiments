@@ -102,7 +102,10 @@ export class Player {
     }
 
     get inSpace() {
-        return this.shell === this.home && this.pos.y > 400;
+        if ( this.shell !== this.home ) return false;
+        if ( this.pos.y > 400 || this.pos.y < -400 ) return true;
+        if ( ! this.spawn ) this.spawn = spawnOf( this.home.world.seed );
+        return Math.hypot( this.pos.x - this.spawn.x, this.pos.z - this.spawn.z ) > 200000;
     }
 
     unstick() {

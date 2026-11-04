@@ -68,10 +68,14 @@ function planetColumn( t ) {
     return ( x, z ) => {
         const d = [ up[ 0 ] * t.radius + u[ 0 ] * x + w[ 0 ] * z, up[ 1 ] * t.radius + u[ 1 ] * x + w[ 1 ] * z, up[ 2 ] * t.radius + u[ 2 ] * x + w[ 2 ] * z ];
         const dl = Math.hypot( ...d ); d[ 0 ] /= dl; d[ 1 ] /= dl; d[ 2 ] /= dl;
-        const { r, biome } = surfaceAt( t.planet, k, d, t.seed, t.radius, 8 );
+        const { r, biome, e } = surfaceAt( t.planet, k, d, t.seed, t.radius, 8 );
         const cosA = d[ 0 ] * up[ 0 ] + d[ 1 ] * up[ 1 ] + d[ 2 ] * up[ 2 ];
-        const h = Math.max( 1, Math.min( HEIGHT - 12, Math.round( cosA * r - t.zero ) ) );
         const sea = seaR > 0 ? Math.round( cosA * seaR - t.zero ) : -1;
+        const wet = seaR > 0 && e < k.seaLevel;
+        const floor = wet ? Math.max( seaR - 14, t.radius * ( 1 + e * k.amp * 4 ) ) : r;
+        let h = Math.round( cosA * floor - t.zero );
+        if ( wet ) h = Math.min( h, sea - 2 );
+        h = Math.max( 1, Math.min( HEIGHT - 12, h ) );
         return { h, biome, sea, liquid: t.planet === 'ember' ? LAVA : t.planet === 'icy' ? ICE : WATER };
     };
 }
