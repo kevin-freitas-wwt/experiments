@@ -40,7 +40,7 @@ function column( x, z, seed ) {
 function surface( biome, depth, x, z, seed ) {
     if ( depth > 3 ) return STONE;
     switch ( biome ) {
-        case 0: return depth === 0 ? ( hash2( x, z, seed + 3 ) < 0.5 ? GRAVEL : CLAY ) : STONE;
+        case 0: return depth === 0 ? ( hash2( x, z, seed + 3 ) < 0.5 ? GRAVEL : SAND ) : STONE;
         case 1: return SAND;
         case 2: return depth === 0 ? GRASS : DIRT;
         case 3: return depth === 0 ? GRASS : DIRT;
@@ -352,7 +352,7 @@ function patch( { kind, radius, seed, center, ang, n } ) {
     return { pos, col, idx };
 }
 
-function rock( { size, seed } ) {
+function rock( { size, seed, color } ) {
     const n = size, c = ( n - 1 ) / 2;
     const ax = 0.6 + hash2( seed, 1, 5 ) * 0.4, ay = 0.5 + hash2( seed, 2, 5 ) * 0.5, az = 0.6 + hash2( seed, 3, 5 ) * 0.4;
     const vol = new Uint8Array( n * n * n );
@@ -361,7 +361,7 @@ function rock( { size, seed } ) {
         const d = Math.sqrt( dx * dx + dy * dy + dz * dz ) + fbm3( x / 5, y / 5, z / 5, seed, 3 ) * 0.45;
         vol[ ( x * n + y ) * n + z ] = d < 0.95 ? 1 : 0;
     }
-    const base = [ [ 0x8a, 0x84, 0x7a ], [ 0x6e, 0x66, 0x5e ], [ 0x9c, 0x8c, 0x78 ] ][ seed % 3 ];
+    const base = color || [ [ 0x8a, 0x84, 0x7a ], [ 0x6e, 0x66, 0x5e ], [ 0x9c, 0x8c, 0x78 ] ][ seed % 3 ];
     const m = meshVolume( n, n, n, ( x, y, z ) => {
         if ( ! vol[ ( x * n + y ) * n + z ] ) return null;
         const j = 0.85 + hash3( x, y, z, seed ) * 0.3;

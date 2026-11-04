@@ -60,10 +60,32 @@ export function curved( material, edge = null ) {
     return material;
 }
 
+export const waterTime = { value: 0 };
+
+// Animated liquid: scrolling ripples brighten and sparkle the surface, in world xz so it reads the same in any frame.
+export function watery( material ) {
+    const prev = material.onBeforeCompile;
+    material.onBeforeCompile = ( shader ) => {
+        prev( shader );
+        shader.uniforms.time = waterTime;
+        shader.fragmentShader = shader.fragmentShader
+            .replace( '#include <common>', '#include <common>\nuniform float time;' )
+            .replace( '#include <color_fragment>', `#include <color_fragment>
+                float w1 = sin( vCurveXZ.x * 0.9 + time * 1.3 ) * sin( vCurveXZ.y * 0.7 - time * 0.9 );
+                float w2 = sin( ( vCurveXZ.x + vCurveXZ.y ) * 1.7 + time * 2.1 );
+                float ripple = 0.5 + 0.5 * ( w1 * 0.6 + w2 * 0.4 );
+                diffuseColor.rgb *= 0.9 + ripple * 0.18;
+                diffuseColor.rgb += vec3( 0.1 ) * pow( ripple, 8.0 );` );
+    };
+    material.customProgramCacheKey = () => 'curved-water';
+    material.userData.patch = ( m ) => watery( curved( m ) );
+    return material;
+}
+
 const edgeUniforms = () => ( { center: { value: new THREE.Vector2() }, r0: { value: -1 }, r1: { value: -1 } } );
 
 export const solidMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ) );
-export const waterMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true, transparent: true, opacity: 0.86, depthWrite: false } ) );
+export const waterMat = watery( curved( new THREE.MeshLambertMaterial( { vertexColors: true, transparent: true, opacity: 0.86, depthWrite: false } ) ) );
 export const fineTileMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() );
 export const midTileMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() );
 export const coarseTileMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() );

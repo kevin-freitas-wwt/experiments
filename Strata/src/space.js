@@ -8,6 +8,8 @@ const KINDS = [ 'lush', 'icy', 'rocky', 'ember' ];
 const NAMES = [ 'Oriel', 'Tamsin', 'Halvard', 'Nerys', 'Cordan', 'Ilse', 'Brannoc', 'Sable', 'Ysolde', 'Marrow', 'Quill', 'Vesper', 'Ashdown', 'Lorn', 'Kestrel', 'Pembray', 'Solenne', 'Thackery', 'Wren', 'Ismay' ];
 const STAR_NAMES = [ 'Aldric', 'Bellane', 'Corvane', 'Dunmore', 'Elsinor', 'Fairweather', 'Galloway', 'Harrow', 'Inverleith', 'Jessamy', 'Kinloch', 'Lammas', 'Morrow', 'Nethercote', 'Orrin', 'Penhallow', 'Quenby', 'Rosslyn', 'Sorrel', 'Tarrant' ];
 const DETAILS = [ 2, 4, 6, 7 ];
+export const ROCK_TINTS = [ [ 0x8a, 0x84, 0x7a ], [ 0x6e, 0x66, 0x5e ], [ 0x9c, 0x8c, 0x78 ], [ 0xa6, 0x6a, 0x48 ], [ 0x5e, 0x5a, 0x66 ] ];
+const rgbHex = ( c ) => ( c[ 0 ] << 16 ) | ( c[ 1 ] << 8 ) | c[ 2 ];
 // Main-sequence spectral classes: share of stars, luminosity range (Sun = 1), colour, visual radius. Habitable-zone distance scales with sqrt(L).
 const STARS = [
     { cls: 'M', share: 0.72, lum: [ 0.03, 0.1 ], color: 0xffb080, radius: 3500, name: 'red dwarf' },
@@ -160,12 +162,13 @@ class System {
                 const a = this.rnd( i, 25 ) * Math.PI * 2, r = 20000 + this.rnd( i, 26 ) * 90000;
                 pos = new THREE.Vector3( Math.cos( a ) * r, ( this.home ? 6000 : -20000 ) + this.rnd( i, 27 ) * 40000, Math.sin( a ) * r ).add( this.center );
             }
-            const rock = { i, system: this, size, voxel, pos, radius: size * voxel * 0.42, mesh: null, want: false, spin: new THREE.Vector3( this.rnd( i, 28 ) - 0.5, this.rnd( i, 29 ) - 0.5, this.rnd( i, 30 ) - 0.5 ).multiplyScalar( 0.3 ), rot: new THREE.Euler( 0, 0, 0 ) };
+            const tint = ROCK_TINTS[ Math.floor( this.rnd( i, 31 ) * ROCK_TINTS.length ) ];
+            const rock = { i, system: this, size, voxel, pos, color: tint, radius: size * voxel * 0.42, mesh: null, want: false, spin: new THREE.Vector3( this.rnd( i, 28 ) - 0.5, this.rnd( i, 29 ) - 0.5, this.rnd( i, 30 ) - 0.5 ).multiplyScalar( 0.3 ), rot: new THREE.Euler( 0, 0, 0 ) };
             d.position.copy( pos );
             d.scale.setScalar( rock.radius * 0.9 );
             d.updateMatrix();
             this.rockFar.setMatrixAt( i, d.matrix );
-            this.rockFar.setColorAt( i, new THREE.Color( 0xb0a89c ) );
+            this.rockFar.setColorAt( i, new THREE.Color( rgbHex( tint ) ).multiplyScalar( 0.95 ) );
             this.rocks.push( rock );
         }
         this.rockFar.frustumCulled = false;
@@ -504,7 +507,7 @@ export class Space {
                 const d = r.pos.distanceTo( camPos );
                 if ( d < nearR && ! r.want ) {
                     r.want = true;
-                    this.pool.submit( { type: 'rock', size: r.size, seed: sys.seed * 3 + r.i, i: r.i }, { priority: d / 100, tag: 'rock' } ).then( ( data ) => {
+                    this.pool.submit( { type: 'rock', size: r.size, seed: sys.seed * 3 + r.i, i: r.i, color: r.color }, { priority: d / 100, tag: 'rock' } ).then( ( data ) => {
                         if ( ! r.want || sys.disposed ) return;
                         r.mesh = new THREE.Mesh( voxelGeometry( data ), rockMat );
                         r.mesh.position.copy( r.pos );

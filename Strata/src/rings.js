@@ -164,7 +164,7 @@ export class RingField {
             const d = rk.pos.distanceTo( camPos );
             if ( d < nearR && rk.radius > 4 && ! rk.want ) {
                 rk.want = true;
-                this.space.pool.submit( { type: 'rock', size: rk.size, seed: ( this.seed + rk.i ) % 100000, i: rk.i }, { priority: d / 50, tag: 'rock' } ).then( ( data ) => {
+                this.space.pool.submit( { type: 'rock', size: rk.size, seed: ( this.seed + rk.i ) % 100000, i: rk.i, color: [ rk.color >> 16 & 255, rk.color >> 8 & 255, rk.color & 255 ] }, { priority: d / 50, tag: 'rock' } ).then( ( data ) => {
                     if ( ! rk.want ) return;
                     const g = new THREE.BufferGeometry();
                     g.setAttribute( 'position', new THREE.BufferAttribute( data.pos, 3 ) );

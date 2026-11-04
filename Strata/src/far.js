@@ -116,11 +116,11 @@ export class FarField {
         const alt = pos.y - SEA;
         if ( alt < this.fineCeiling ) {
             me.center.value.set( pos.x + ox, pos.z + oz );
-            me.r0.value = this.fine.range - 700; me.r1.value = this.fine.range - 100;
+            me.r0.value = this.fine.range - 260; me.r1.value = this.fine.range - 60;
         } else me.r1.value = -1;
         if ( alt < this.midCeiling ) {
             ce.center.value.set( pos.x + ox, pos.z + oz );
-            ce.r0.value = this.mid.range - 2500; ce.r1.value = this.mid.range - 500;
+            ce.r0.value = this.mid.range - 900; ce.r1.value = this.mid.range - 200;
         } else ce.r1.value = -1;
         this.timer -= dt;
         if ( this.timer > 0 ) return;

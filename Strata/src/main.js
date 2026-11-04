@@ -7,7 +7,7 @@ import { Player } from './player.js';
 import { Crumbs } from './crumbs.js';
 import { Flares } from './flare.js';
 import { BIOMES, SEA, CHUNK, spawnOf } from './blocks.js';
-import { tickFades, hole } from './materials.js';
+import { tickFades, hole, waterTime } from './materials.js';
 import { KINDS } from './planet.js';
 
 const params = new URLSearchParams( location.search );
@@ -97,7 +97,7 @@ function lookAt( target ) {
     player.pitch = Math.max( -1.5, Math.min( 1.5, Math.atan2( f.y, Math.hypot( f.x, f.z ) ) ) );
 }
 
-function travel( kind, index = 0 ) {
+function travel( kind, index = 0, approach = false ) {
     leaveShell();
     player.vel.set( 0, 0, 0 );
     player.flying = true;
@@ -105,6 +105,8 @@ function travel( kind, index = 0 ) {
     const away = ( from, pos, dist ) => {
         const dir = pos.clone().sub( from );
         if ( dir.lengthSq() < 1 ) dir.set( 0.3, 0.4, 1 );
+        const now = dir.length();
+        if ( approach && now > dist * 1.5 ) dist = Math.max( dist, now * 0.3 );
         return from.clone().addScaledVector( dir.normalize(), dist );
     };
     if ( kind === 'home' ) {
@@ -161,7 +163,7 @@ function aimTarget() {
 canvas.addEventListener( 'mousedown', ( e ) => {
     if ( e.button !== 0 || ! player.locked ) return;
     const hit = aimTarget();
-    if ( hit ) travel( hit.kind, hit.obj );
+    if ( hit ) travel( hit.kind, hit.obj, true );
 } );
 
 const NAV = { Digit1: [ 'planet', 0 ], Digit2: [ 'planet', 1 ], Digit3: [ 'planet', 2 ], Digit4: [ 'planet', 3 ], Digit5: [ 'planet', 4 ], Digit6: [ 'planet', 5 ], Digit7: [ 'planet', 6 ], Digit8: [ 'rock' ], Digit9: [ 'ship' ], Minus: [ 'station' ], Digit0: [ 'home' ] };
@@ -389,6 +391,7 @@ function frame() {
     far.update( dt, homePos, world, player.shell === home ? face : null );
     ambient.intensity = player.shell.interior ? 2.2 : 0.6;
     tickFades( dt );
+    waterTime.value += dt;
     lastPos.copy( worldPos );
     if ( ! spawned ) {
         if ( world.loaded( SPAWN.x, SPAWN.z ) ) { player.place( SPAWN.x, SPAWN.z ); spawned = true; }
