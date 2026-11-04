@@ -38,7 +38,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 const HORIZON = new THREE.Color( 0xeadfca ), ZENITH = new THREE.Color( 0x5d73a3 ), UP_Y = new THREE.Vector3( 0, 1, 0 ), WHITE = new THREE.Color( 0xffffff ), starTint = new THREE.Color();
 const ATMOS = Object.fromEntries( Object.entries( KINDS ).map( ( [ k, v ] ) => [ k, v.atmosphere && { zenith: new THREE.Color( v.atmosphere.zenith ), horizon: new THREE.Color( v.atmosphere.horizon ) } ] ) );
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera( 72, 1, 0.1, 500000 );
+const camera = new THREE.PerspectiveCamera( 72, 1, 0.1, 3000000 );
 
 const skyMat = new THREE.ShaderMaterial( {
     side: THREE.BackSide, depthWrite: false, depthTest: false,

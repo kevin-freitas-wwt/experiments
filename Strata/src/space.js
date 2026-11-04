@@ -427,7 +427,7 @@ export class Space {
         const r = ( i, j ) => hash2( i, j, this.seed + 7 );
         for ( let i = 0; i < n; i++ ) {
             const u = r( i, 60 ) * 2 - 1, a = r( i, 61 ) * Math.PI * 2, s = Math.sqrt( 1 - u * u );
-            pos.set( [ Math.cos( a ) * s * 240000, u * 240000, Math.sin( a ) * s * 240000 ], i * 3 );
+            pos.set( [ Math.cos( a ) * s * 2500000, u * 2500000, Math.sin( a ) * s * 2500000 ], i * 3 );
             const w = 0.55 + r( i, 62 ) * 0.45, warm = r( i, 63 );
             col.set( [ w, w * ( 0.92 + warm * 0.08 ), w * ( 0.85 + ( 1 - warm ) * 0.15 ) ], i * 3 );
         }
