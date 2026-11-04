@@ -74,22 +74,31 @@ export const instanceMat = new THREE.MeshLambertMaterial( { color: 0xffffff } );
 
 const fades = [];
 
-export function fadeIn( mesh, duration = 0.6, onDone = null ) {
-    const base = mesh.material;
+export function fadeIn( mesh, duration = 0.6, onDone = null, out = false ) {
+    const existing = fades.find( ( f ) => f.mesh === mesh );
+    const base = existing ? existing.base : mesh.material;
+    if ( existing ) { existing.m.dispose(); fades.splice( fades.indexOf( existing ), 1 ); }
     const m = base.clone();
     if ( base.userData.patch ) base.userData.patch( m );
     m.alphaHash = true;
-    m.opacity = 0;
+    m.opacity = out ? 1 : 0;
+    if ( out ) { m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; }
     mesh.material = m;
-    fades.push( { mesh, base, m, t: 0, duration, onDone } );
+    fades.push( { mesh, base, m, t: 0, duration, onDone, out } );
+}
+
+export function fadeOut( mesh, duration = 0.8, onDone = null ) {
+    fadeIn( mesh, duration, onDone, true );
 }
 
 export function tickFades( dt ) {
     for ( let i = fades.length - 1; i >= 0; i-- ) {
         const f = fades[ i ];
         f.t += dt;
-        f.m.opacity = Math.min( 1, f.t / f.duration );
+        const k = Math.min( 1, f.t / f.duration );
+        f.m.opacity = f.out ? 1 - k : k;
         if ( f.t < f.duration ) continue;
+        if ( f.out ) f.mesh.visible = false;
         f.mesh.material = f.base;
         f.m.dispose();
         fades.splice( i, 1 );

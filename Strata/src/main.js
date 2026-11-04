@@ -300,18 +300,23 @@ function manageShells( dt ) {
         r.t += dt;
         if ( r.leaving ) {
             const k = 1 - Math.min( 1, r.t / 1.2 );
-            r.shell.group.traverse( ( o ) => { if ( o.isMesh ) o.visible = k > 0; } );
+            if ( ! r.fading ) { r.fading = true; r.shell.world.fadeOut( 1.1, () => {} ); }
             if ( ! player.shell.planet ) { r.shell.originWorld( hole.center.value ); hole.r0.value = ringR * k - 24; hole.r1.value = ringR * k + 8; }
             if ( r.t > 1.2 ) { r.shell.dispose(); retiring.splice( i, 1 ); if ( ! player.shell.planet ) hole.r1.value = -1; }
-        } else if ( r.t > 4 || player.world.loaded( player.pos.x, player.pos.z ) ) { r.shell.dispose(); retiring.splice( i, 1 ); }
+        } else {
+            const ready = player.world.stats.pending === 0 && player.world.chunks.size > 0;
+            if ( ! r.fading && ( ready || r.t > 6 ) ) { r.fading = true; r.shell.world.fadeOut( 0.8, () => {} ); r.t = 0; }
+            if ( r.fading && r.t > 0.9 ) { r.shell.dispose(); retiring.splice( i, 1 ); }
+        }
     }
     if ( player.shell.planet ) {
         const sh = player.shell, alt = player.pos.y - BASE, horiz = Math.hypot( player.pos.x, player.pos.z );
-        if ( alt > 350 || horiz > ringR + 32 ) { leaveShell(); return; }
-        if ( horiz > 64 ) enterShell( sh.body );
+        if ( alt > 350 ) { leaveShell(); return; }
+        const recenter = Math.min( 400, Math.max( 64, sh.body.radius * 0.07 ) );
+        if ( horiz > recenter && ! retiring.some( ( r ) => ! r.leaving ) ) enterShell( sh.body );
         sh.age = ( sh.age || 0 ) + dt;
         const k = Math.min( 1, sh.age / 1.4 );
-        sh.originWorld( hole.center.value );
+        hole.center.value.copy( player.worldPos );
         hole.r0.value = ringR * k - 24; hole.r1.value = ringR * k + 8;
     } else if ( player.shell.radial ) {
         const rk = player.shell.rock;

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CHUNK, HEIGHT, AIR, isSolid } from './blocks.js';
-import { solidMat, waterMat, fadeIn } from './materials.js';
+import { solidMat, waterMat, fadeIn, fadeOut } from './materials.js';
 
 const key = ( cx, cz ) => `${cx},${cz}`;
 
@@ -65,11 +65,18 @@ export class World {
             g.setIndex( new THREE.BufferAttribute( part.idx, 1 ) );
             g.computeBoundingSphere();
             const m = new THREE.Mesh( g, mat );
-            if ( mat === solidMat && this.center && ( Math.abs( data.cx - this.center.cx ) > 1 || Math.abs( data.cz - this.center.cz ) > 1 ) ) fadeIn( m );
+            if ( mat === solidMat && ( this.terrain || ( this.center && ( Math.abs( data.cx - this.center.cx ) > 1 || Math.abs( data.cz - this.center.cz ) > 1 ) ) ) ) fadeIn( m );
             group.add( m );
         }
         this.scene.add( group );
         this.chunks.set( k, { cx: data.cx, cz: data.cz, group, blocks: data.blocks, biomes: data.biomes } );
+    }
+
+    fadeOut( duration, onDone ) {
+        let n = 0;
+        for ( const c of this.chunks.values() ) c.group.children.forEach( ( m ) => { n++; fadeOut( m, duration ); } );
+        setTimeout( onDone, duration * 1000 + 50 );
+        return n;
     }
 
     dispose() {

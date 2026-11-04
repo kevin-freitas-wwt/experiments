@@ -61,6 +61,7 @@ class Level {
         g.computeVertexNormals();
         g.computeBoundingSphere();
         const m = new THREE.Mesh( g, this.material );
+        m.frustumCulled = false;
         m.position.set( data.x0, 0, data.z0 );
         fadeIn( m, 0.8 );
         t.mesh = m;
@@ -98,6 +99,7 @@ export class FarField {
         this.fineCeiling = 9000;
         this.ocean = new THREE.Mesh( new THREE.RingGeometry( 1, 190000, 64, 60 ).rotateX( -Math.PI / 2 ), oceanMat );
         this.ocean.position.set( this.spawn.x, SEA - 14, this.spawn.z );
+        this.ocean.frustumCulled = false;
         scene.add( this.ocean );
         this.timer = 0;
     }
