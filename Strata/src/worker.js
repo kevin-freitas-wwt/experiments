@@ -70,8 +70,8 @@ function planetColumn( t ) {
         const dl = Math.hypot( ...d ); d[ 0 ] /= dl; d[ 1 ] /= dl; d[ 2 ] /= dl;
         const { r, biome } = surfaceAt( t.planet, k, d, t.seed, t.radius, 8 );
         const cosA = d[ 0 ] * up[ 0 ] + d[ 1 ] * up[ 1 ] + d[ 2 ] * up[ 2 ];
-        const h = Math.max( 1, Math.min( HEIGHT - 12, Math.round( cosA * r - t.R0 + BASE ) ) );
-        const sea = seaR > 0 ? Math.round( cosA * seaR - t.R0 + BASE ) : -1;
+        const h = Math.max( 1, Math.min( HEIGHT - 12, Math.round( cosA * r - t.zero ) ) );
+        const sea = seaR > 0 ? Math.round( cosA * seaR - t.zero ) : -1;
         return { h, biome, sea, liquid: t.planet === 'ember' ? LAVA : t.planet === 'icy' ? ICE : WATER };
     };
 }
@@ -159,7 +159,7 @@ class Builder {
             this.pos.push( cx + ( u[ 0 ] * a + v[ 0 ] * b ) * 0.5, cy + ( u[ 1 ] * a + v[ 1 ] * b ) * 0.5, cz + ( u[ 2 ] * a + v[ 2 ] * b ) * 0.5 );
             this.nrm.push( n[ 0 ], n[ 1 ], n[ 2 ] );
             const f = AO[ ao[ i ] ];
-            this.col.push( rgb[ 0 ] * f, rgb[ 1 ] * f, rgb[ 2 ] * f );
+            this.col.push( Math.min( 255, rgb[ 0 ] * f ), Math.min( 255, rgb[ 1 ] * f ), Math.min( 255, rgb[ 2 ] * f ) );
         }
         const c = this.count;
         if ( ao[ 0 ] + ao[ 2 ] > ao[ 1 ] + ao[ 3 ] ) this.idx.push( c, c + 1, c + 2, c, c + 2, c + 3 );

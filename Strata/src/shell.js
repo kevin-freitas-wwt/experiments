@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { World } from './world.js';
+import { HEIGHT } from './blocks.js';
 import { KINDS, surfaceAt } from './planet.js';
 
 export const BASE = 110;
@@ -14,15 +15,29 @@ export class Shell {
             const ref = Math.abs( up.y ) < 0.9 ? new THREE.Vector3( 0, 1, 0 ) : new THREE.Vector3( 1, 0, 0 );
             const u = new THREE.Vector3().crossVectors( ref, up ).normalize();
             const w = new THREE.Vector3().crossVectors( u, up );
-            this.R0 = surfaceAt( body.kind, KINDS[ body.kind ], up.toArray(), body.seed, body.radius, 8 ).r;
+            const k = KINDS[ body.kind ], reach = radius * 16 + 40;
+            this.R0 = surfaceAt( body.kind, k, up.toArray(), body.seed, body.radius, 8 ).r;
+            let rMin = this.R0, rMax = this.R0;
+            const d = new THREE.Vector3();
+            for ( let i = -4; i <= 4; i++ ) for ( let j = -4; j <= 4; j++ ) {
+                d.copy( up ).multiplyScalar( body.radius ).addScaledVector( u, i / 4 * reach ).addScaledVector( w, j / 4 * reach ).normalize();
+                const r = surfaceAt( body.kind, k, d.toArray(), body.seed, body.radius, 6 ).r * d.dot( up );
+                if ( r < rMin ) rMin = r;
+                if ( r > rMax ) rMax = r;
+            }
+            const seaR = k.sea ? body.radius * ( 1 + k.seaLevel * k.amp * 4 ) : 0;
+            if ( seaR && seaR < rMin ) rMin = seaR;
+            this.zero = rMin - 30;
+            if ( rMax - this.zero > HEIGHT - 14 ) this.zero = ( rMin + rMax ) / 2 - ( HEIGHT - 14 ) / 2;
+            this.base = this.R0 - this.zero;
             this.group.quaternion.setFromRotationMatrix( new THREE.Matrix4().makeBasis( u, up, w ) );
-            this.group.position.copy( up ).multiplyScalar( this.R0 - BASE );
-            terrain = { planet: body.kind, radius: body.radius, seed: body.seed, R0: this.R0, up: up.toArray(), u: u.toArray(), w: w.toArray() };
+            this.group.position.copy( up ).multiplyScalar( this.zero );
+            terrain = { planet: body.kind, radius: body.radius, seed: body.seed, zero: this.zero, up: up.toArray(), u: u.toArray(), w: w.toArray() };
             body.group.add( this.group );
         } else scene.add( this.group );
         this.group.updateMatrixWorld( true );
         this.world = new World( this.group, pool, seed, radius, terrain );
-        this.seaLevel = terrain && KINDS[ body.kind ].sea ? Math.round( body.radius * ( 1 + KINDS[ body.kind ].seaLevel * KINDS[ body.kind ].amp * 4 ) - this.R0 + BASE ) : null;
+        this.seaLevel = terrain && KINDS[ body.kind ].sea ? Math.round( body.radius * ( 1 + KINDS[ body.kind ].seaLevel * KINDS[ body.kind ].amp * 4 ) - this.zero ) : null;
     }
 
     get planet() {
@@ -45,7 +60,7 @@ export class Shell {
     }
 
     originWorld( out = new THREE.Vector3() ) {
-        return this.toWorld( new THREE.Vector3( 0, BASE, 0 ), out );
+        return this.toWorld( new THREE.Vector3( 0, this.base, 0 ), out );
     }
 
     dispose() {

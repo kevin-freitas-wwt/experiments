@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Pool } from './pool.js';
-import { Shell, BASE, InteriorShell, RockFrame } from './shell.js';
+import { Shell, InteriorShell, RockFrame } from './shell.js';
 import { FarField } from './far.js';
 import { Space } from './space.js';
 import { Player } from './player.js';
@@ -345,7 +345,7 @@ function manageShells( dt ) {
         }
     }
     if ( player.shell.planet ) {
-        const sh = player.shell, alt = player.pos.y - BASE, horiz = Math.hypot( player.pos.x, player.pos.z );
+        const sh = player.shell, alt = player.pos.y - sh.base, horiz = Math.hypot( player.pos.x, player.pos.z );
         if ( alt > 350 ) { leaveShell(); return; }
         const recenter = Math.min( 400, Math.max( 64, sh.body.radius * 0.07 ) );
         if ( horiz > recenter && ! retiring.some( ( r ) => ! r.leaving ) ) enterShell( sh.body );
@@ -436,7 +436,7 @@ function frame() {
         hudTimer = 0;
         const onPlanet = player.shell.planet;
         const b = player.world.biome( player.pos.x, player.pos.z );
-        hud.alt.textContent = onPlanet ? fmtDist( player.pos.y - ( player.shell.seaLevel ?? BASE ) ) : player.shell === home && ! offHome ? fmtDist( alt ) : fmtDist( worldPos.distanceTo( home.toWorld( new THREE.Vector3( SPAWN.x, SEA, SPAWN.z ) ) ) );
+        hud.alt.textContent = onPlanet ? fmtDist( player.pos.y - ( player.shell.seaLevel ?? player.shell.base ) ) : player.shell === home && ! offHome ? fmtDist( alt ) : fmtDist( worldPos.distanceTo( home.toWorld( new THREE.Vector3( SPAWN.x, SEA, SPAWN.z ) ) ) );
         hud.biome.textContent = onPlanet || player.shell.interior ? ( b < 0 ? '…' : BIOMES[ b ] ) : player.shell.radial ? 'asteroid' : alt > 2000 ? ( spaceness >= 1 ? 'deep space' : 'upper air' ) : b < 0 ? '…' : BIOMES[ b ];
         hud.coord.textContent = `${homeLocal.x.toFixed( 0 )}, ${homeLocal.z.toFixed( 0 )}`;
         const s = player.world.stats, f = far.stats;
