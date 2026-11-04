@@ -2,12 +2,13 @@ import * as THREE from 'three';
 import { Pool } from './pool.js';
 import { Shell, InteriorShell, RockFrame } from './shell.js';
 import { FarField } from './far.js';
+import { PlanetFar } from './pfar.js';
 import { Space } from './space.js';
 import { Player } from './player.js';
 import { Crumbs } from './crumbs.js';
 import { Flares } from './flare.js';
 import { BIOMES, SEA, CHUNK, spawnOf } from './blocks.js';
-import { tickFades, hole, waterTime } from './materials.js';
+import { tickFades, hole, tileEdge, waterTime } from './materials.js';
 import { KINDS } from './planet.js';
 
 const params = new URLSearchParams( location.search );
@@ -335,34 +336,85 @@ function useAirlock() {
     else { const a = nearAirlock(); if ( a ) enterInterior( a.vessel ); }
 }
 
+let pfar = null, pfarOld = null;
+
+// Heightfield tiles around the nearest planet you are low over, re-framed when you drift half their range.
+function managePlanetFar( dt ) {
+    const wp = player.worldPos;
+    let best = null;
+    for ( const b of space.bodies ) {
+        const d = wp.distanceTo( b.pos );
+        if ( d > b.radius * 1.5 ) continue;
+        const alt = d - space.surfaceRadius( b, wp );
+        if ( alt < Math.min( 4000 * space.scale, b.radius * 0.5 ) && ( ! best || alt < best.alt ) ) best = { b, alt };
+    }
+    if ( pfarOld ) {
+        pfarOld.t += dt;
+        if ( ! pfar || pfar.coveredRadius( pfar.local ) >= pfar.range * 0.8 || pfarOld.t > 8 ) { const o = pfarOld.far; pfarOld = null; o.fadeOut( () => o.dispose() ); }
+    }
+    if ( ! best ) {
+        if ( pfar ) { const o = pfar; pfar = null; o.fadeOut( () => o.dispose() ); }
+        return null;
+    }
+    const local = best.b.group.worldToLocal( wp.clone() );
+    if ( ! pfar || pfar.body !== best.b || pfar.drift( local ) > 0.5 ) {
+        if ( pfar ) {
+            if ( pfar.body === best.b && ! pfarOld ) pfarOld = { far: pfar, t: 0 };
+            else { const o = pfar; o.fadeOut( () => o.dispose() ); }
+        }
+        pfar = new PlanetFar( pool, best.b, local, space.scale );
+    }
+    pfar.local = local;
+    const f = best.b.group.worldToLocal( wp.clone().add( player.forward() ) ).sub( local );
+    pfar.update( dt, local, { x: f.dot( pfar.u ), z: f.dot( pfar.w ) } );
+    return pfar;
+}
+
 function manageShells( dt ) {
-    const ringR = radius * CHUNK;
+    const ringR = radius * CHUNK, pf = managePlanetFar( dt );
+    let r0 = -1, r1 = -1;
+    const center = hole.center.value.copy( player.worldPos );
+    tileEdge.center.value.copy( player.worldPos );
+    tileEdge.r1.value = -1;
+    const a = nearAirlock();
+    prompt.textContent = nearDoor() ? 'airlock · Enter to go outside' : a ? `${a.vessel.name || a.vessel.cls + ' ship'} airlock · Enter to board` : '';
     for ( let i = retiring.length - 1; i >= 0; i-- ) {
         const r = retiring[ i ];
         r.t += dt;
         if ( r.leaving ) {
             const k = 1 - Math.min( 1, r.t / 1.2 );
             if ( ! r.fading ) { r.fading = true; r.shell.world.fadeOut( 1.1, () => {} ); }
-            if ( ! player.shell.planet ) { r.shell.originWorld( hole.center.value ); hole.r0.value = ringR * k - 24; hole.r1.value = ringR * k + 8; }
-            if ( r.t > 1.2 ) { r.shell.dispose(); retiring.splice( i, 1 ); if ( ! player.shell.planet ) hole.r1.value = -1; }
+            if ( ! player.shell.planet ) { if ( ! pf ) r.shell.originWorld( center ); r0 = ringR * k - 24; r1 = ringR * k + 8; }
+            if ( r.t > 1.2 ) { r.shell.dispose(); retiring.splice( i, 1 ); }
         } else {
             const ready = player.world.stats.pending === 0 && player.world.chunks.size > 0;
             if ( ! r.fading && ( ready || r.t > 6 ) ) { r.fading = true; r.shell.world.fadeOut( 0.8, () => {} ); r.t = 0; }
             if ( r.fading && r.t > 0.9 ) { r.shell.dispose(); retiring.splice( i, 1 ); }
         }
     }
+    if ( pf ) {
+        const tc = pf.coveredRadius( pf.local );
+        if ( tc > 300 ) { r0 = Math.max( r0, tc - 260 ); r1 = Math.max( r1, tc - 60 ); }
+    }
     if ( player.shell.planet ) {
         const sh = player.shell, alt = player.pos.y - sh.base, horiz = Math.hypot( player.pos.x, player.pos.z );
+        const covered = Math.min( ringR, sh.world.coveredRadius( player.pos.x, player.pos.z ) );
+        r0 = Math.max( r0, covered - 24 ); r1 = Math.max( r1, covered + 8 );
+        tileEdge.r0.value = covered - 48; tileEdge.r1.value = covered + 16;
+        hole.r0.value = r0; hole.r1.value = r1;
         if ( alt > 350 ) { leaveShell(); return; }
         const recenter = Math.min( 400, Math.max( 64, sh.body.radius * 0.07 ) );
         if ( horiz > recenter && ! retiring.some( ( r ) => ! r.leaving ) ) enterShell( sh.body );
-        const covered = Math.min( ringR, sh.world.coveredRadius( player.pos.x, player.pos.z ) );
-        hole.center.value.copy( player.worldPos );
-        hole.r0.value = covered - 24; hole.r1.value = covered + 8;
+        return;
+    }
+    hole.r0.value = r0; hole.r1.value = r1;
+    if ( player.shell.radial ) {
     } else if ( player.shell.radial ) {
         const rk = player.shell.rock;
         if ( ! rk.mesh || player.pos.length() > rk.radius * 3 + 80 ) leaveShell();
-    } else if ( player.shell === home && player.inSpace ) {
+        return;
+    }
+    if ( player.shell === home && player.inSpace ) {
         const wp = player.worldPos;
         for ( const b of space.bodies ) {
             const d = wp.distanceTo( b.pos );
@@ -374,8 +426,6 @@ function manageShells( dt ) {
             player.moveTo( frame );
         }
     }
-    const a = nearAirlock();
-    prompt.textContent = nearDoor() ? 'airlock · Enter to go outside' : a ? `${a.vessel.name || a.vessel.cls + ' ship'} airlock · Enter to board` : '';
 }
 
 const timer = new THREE.Timer();

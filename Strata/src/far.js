@@ -4,7 +4,7 @@ import { fineTileMat, midTileMat, coarseTileMat, oceanMat, fadeIn } from './mate
 
 const N = 33;
 
-function gridIndex() {
+export function gridIndex() {
     const idx = new Uint16Array( ( N - 1 ) * ( N - 1 ) * 6 );
     let i = 0;
     for ( let z = 0; z < N - 1; z++ ) for ( let x = 0; x < N - 1; x++ ) {

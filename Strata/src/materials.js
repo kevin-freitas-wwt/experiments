@@ -71,6 +71,33 @@ export function curved( material, edge = null, jitter = false ) {
     return material;
 }
 
+// Planet heightfield tiles: no horizon curvature (they are true sphere points), hidden inside tileEdge.r0 of
+// tileEdge.center (where voxels cover them) with a dither band to r1, offset to win depth ties with the sphere.
+export const tileEdge = { center: { value: new THREE.Vector3() }, r0: { value: -1 }, r1: { value: -1 } };
+
+export function tiled( material ) {
+    material.userData.patch = tiled;
+    material.polygonOffset = true; material.polygonOffsetFactor = -1; material.polygonOffsetUnits = -2;
+    material.onBeforeCompile = ( shader ) => {
+        shader.uniforms.tileCenter = tileEdge.center;
+        shader.uniforms.tileR0 = tileEdge.r0;
+        shader.uniforms.tileR1 = tileEdge.r1;
+        shader.vertexShader = shader.vertexShader
+            .replace( '#include <common>', '#include <common>\nvarying vec3 vTileW;' )
+            .replace( '#include <begin_vertex>', '#include <begin_vertex>\nvTileW = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;' );
+        shader.fragmentShader = shader.fragmentShader
+            .replace( '#include <common>', '#include <common>\nuniform vec3 tileCenter; uniform float tileR0; uniform float tileR1; varying vec3 vTileW;' )
+            .replace( '#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+                if ( tileR1 > tileR0 ) {
+                    float tileT = smoothstep( tileR0, tileR1, length( vTileW - tileCenter ) );
+                    float tileH = fract( sin( dot( gl_FragCoord.xy, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+                    if ( tileH > tileT ) discard;
+                }` );
+    };
+    material.customProgramCacheKey = () => 'tiled';
+    return material;
+}
+
 export const waterTime = { value: 0 };
 
 // Animated liquid: scrolling ripples brighten and sparkle the surface, in world xz so it reads the same in any frame.
@@ -112,6 +139,7 @@ export const fineTileMat = curved( new THREE.MeshLambertMaterial( { vertexColors
 export const midTileMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() );
 export const coarseTileMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() );
 export const oceanMat = curved( new THREE.MeshLambertMaterial( { color: 0x2d4e80 } ) );
+export const planetTileMat = tiled( new THREE.MeshLambertMaterial( { vertexColors: true } ) );
 export const bodyMat = holed( new THREE.MeshLambertMaterial( { vertexColors: true } ) );
 export const rockMat = new THREE.MeshLambertMaterial( { vertexColors: true } );
 export const instanceMat = new THREE.MeshLambertMaterial( { color: 0xffffff } );

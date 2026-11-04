@@ -276,19 +276,37 @@ function meshVolume( sx, sy, sz, cell ) {
     return b.pack();
 }
 
-function tile( { x0, z0, size, step, seed } ) {
+// Heightfield tile. On the home world a flat grid; with `terrain` (a planet) the grid is gnomonic in the
+// tangent frame (up, u, w) but vertices are exact body-local sphere points, so tiles overlay the smooth sphere.
+function tile( { x0, z0, size, step, seed, terrain } ) {
     const n = size / step + 1;
     const pos = new Float32Array( n * n * 3 ), col = new Uint8Array( n * n * 3 );
+    const k = terrain ? KINDS[ terrain.planet ] : null, oct = terrain ? octavesFor( terrain.radius, 8 ) : 0;
+    const seaR = k && k.sea ? terrain.radius * ( 1 + k.seaLevel * k.amp * 4 ) : -1;
     let i = 0;
     for ( let gz = 0; gz < n; gz++ ) for ( let gx = 0; gx < n; gx++ ) {
         const x = x0 + gx * step, z = z0 + gz * step;
-        const c = column( x, z, seed );
-        const wet = c.h <= SEA;
-        const h = wet ? SEA : c.h;
-        pos[ i * 3 ] = gx * step; pos[ i * 3 + 1 ] = h - 1; pos[ i * 3 + 2 ] = gz * step;
-        let rgb = PALETTE[ wet ? WATER : surface( c.biome, 0, x, z, seed ) ];
+        let c, wet, bedDepth, liquid = WATER;
+        if ( terrain ) {
+            const { up, u, w, radius } = terrain;
+            const d = [ up[ 0 ] * radius + u[ 0 ] * x + w[ 0 ] * z, up[ 1 ] * radius + u[ 1 ] * x + w[ 1 ] * z, up[ 2 ] * radius + u[ 2 ] * x + w[ 2 ] * z ];
+            const dl = Math.hypot( ...d ); d[ 0 ] /= dl; d[ 1 ] /= dl; d[ 2 ] /= dl;
+            const { r, biome, e } = surfaceAt( terrain.planet, k, d, seed, radius, oct );
+            wet = seaR > 0 && e < k.seaLevel;
+            const rr = wet ? seaR : r;
+            bedDepth = wet ? seaR - Math.max( seaR - 14, radius * ( 1 + e * k.amp * 4 ) ) : 0;
+            pos[ i * 3 ] = d[ 0 ] * rr; pos[ i * 3 + 1 ] = d[ 1 ] * rr; pos[ i * 3 + 2 ] = d[ 2 ] * rr;
+            c = { biome };
+            liquid = terrain.planet === 'ember' ? LAVA : terrain.planet === 'icy' ? ICE : WATER;
+        } else {
+            c = column( x, z, seed );
+            wet = c.h <= SEA;
+            bedDepth = SEA - c.h;
+            pos[ i * 3 ] = gx * step; pos[ i * 3 + 1 ] = ( wet ? SEA : c.h ) - 1; pos[ i * 3 + 2 ] = gz * step;
+        }
+        let rgb = PALETTE[ wet ? liquid : surface( c.biome, 0, x, z, seed ) ];
         if ( ! wet && ( c.biome === 3 || c.biome === 6 ) ) rgb = PALETTE[ c.biome === 3 ? LEAF : NEEDLE ];
-        if ( wet ) { const bed = PALETTE[ c.h < SEA - 6 ? GRAVEL : SAND ], k = c.h < SEA - 3 ? 0.1 : 0.16; rgb = rgb.map( ( v, i ) => v * ( 1 - k ) + bed[ i ] * k ); }
+        if ( wet && liquid !== ICE ) { const bed = PALETTE[ bedDepth > 6 ? GRAVEL : SAND ], kk = bedDepth > 3 ? 0.1 : 0.16; rgb = rgb.map( ( v, j ) => v * ( 1 - kk ) + bed[ j ] * kk ); }
         const j = ( wet ? 1 : 0.9 ) * ( 0.95 + hash2( x, z, seed + 17 ) * 0.1 );
         col[ i * 3 ] = rgb[ 0 ] * j; col[ i * 3 + 1 ] = rgb[ 1 ] * j; col[ i * 3 + 2 ] = rgb[ 2 ] * j;
         i++;
