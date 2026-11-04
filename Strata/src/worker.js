@@ -154,13 +154,16 @@ class Builder {
     constructor() {
         this.pos = []; this.col = []; this.nrm = []; this.idx = []; this.count = 0;
     }
-    quad( x, y, z, d, rgb, ao ) {
+    // A face of block (x,y,z) on side d, spanning w blocks along d.u and h along d.v.
+    quad( x, y, z, d, rgb, ao, w = 1, h = 1 ) {
         const { n, u, v } = d;
-        const cx = x + 0.5 + n[ 0 ] * 0.5, cy = y + 0.5 + n[ 1 ] * 0.5, cz = z + 0.5 + n[ 2 ] * 0.5;
+        const cx = x + 0.5 + n[ 0 ] * 0.5 + ( u[ 0 ] * ( w - 1 ) + v[ 0 ] * ( h - 1 ) ) * 0.5;
+        const cy = y + 0.5 + n[ 1 ] * 0.5 + ( u[ 1 ] * ( w - 1 ) + v[ 1 ] * ( h - 1 ) ) * 0.5;
+        const cz = z + 0.5 + n[ 2 ] * 0.5 + ( u[ 2 ] * ( w - 1 ) + v[ 2 ] * ( h - 1 ) ) * 0.5;
         const corners = [ [ -1, -1 ], [ 1, -1 ], [ 1, 1 ], [ -1, 1 ] ];
         for ( let i = 0; i < 4; i++ ) {
             const [ a, b ] = corners[ i ];
-            this.pos.push( cx + ( u[ 0 ] * a + v[ 0 ] * b ) * 0.5, cy + ( u[ 1 ] * a + v[ 1 ] * b ) * 0.5, cz + ( u[ 2 ] * a + v[ 2 ] * b ) * 0.5 );
+            this.pos.push( cx + ( u[ 0 ] * a * w + v[ 0 ] * b * h ) * 0.5, cy + ( u[ 1 ] * a * w + v[ 1 ] * b * h ) * 0.5, cz + ( u[ 2 ] * a * w + v[ 2 ] * b * h ) * 0.5 );
             this.nrm.push( n[ 0 ], n[ 1 ], n[ 2 ] );
             const f = AO[ ao[ i ] ];
             this.col.push( Math.min( 255, rgb[ 0 ] * f ), Math.min( 255, rgb[ 1 ] * f ), Math.min( 255, rgb[ 2 ] * f ) );
@@ -178,50 +181,63 @@ class Builder {
     }
 }
 
+// Greedy mesher: per side and slice, faces with the same colour and an AO pattern constant along the
+// merge axis are joined into one quad. Per-block tone jitter lives in the shader so flats can merge.
 function mesh( vol, cx, cz, seed ) {
     const solid = new Builder(), water = new Builder();
     const at = ( x, y, z ) => ( y < 0 || y >= HEIGHT ) ? AIR : vol[ ( ( x + PAD ) * P + z + PAD ) * HEIGHT + y ];
     const occ = ( x, y, z ) => isOpaque( at( x, y, z ) ) ? 1 : 0;
-    const ao = new Array( 4 ), rgb = [ 0, 0, 0 ];
     let yMax = 0;
     for ( let i = 0; i < vol.length; i++ ) if ( vol[ i ] ) { const y = i % HEIGHT; if ( y > yMax ) yMax = y; }
-    for ( let x = 0; x < CHUNK; x++ ) for ( let z = 0; z < CHUNK; z++ ) for ( let y = 0; y <= Math.min( HEIGHT - 1, yMax + 1 ); y++ ) {
-        const b = at( x, y, z );
-        if ( b === AIR ) continue;
-        if ( isLiquid( b ) ) {
-            if ( at( x, y + 1, z ) === AIR ) {
-                ao.fill( 3 );
-                water.quad( x, y - 0.15, z, DIRS[ 2 ], PALETTE[ b ], ao );
+    const size = [ CHUNK, Math.min( HEIGHT, yMax + 2 ), CHUNK ];
+    const corners = [ [ -1, -1 ], [ 1, -1 ], [ 1, 1 ], [ -1, 1 ] ];
+    const p = [ 0, 0, 0 ];
+    for ( const d of DIRS ) {
+        const axis = d.n.findIndex( ( c ) => c !== 0 ), ua = d.u.findIndex( ( c ) => c !== 0 ), va = d.v.findIndex( ( c ) => c !== 0 );
+        const W = size[ ua ], H = size[ va ], cells = new Array( W * H );
+        for ( let s = 0; s < size[ axis ]; s++ ) {
+            cells.fill( null );
+            for ( let a = 0; a < W; a++ ) for ( let b = 0; b < H; b++ ) {
+                p[ axis ] = s; p[ ua ] = a; p[ va ] = b;
+                const [ x, y, z ] = p, blk = at( x, y, z );
+                if ( blk === AIR ) continue;
+                const nx = x + d.n[ 0 ], ny = y + d.n[ 1 ], nz = z + d.n[ 2 ], nb = at( nx, ny, nz );
+                let face = null;
+                if ( isLiquid( blk ) ) {
+                    if ( d.n[ 1 ] === 1 && nb === AIR ) face = { to: water, rgb: PALETTE[ blk ], ao: 255, dy: -0.15, mu: true, mv: true };
+                } else if ( blk === GLASS ) {
+                    if ( nb === AIR ) face = { to: water, rgb: PALETTE[ GLASS ].map( ( c ) => c * d.shade ), ao: 255, dy: 0, mu: true, mv: true };
+                } else if ( ! isOpaque( nb ) ) {
+                    const src = ( d.n[ 1 ] === 0 && ( blk === GRASS || blk === TUNDRA ) ) ? DIRT : blk, base = PALETTE[ src ];
+                    const ao = [ 0, 0, 0, 0 ];
+                    for ( let i = 0; i < 4; i++ ) {
+                        const [ ca, cb ] = corners[ i ];
+                        const s1 = occ( nx + d.u[ 0 ] * ca, ny + d.u[ 1 ] * ca, nz + d.u[ 2 ] * ca );
+                        const s2 = occ( nx + d.v[ 0 ] * cb, ny + d.v[ 1 ] * cb, nz + d.v[ 2 ] * cb );
+                        const cc = occ( nx + d.u[ 0 ] * ca + d.v[ 0 ] * cb, ny + d.u[ 1 ] * ca + d.v[ 1 ] * cb, nz + d.u[ 2 ] * ca + d.v[ 2 ] * cb );
+                        ao[ i ] = s1 && s2 ? 0 : 3 - ( s1 + s2 + cc );
+                    }
+                    face = { to: solid, rgb: [ base[ 0 ] * d.shade, base[ 1 ] * d.shade, base[ 2 ] * d.shade ], ao: ao[ 0 ] | ao[ 1 ] << 2 | ao[ 2 ] << 4 | ao[ 3 ] << 6, aov: ao, dy: 0,
+                        mu: ao[ 0 ] === ao[ 1 ] && ao[ 3 ] === ao[ 2 ], mv: ao[ 0 ] === ao[ 3 ] && ao[ 1 ] === ao[ 2 ] };
+                }
+                if ( face ) { face.key = ( ( src8( face.rgb[ 0 ] ) * 256 + src8( face.rgb[ 1 ] ) ) * 256 + src8( face.rgb[ 2 ] ) ) * 256 + face.ao + ( face.to === water ? 1e10 : 0 ); cells[ a * H + b ] = face; }
             }
-            continue;
-        }
-        if ( b === GLASS ) {
-            ao.fill( 3 );
-            for ( const d of DIRS ) if ( at( x + d.n[ 0 ], y + d.n[ 1 ], z + d.n[ 2 ] ) === AIR ) water.quad( x, y, z, d, PALETTE[ GLASS ].map( ( c ) => c * d.shade ), ao );
-            continue;
-        }
-        const wx = cx * CHUNK + x, wz = cz * CHUNK + z;
-        const jitter = 0.93 + hash2( wx * 7 + y, wz * 13 - y, seed ) * 0.14;
-        for ( const d of DIRS ) {
-            const nx = x + d.n[ 0 ], ny = y + d.n[ 1 ], nz = z + d.n[ 2 ];
-            if ( isOpaque( at( nx, ny, nz ) ) ) continue;
-            const src = ( d.n[ 1 ] === 0 && ( b === GRASS || b === TUNDRA ) ) ? DIRT : b;
-            const base = PALETTE[ src ];
-            const s = d.shade * jitter;
-            rgb[ 0 ] = base[ 0 ] * s; rgb[ 1 ] = base[ 1 ] * s; rgb[ 2 ] = base[ 2 ] * s;
-            const corners = [ [ -1, -1 ], [ 1, -1 ], [ 1, 1 ], [ -1, 1 ] ];
-            for ( let i = 0; i < 4; i++ ) {
-                const [ a, bb ] = corners[ i ];
-                const s1 = occ( nx + d.u[ 0 ] * a, ny + d.u[ 1 ] * a, nz + d.u[ 2 ] * a );
-                const s2 = occ( nx + d.v[ 0 ] * bb, ny + d.v[ 1 ] * bb, nz + d.v[ 2 ] * bb );
-                const cc = occ( nx + d.u[ 0 ] * a + d.v[ 0 ] * bb, ny + d.u[ 1 ] * a + d.v[ 1 ] * bb, nz + d.u[ 2 ] * a + d.v[ 2 ] * bb );
-                ao[ i ] = s1 && s2 ? 0 : 3 - ( s1 + s2 + cc );
+            for ( let a = 0; a < W; a++ ) for ( let b = 0; b < H; b++ ) {
+                const f = cells[ a * H + b ];
+                if ( ! f ) continue;
+                let w = 1, h = 1;
+                while ( f.mu && a + w < W && cells[ ( a + w ) * H + b ] && cells[ ( a + w ) * H + b ].key === f.key ) w++;
+                if ( f.mv ) outer: for ( ; b + h < H; h++ ) for ( let i = 0; i < w; i++ ) { const g = cells[ ( a + i ) * H + b + h ]; if ( ! g || g.key !== f.key ) break outer; }
+                for ( let i = 0; i < w; i++ ) for ( let j = 0; j < h; j++ ) cells[ ( a + i ) * H + b + j ] = null;
+                p[ axis ] = s; p[ ua ] = a; p[ va ] = b;
+                f.to.quad( p[ 0 ], p[ 1 ] + f.dy, p[ 2 ], d, f.rgb, f.aov || [ 3, 3, 3, 3 ], w, h );
             }
-            solid.quad( x, y, z, d, rgb, ao );
         }
     }
     return { solid: solid.pack(), water: water.pack() };
 }
+
+const src8 = ( c ) => Math.min( 255, Math.round( c ) );
 
 function inner( vol, cols ) {
     const blocks = new Uint8Array( CHUNK * CHUNK * HEIGHT );

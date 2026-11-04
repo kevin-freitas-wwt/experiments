@@ -29,8 +29,9 @@ export function holed( material ) {
     return material;
 }
 
-export function curved( material, edge = null ) {
-    material.userData.patch = ( m ) => curved( m, edge );
+// With `jitter`, each block gets a ±7% tone from a hash of its cell in object space (so greedy-merged faces still read as blocks).
+export function curved( material, edge = null, jitter = false ) {
+    material.userData.patch = ( m ) => curved( m, edge, jitter );
     material.userData.curved = true;
     material.userData.edge = edge;
     material.onBeforeCompile = ( shader ) => {
@@ -42,6 +43,16 @@ export function curved( material, edge = null ) {
                 vCurveXZ = curveWorld.xz;
                 vec2 curveD = curveWorld.xz - cameraPosition.xz;
                 transformed.y -= dot( curveD, curveD ) / ( 2.0 * curveR );` );
+        if ( jitter ) {
+            shader.vertexShader = shader.vertexShader
+                .replace( '#include <common>', '#include <common>\nvarying vec3 vJp; varying vec3 vJn;' )
+                .replace( '#include <begin_vertex>', '#include <begin_vertex>\nvJp = position; vJn = normal;' );
+            shader.fragmentShader = shader.fragmentShader
+                .replace( '#include <common>', '#include <common>\nvarying vec3 vJp; varying vec3 vJn;' )
+                .replace( '#include <color_fragment>', `#include <color_fragment>
+                    vec3 jc = floor( vJp - vJn * 0.5 );
+                    diffuseColor.rgb *= 0.93 + fract( sin( dot( jc, vec3( 12.9898, 78.233, 37.719 ) ) ) * 43758.5453 ) * 0.14;` );
+        }
         if ( edge ) {
             shader.uniforms.edgeCenter = edge.center;
             shader.uniforms.edgeR0 = edge.r0;
@@ -56,7 +67,7 @@ export function curved( material, edge = null ) {
                     }` );
         }
     };
-    material.customProgramCacheKey = () => edge ? 'curved-edge' : 'curved';
+    material.customProgramCacheKey = () => ( edge ? 'curved-edge' : 'curved' ) + ( jitter ? '-jitter' : '' );
     return material;
 }
 
@@ -95,7 +106,7 @@ export function watery( material ) {
 
 const edgeUniforms = () => ( { center: { value: new THREE.Vector2() }, r0: { value: -1 }, r1: { value: -1 } } );
 
-export const solidMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ) );
+export const solidMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), null, true );
 export const waterMat = watery( curved( new THREE.MeshLambertMaterial( { vertexColors: true, transparent: true, opacity: 0.86, depthWrite: false } ) ) );
 export const fineTileMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() );
 export const midTileMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() );
