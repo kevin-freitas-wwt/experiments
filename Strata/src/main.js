@@ -98,16 +98,23 @@ function lookAt( target ) {
 }
 
 function travel( kind, index = 0, approach = false ) {
-    leaveShell();
+    const sh = player.shell, stay = approach && kind === 'planet' && sh.planet && sh.body === index;
+    if ( ! stay ) leaveShell();
     player.vel.set( 0, 0, 0 );
     player.flying = true;
-    const wp = player.worldPos, go = ( renderPos ) => home.toLocal( renderPos, player.pos );
+    const wp = player.worldPos, go = ( renderPos ) => ( stay ? sh : home ).toLocal( renderPos, player.pos );
     const away = ( from, pos, dist ) => {
         const dir = pos.clone().sub( from );
         if ( dir.lengthSq() < 1 ) dir.set( 0.3, 0.4, 1 );
-        const now = dir.length();
-        if ( approach && now > dist * 1.5 ) dist = Math.max( dist, now * 0.3 );
         return from.clone().addScaledVector( dir.normalize(), dist );
+    };
+    // Each approach click halves the clearance to the surface, down to `min`, where you are set down.
+    const closer = ( center, surfaceR, min, land = false ) => {
+        const dir = wp.clone().sub( center );
+        if ( dir.lengthSq() < 1 ) dir.set( 0.3, 0.4, 1 );
+        const clear = dir.length() - surfaceR, next = clear > min * 2 ? clear / 2 : min;
+        if ( land && next === min ) player.flying = false;
+        return center.clone().addScaledVector( dir.normalize(), surfaceR + next );
     };
     if ( kind === 'home' ) {
         player.pos.set( SPAWN.x + 0.5, 140, SPAWN.z + 0.5 );
@@ -116,26 +123,26 @@ function travel( kind, index = 0, approach = false ) {
     } else if ( kind === 'planet' ) {
         const b = typeof index === 'object' ? index : space.nearestSystem( wp ).bodies[ index ];
         if ( ! b ) return;
-        go( away( b.pos, wp, b.rings ? b.rings.outer * 1.25 : b.radius * 2.6 ) );
+        go( approach ? closer( b.pos, space.surfaceRadius( b, wp ), 1.5, true ) : away( b.pos, wp, b.rings ? b.rings.outer * 1.25 : b.radius * 2.6 ) );
         lookAt( b.pos );
     } else if ( kind === 'rock' ) {
         const r = typeof index === 'object' ? index : space.nearestRock( wp );
-        go( away( r.pos, wp, r.radius * 4 + 60 ) );
+        go( approach ? closer( r.pos, r.radius, 2, true ) : away( r.pos, wp, r.radius * 4 + 60 ) );
         lookAt( r.pos );
     } else if ( kind === 'ship' ) {
         const sh = typeof index === 'object' ? index : space.nearestShip( wp );
         const side = new THREE.Vector3( 1, 0.35, 0 ).applyQuaternion( sh.group.quaternion ).normalize();
         const span = sh.cls === 'capital' ? 130 : sh.cls === 'medium' ? 70 : 60;
-        go( sh.group.position.clone().addScaledVector( side, span * sh.voxel ) );
+        go( approach ? closer( sh.group.position, ( sh.cls === 'capital' ? 55 : sh.cls === 'medium' ? 24 : 12 ) * sh.voxel, 12 ) : sh.group.position.clone().addScaledVector( side, span * sh.voxel ) );
         lookAt( sh.group.position );
     } else if ( kind === 'station' ) {
         const st = typeof index === 'object' ? index : space.nearestStation( wp );
         if ( ! st ) return;
-        go( away( st.group.position, wp, 90 * st.voxel ) );
+        go( approach ? closer( st.group.position, 32 * st.voxel, 12 ) : away( st.group.position, wp, 90 * st.voxel ) );
         lookAt( st.group.position );
     } else if ( kind === 'star' ) {
         const sys = index;
-        go( away( sys.starPos, wp, sys.starRadius * 4 ) );
+        go( approach ? closer( sys.starPos, sys.starRadius, sys.starRadius * 0.6 ) : away( sys.starPos, wp, sys.starRadius * 4 ) );
         lookAt( sys.starPos );
     }
     crumbs.last = null;
