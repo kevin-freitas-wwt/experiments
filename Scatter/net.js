@@ -1,4 +1,4 @@
-const TRYSTERO = new URL( '../vendor/trystero-0.26.0-nostr.js', import.meta.url ).href;
+const TRYSTERO = 'https://cdn.jsdelivr.net/npm/trystero@0.26.0/nostr/+esm';
 const APP = 'kf-scatter-v1';
 
 async function roomId( vault ) {

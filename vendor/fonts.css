@@ -1,6 +1,0 @@
-/* Latin subsets, SIL Open Font License 1.1. IBM Plex Sans is the variable-weight file. */
-@font-face { font-display: swap; font-family: "Shippori Mincho"; font-style: normal; font-weight: 400; src: url("fonts/shippori-mincho-400.woff2") format("woff2"); }
-@font-face { font-display: swap; font-family: "Shippori Mincho"; font-style: normal; font-weight: 500; src: url("fonts/shippori-mincho-500.woff2") format("woff2"); }
-@font-face { font-display: swap; font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; src: url("fonts/ibm-plex-mono-400.woff2") format("woff2"); }
-@font-face { font-display: swap; font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; src: url("fonts/ibm-plex-mono-500.woff2") format("woff2"); }
-@font-face { font-display: swap; font-family: "IBM Plex Sans"; font-style: normal; font-weight: 100 700; src: url("fonts/ibm-plex-sans.woff2") format("woff2"); }
