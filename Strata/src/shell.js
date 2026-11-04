@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { World } from './world.js';
 import { HEIGHT } from './blocks.js';
-import { KINDS, surfaceAt } from './planet.js';
+import { KINDS, surfaceAt, octavesFor } from './planet.js';
 
 export const BASE = 110;
 
@@ -16,17 +16,18 @@ export class Shell {
             const u = new THREE.Vector3().crossVectors( ref, up ).normalize();
             const w = new THREE.Vector3().crossVectors( u, up );
             const k = KINDS[ body.kind ], reach = radius * 16 + 40;
-            this.R0 = surfaceAt( body.kind, k, up.toArray(), body.seed, body.radius, 8 ).r;
+            this.R0 = surfaceAt( body.kind, k, up.toArray(), body.seed, body.radius, octavesFor( body.radius, 8 ) ).r;
             let rMin = this.R0, rMax = this.R0;
             const d = new THREE.Vector3();
             for ( let i = -4; i <= 4; i++ ) for ( let j = -4; j <= 4; j++ ) {
                 d.copy( up ).multiplyScalar( body.radius ).addScaledVector( u, i / 4 * reach ).addScaledVector( w, j / 4 * reach ).normalize();
-                const r = surfaceAt( body.kind, k, d.toArray(), body.seed, body.radius, 6 ).r * d.dot( up );
+                const r = surfaceAt( body.kind, k, d.toArray(), body.seed, body.radius, octavesFor( body.radius, 6 ) ).r * d.dot( up );
                 if ( r < rMin ) rMin = r;
                 if ( r > rMax ) rMax = r;
             }
             const seaR = k.sea ? body.radius * ( 1 + k.seaLevel * k.amp * 4 ) : 0;
-            if ( seaR && seaR < rMin ) rMin = seaR;
+            // A sea only lowers the origin if it is near enough to show inside the ring.
+            if ( seaR && seaR < rMin ) rMin = Math.max( seaR, rMin - 60 );
             this.zero = rMin - 30;
             if ( rMax - this.zero > HEIGHT - 14 ) this.zero = ( rMin + rMax ) / 2 - ( HEIGHT - 14 ) / 2;
             this.base = this.R0 - this.zero;

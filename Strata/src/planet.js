@@ -42,6 +42,11 @@ const BIOME_RGB = {
     15: dim( mix( PALETTE[ STONE ], PALETTE[ GRAVEL ], 0.35 ) ),
 };
 
+// Extra noise octaves on bigger worlds so detail keeps pace with the voxel scale; every consumer uses this so they agree.
+export function octavesFor( radius, base ) {
+    return base + Math.max( 0, Math.round( Math.log2( radius / 4000 ) ) );
+}
+
 export function surfaceAt( kind, k, v, seed, radius, octaves ) {
     let e = fbm3( v[ 0 ] * k.freq + 10, v[ 1 ] * k.freq, v[ 2 ] * k.freq, seed, octaves );
     if ( kind === 'rocky' ) e -= 0.08 * Math.max( 0, 1 - 30 * Math.abs( fbm3( v[ 0 ] * 5, v[ 1 ] * 5, v[ 2 ] * 5, seed + 3, 2 ) ) );

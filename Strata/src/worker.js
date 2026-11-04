@@ -1,5 +1,5 @@
 import { fbm, ridged, hash2, fbm3, hash3 } from './noise.js';
-import { KINDS, surfaceAt } from './planet.js';
+import { KINDS, surfaceAt, octavesFor } from './planet.js';
 import { AIR, STONE, DIRT, GRASS, SAND, WATER, SNOW, LOG, LEAF, NEEDLE, GRAVEL, TUNDRA, CLAY, ICE, BASALT, LAVA, RUST, CLOUD,
     PLATE, PANEL, FLOOR, GLASS, LIGHT, CORE, DOOR, CHUNK, HEIGHT, SEA, PALETTE, isSolid, isLiquid, isOpaque, spawnOf } from './blocks.js';
 
@@ -68,7 +68,7 @@ function planetColumn( t ) {
     return ( x, z ) => {
         const d = [ up[ 0 ] * t.radius + u[ 0 ] * x + w[ 0 ] * z, up[ 1 ] * t.radius + u[ 1 ] * x + w[ 1 ] * z, up[ 2 ] * t.radius + u[ 2 ] * x + w[ 2 ] * z ];
         const dl = Math.hypot( ...d ); d[ 0 ] /= dl; d[ 1 ] /= dl; d[ 2 ] /= dl;
-        const { r, biome, e } = surfaceAt( t.planet, k, d, t.seed, t.radius, 8 );
+        const { r, biome, e } = surfaceAt( t.planet, k, d, t.seed, t.radius, octavesFor( t.radius, 8 ) );
         const cosA = d[ 0 ] * up[ 0 ] + d[ 1 ] * up[ 1 ] + d[ 2 ] * up[ 2 ];
         const sea = seaR > 0 ? Math.round( cosA * seaR - t.zero ) : -1;
         const wet = seaR > 0 && e < k.seaLevel;
@@ -312,7 +312,7 @@ function icosphere( detail ) {
 function body( { kind, radius, detail, seed } ) {
     const k = KINDS[ kind ], { verts, faces } = icosphere( detail );
     const pos = new Float32Array( verts.length * 3 ), col = new Uint8Array( verts.length * 3 );
-    const octaves = detail >= 6 ? 6 : 5;
+    const octaves = octavesFor( radius, detail >= 6 ? 6 : 5 );
     verts.forEach( ( v, i ) => {
         const { r, rgb } = surfaceAt( kind, k, v, seed, radius, octaves );
         pos[ i * 3 ] = v[ 0 ] * r; pos[ i * 3 + 1 ] = v[ 1 ] * r; pos[ i * 3 + 2 ] = v[ 2 ] * r;
@@ -339,7 +339,7 @@ function patch( { kind, radius, seed, center, ang, n } ) {
         const a = ( gx / ( n - 1 ) * 2 - 1 ) * t, b = ( gy / ( n - 1 ) * 2 - 1 ) * t;
         const d = [ cn[ 0 ] + u[ 0 ] * a + w[ 0 ] * b, cn[ 1 ] + u[ 1 ] * a + w[ 1 ] * b, cn[ 2 ] + u[ 2 ] * a + w[ 2 ] * b ];
         const dl = Math.hypot( ...d ); d.forEach( ( x, j ) => d[ j ] = x / dl );
-        const { r, rgb } = surfaceAt( kind, k, d, seed, radius, 8 );
+        const { r, rgb } = surfaceAt( kind, k, d, seed, radius, octavesFor( radius, 8 ) );
         const rim = ( gx === 0 || gy === 0 || gx === n - 1 || gy === n - 1 ) ? skirt : -0.4;
         const rr = r - rim;
         pos[ i * 3 ] = d[ 0 ] * rr; pos[ i * 3 + 1 ] = d[ 1 ] * rr; pos[ i * 3 + 2 ] = d[ 2 ] * rr;

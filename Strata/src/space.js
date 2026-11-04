@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { hash2 } from './noise.js';
 import { bodyMat, rockMat, instanceMat, fadeIn } from './materials.js';
-import { KINDS as SURFACE, surfaceAt } from './planet.js';
+import { KINDS as SURFACE, surfaceAt, octavesFor } from './planet.js';
 import { RingField } from './rings.js';
 
 const KINDS = [ 'lush', 'icy', 'rocky', 'ember' ];
@@ -340,7 +340,7 @@ export class Space {
 
     surfaceRadius( body, worldPos ) {
         const local = body.group.worldToLocal( worldPos.clone() ).normalize();
-        return surfaceAt( body.kind, SURFACE[ body.kind ], local.toArray(), body.seed, body.radius, 6 ).r;
+        return surfaceAt( body.kind, SURFACE[ body.kind ], local.toArray(), body.seed, body.radius, octavesFor( body.radius, 6 ) ).r;
     }
 
     updatePatch( body, camPos ) {
