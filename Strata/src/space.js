@@ -72,7 +72,7 @@ class System {
         if ( ! this.home ) for ( const t of STARS ) { if ( roll < t.share ) { type = t; break; } roll -= t.share; }
         this.starType = type;
         this.lum = type.lum[ 0 ] + this.rnd( 0, 2 ) * ( type.lum[ 1 ] - type.lum[ 0 ] );
-        this.hz = HZ_BASE * Math.sqrt( this.lum );
+        this.hz = this.home ? 300000 : HZ_BASE * Math.sqrt( this.lum );
         this.frost = this.hz * 2.7;
         this.starRadius = type.radius * ( 0.85 + this.rnd( 0, 3 ) * 0.3 );
         this.starColor = type.color;
@@ -100,15 +100,20 @@ class System {
         const maxN = this.starType.cls === 'M' ? 7 : this.starType.cls === 'K' ? 8 : 8;
         const n = Math.min( maxN, ( this.home ? 4 : 2 ) + Math.floor( this.rnd( 1, 1 ) * ( this.home ? 4 : 7 ) ) );
         this.rings = [];
-        const inner = this.home ? this.hz * 0.6 : Math.max( this.hz * 0.22, this.starRadius * 4 );
+        const inner = this.home ? 60000 : Math.max( this.hz * 0.22, this.starRadius * 4 );
         const spread = this.home ? 1.6 : this.starType.cls === 'M' ? 1.6 : 1.9;
         const plane = new THREE.Vector3( ( this.rnd( 1, 2 ) - 0.5 ) * 0.4, 1, ( this.rnd( 1, 3 ) - 0.5 ) * 0.4 ).normalize();
         const pu = new THREE.Vector3( 1, 0, 0 ).cross( plane ).normalize(), pv = plane.clone().cross( pu );
+        // Radii on a rough power law, 1.3 km to 100 km (home-world scale); orbits are spaced so neighbours
+        // and their rings clear each other, and the home system starts beyond the home disc.
+        let prevDist = this.home ? 200000 : 0, prevR = 0;
         for ( let i = 0; i < n; i++ ) {
-            const dist = Math.min( 420000, inner * Math.pow( spread, i ) * ( 0.88 + this.rnd( i, 4 ) * 0.24 ) );
-            const q = dist / this.hz;
-            const radius = q > 2.7 ? 2200 + this.rnd( i, 3 ) * 7000 : 1300 + this.rnd( i, 3 ) * ( this.rnd( i, 12 ) < 0.3 ? 5500 : 3500 );
-            const kind = this.planetKind( q, radius );
+            const u = this.rnd( i, 3 ), big = this.rnd( i, 12 );
+            const radius = Math.min( this.home && i === 0 ? 30000 : 1e9, big < 0.12 ? 40000 + u * 60000 : big < 0.4 ? 9000 + u * 31000 : 1300 + u * 7700 );
+            const gap = ( prevR + radius ) * 3 + 20000;
+            const dist = Math.max( inner * Math.pow( spread, i ) * ( 0.88 + this.rnd( i, 4 ) * 0.24 ), prevDist + gap );
+            if ( dist > 600000 ) continue;
+            prevDist = dist; prevR = radius;
             const az = this.rnd( i, 5 ) * Math.PI * 2;
             let pos;
             if ( this.home ) {
@@ -118,6 +123,9 @@ class System {
                 const tilt = ( this.rnd( i, 6 ) - 0.5 ) * 0.12 * dist;
                 pos = this.starPos.clone().addScaledVector( pu, Math.cos( az ) * dist ).addScaledVector( pv, Math.sin( az ) * dist ).addScaledVector( plane, tilt );
             }
+            // Home orbits are measured from the home world, so temperature uses the true distance to its sun.
+            const q = ( this.home ? pos.distanceTo( this.starPos ) : dist ) / this.hz;
+            const kind = this.planetKind( q, radius );
             const group = new THREE.Group();
             group.position.copy( pos );
             const mesh = new THREE.Mesh( new THREE.IcosahedronGeometry( radius, 1 ), bodyMat );
