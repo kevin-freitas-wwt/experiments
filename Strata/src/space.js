@@ -22,6 +22,8 @@ const HZ_BASE = 70000;
 const PATCH_N = 97;
 export const CELL = 900000;
 
+const SCRATCH = new THREE.Vector3(), AIRLOCK_P = new THREE.Vector3();
+
 const rimMaterial = ( color ) => new THREE.ShaderMaterial( {
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     uniforms: { tint: { value: new THREE.Color( color ) }, fade: { value: 1 } },
@@ -287,7 +289,7 @@ export class Space {
     }
 
     refresh( camPos ) {
-        const abs = camPos.clone().add( this.offset );
+        const abs = SCRATCH.copy( camPos ).add( this.offset );
         const ci = Math.floor( abs.x / CELL ), cj = Math.round( abs.y / CELL ), ck = Math.floor( abs.z / CELL );
         const wanted = new Set();
         for ( let i = ci - 2; i <= ci + 2; i++ ) for ( let j = cj - 2; j <= cj + 2; j++ ) for ( let k = ck - 2; k <= ck + 2; k++ ) {
@@ -338,9 +340,14 @@ export class Space {
         fadeIn( next, 0.7, () => body.group.remove( old ) );
     }
 
+    // Cached per body against the last query point: every caller in a frame asks about the same spot.
     surfaceRadius( body, worldPos ) {
-        const local = body.group.worldToLocal( worldPos.clone() ).normalize();
-        return surfaceAt( body.kind, SURFACE[ body.kind ], local.toArray(), body.seed, body.radius, octavesFor( body.radius, 6 ) ).r;
+        const c = body.srCache || ( body.srCache = { pos: new THREE.Vector3( Infinity, 0, 0 ), r: 0 } );
+        if ( c.pos.distanceToSquared( worldPos ) < 0.04 ) return c.r;
+        c.pos.copy( worldPos );
+        const local = body.group.worldToLocal( SCRATCH.copy( worldPos ) ).normalize();
+        c.r = surfaceAt( body.kind, SURFACE[ body.kind ], [ local.x, local.y, local.z ], body.seed, body.radius, octavesFor( body.radius, 6 ) ).r;
+        return c.r;
     }
 
     updatePatch( body, camPos ) {
@@ -350,7 +357,7 @@ export class Space {
             if ( body.patch ) { body.group.remove( body.patch ); body.patch.geometry.dispose(); body.patch = null; }
             return;
         }
-        const local = body.group.worldToLocal( camPos.clone() ).normalize();
+        const local = body.group.worldToLocal( SCRATCH.copy( camPos ) ).normalize();
         const ang = Math.min( 0.5, Math.max( 0.025, alt / body.radius * 2.2 + 0.015 ) );
         const p = body.patch;
         if ( p && p.userData.center.angleTo( local ) < p.userData.ang * 0.35 && Math.abs( Math.log( ang / p.userData.ang ) ) < 0.3 ) return;
@@ -391,7 +398,7 @@ export class Space {
             if ( ! v.airlock ) continue;
             v.airlock.getWorldPosition( p );
             const d = p.distanceTo( pos );
-            if ( ! best || d < best.d ) best = { vessel: v, point: p.clone(), d };
+            if ( ! best || d < best.d ) { best = { vessel: v, point: AIRLOCK_P.copy( p ), d }; }
         }
         return best;
     }

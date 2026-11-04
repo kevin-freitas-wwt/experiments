@@ -5,6 +5,8 @@ const KEYS = { fwd: [ 'KeyE', 'ArrowUp' ], back: [ 'KeyD', 'ArrowDown' ], left: 
 
 const HALF = 0.3, TALL = 1.8, EYE = 1.62, GRAVITY = 26, JUMP = 8.6;
 
+const TMP = new THREE.Vector3(), TMP2 = new THREE.Vector3(), TMPQ = new THREE.Quaternion();
+
 export class Player {
     constructor( camera, shell, canvas ) {
         this.camera = camera;
@@ -43,9 +45,17 @@ export class Player {
         return this.shell.world;
     }
 
+    // Cached per frame (main bumps `frame`); callers treat the result as read-only.
     get worldPos() {
-        return this.shell.toWorld( this.pos );
+        const c = this.wpCache || ( this.wpCache = { frame: -1, shell: null, pos: new THREE.Vector3(), out: new THREE.Vector3() } );
+        if ( c.frame !== this.frame || c.shell !== this.shell || ! c.pos.equals( this.pos ) ) {
+            c.frame = this.frame; c.shell = this.shell; c.pos.copy( this.pos );
+            this.shell.toWorld( this.pos, c.out );
+        }
+        return c.out;
     }
+
+    frame = 0;
 
     forward( out = new THREE.Vector3() ) {
         out.set( -Math.sin( this.yaw ) * Math.cos( this.pitch ), Math.sin( this.pitch ), -Math.cos( this.yaw ) * Math.cos( this.pitch ) );
@@ -111,7 +121,7 @@ export class Player {
     unstick() {
         if ( ! this.collides( this.pos ) ) return;
         for ( let dy = 0.25; dy <= 64; dy += 0.25 ) {
-            if ( ! this.collides( this.pos.clone().setY( this.pos.y + dy ) ) ) { this.pos.y += dy; this.vel.y = Math.max( 0, this.vel.y ); return; }
+            if ( ! this.collides( TMP.copy( this.pos ).setY( this.pos.y + dy ) ) ) { this.pos.y += dy; this.vel.y = Math.max( 0, this.vel.y ); return; }
         }
     }
 
@@ -178,10 +188,10 @@ export class Player {
                 next[ axis ] += this.vel[ axis ] * dt;
                 if ( ! this.collides( next ) ) return;
                 if ( canStep ) {
-                    const stepped = next.clone().setY( next.y + 1.05 );
+                    const stepped = TMP.copy( next ).setY( next.y + 1.05 );
                     if ( ! this.collides( stepped ) ) {
                         let y = stepped.y;
-                        while ( y > next.y && ! this.collides( stepped.clone().setY( y - 0.05 ) ) ) y -= 0.05;
+                        while ( y > next.y && ! this.collides( TMP2.copy( stepped ).setY( y - 0.05 ) ) ) y -= 0.05;
                         next.y = y;
                         return;
                     }
@@ -198,13 +208,13 @@ export class Player {
                 next.y = stood;
                 this.vel.y = 0;
             }
-            if ( ! this.grounded && ! this.flying && ! swim && this.vel.y === 0 && this.collides( next.clone().setY( next.y - 0.05 ) ) ) this.grounded = true;
+            if ( ! this.grounded && ! this.flying && ! swim && this.vel.y === 0 && this.collides( TMP.copy( next ).setY( next.y - 0.05 ) ) ) this.grounded = true;
         }
         this.pos.copy( next );
         if ( radial ) {
-            const vr = this.vel.clone().applyQuaternion( this.shell.q );
+            const vr = TMP.copy( this.vel ).applyQuaternion( this.shell.q );
             this.shell.retarget( this.pos );
-            this.vel.copy( vr.applyQuaternion( this.shell.q.clone().invert() ) );
+            this.vel.copy( vr.applyQuaternion( TMPQ.copy( this.shell.q ).invert() ) );
         }
 
         this.placeCamera();

@@ -70,6 +70,7 @@ const space = new Space( scene, pool, seed, radius, sunDir );
 const player = new Player( camera, home, canvas );
 const crumbs = new Crumbs( home.group, spacing );
 const flares = new Flares();
+const V_A = new THREE.Vector3(), V_B = new THREE.Vector3(), V_C = new THREE.Vector3();
 
 const hud = {};
 for ( const id of [ 'alt', 'biome', 'coord', 'chunks', 'seed', 'mode', 'crumbs', 'speed', 'body', 'system' ] ) hud[ id ] = document.getElementById( id );
@@ -356,7 +357,7 @@ function managePlanetFar( dt ) {
         if ( pfar ) { const o = pfar; pfar = null; o.fadeOut( () => o.dispose() ); }
         return null;
     }
-    const local = best.b.group.worldToLocal( wp.clone() );
+    const local = best.b.group.worldToLocal( V_A.copy( wp ) );
     if ( ! pfar || pfar.body !== best.b || pfar.drift( local ) > 0.5 ) {
         if ( pfar ) {
             if ( pfar.body === best.b && ! pfarOld ) pfarOld = { far: pfar, t: 0 };
@@ -364,8 +365,8 @@ function managePlanetFar( dt ) {
         }
         pfar = new PlanetFar( pool, best.b, local, space.scale );
     }
-    pfar.local = local;
-    const f = best.b.group.worldToLocal( wp.clone().add( player.forward() ) ).sub( local );
+    ( pfar.local || ( pfar.local = new THREE.Vector3() ) ).copy( local );
+    const f = best.b.group.worldToLocal( V_B.copy( wp ).add( player.forward( V_C ) ) ).sub( local );
     pfar.update( dt, local, { x: f.dot( pfar.u ), z: f.dot( pfar.w ) } );
     return pfar;
 }
@@ -434,6 +435,7 @@ const lastPos = new THREE.Vector3(), homePos = new THREE.Vector3( SPAWN.x, 60, S
 
 function frame() {
     requestAnimationFrame( frame );
+    player.frame++;
     timer.update();
     const dt = Math.min( 0.05, timer.getDelta() );
     const worldPos = player.worldPos, homeLocal = home.toLocal( worldPos );
@@ -460,6 +462,7 @@ function frame() {
         space.rebase( delta );
         home.group.position.sub( delta );
         lastPos.sub( delta );
+        player.frame++;
         player.placeCamera();
     }
     const nearSys = space.nearestSystem( player.worldPos );
@@ -474,7 +477,7 @@ function frame() {
         if ( d > b.radius + 11000 ) continue;
         const bAlt = d - space.surfaceRadius( b, worldPos );
         const sp = Math.min( 1, Math.max( 0, ( bAlt - 1500 ) / 9000 ) );
-        if ( sp < spaceness ) { spaceness = sp; skyUp = worldPos.clone().sub( b.pos ).normalize(); skyTop = atm.zenith; skyBottom = atm.horizon; }
+        if ( sp < spaceness ) { spaceness = sp; skyUp = V_A.copy( worldPos ).sub( b.pos ).normalize(); skyTop = atm.zenith; skyBottom = atm.horizon; }
     }
     const ease = 1 - Math.exp( -dt * 3 );
     skyMat.uniforms.space.value += ( spaceness - skyMat.uniforms.space.value ) * ease;
@@ -512,10 +515,10 @@ function frame() {
         return { pos: sys.starPos, color: starTint.set( sys.starColor ).clone(), bright: sys.lum * Math.pow( 250000 / d, 2 ) * 110 };
     } ), ( pos ) => {
         if ( player.shell.interior ) return true;
-        const dir = pos.clone().sub( camera.position ), len = dir.length();
+        const dir = V_B.copy( pos ).sub( camera.position ), len = dir.length();
         dir.divideScalar( len );
         for ( const b of space.bodies ) {
-            const oc = b.pos.clone().sub( camera.position ), t = oc.dot( dir );
+            const oc = V_C.copy( b.pos ).sub( camera.position ), t = oc.dot( dir );
             if ( t <= 0 || t >= len ) continue;
             if ( oc.lengthSq() - t * t < b.radius * b.radius ) return true;
         }

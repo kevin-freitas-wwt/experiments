@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 // Screen-space lens flare, ported from the Cosmos experiment: a glow core at the star, a horizontal
 // streak, and discs and rings strung along the line through the screen centre.
+const V1 = new THREE.Vector3(), V2 = new THREE.Vector3();
 const MAXF = 4, ELEMS = 8, SAMPLES = [ [ 0, 0 ], [ 1, 0 ], [ -1, 0 ], [ 0, 1 ], [ 0, -1 ] ];
 const PARAMS = [
     [ 0.0, 0.55, 0.55, 0 ], [ 0.0, 1.9, 0.05, 1 ], [ 0.45, 0.05, 0.05, 2 ], [ 0.75, 0.11, 0.11, 2 ],
@@ -124,8 +125,8 @@ void main() {
                 probe.pts.visible = !! ( r && r.target > 0 );
                 if ( ! probe.pts.visible ) { probe.seen = 1; continue; }
                 const nx = Math.max( -0.98, Math.min( 0.98, r.nx + SAMPLES[ j ][ 0 ] * 8 / w ) ), ny = Math.max( -0.98, Math.min( 0.98, r.ny + SAMPLES[ j ][ 1 ] * 8 / h ) );
-                const dir = new THREE.Vector3( nx, ny, 0.5 ).unproject( camera ).sub( camera.position ).normalize();
-                const pos = camera.position.clone().addScaledVector( dir, Math.min( r.dist * 0.9, camera.far * 0.9 ) );
+                const dir = V1.set( nx, ny, 0.5 ).unproject( camera ).sub( camera.position ).normalize();
+                const pos = V2.copy( camera.position ).addScaledVector( dir, Math.min( r.dist * 0.9, camera.far * 0.9 ) );
                 probe.pts.geometry.attributes.position.setXYZ( 0, pos.x, pos.y, pos.z );
                 probe.pts.geometry.attributes.position.needsUpdate = true;
             }
@@ -143,9 +144,9 @@ void main() {
     update( dt, camera, sources, occluded, renderer = null ) {
         const fwd = new THREE.Vector3( 0, 0, -1 ).applyQuaternion( camera.quaternion );
         const ranked = sources.map( ( src ) => {
-            const dir = src.pos.clone().sub( camera.position );
+            const dir = V1.copy( src.pos ).sub( camera.position );
             if ( dir.dot( fwd ) <= 0 ) return { src, target: 0, nx: 0, ny: 0, dist: 1 };
-            const p = src.pos.clone().project( camera );
+            const p = V2.copy( src.pos ).project( camera );
             const edge = Math.min( 1, Math.max( 0, 1.6 - Math.max( Math.abs( p.x ), Math.abs( p.y ) ) ) );
             const t = Math.min( 1, Math.max( 0, Math.log10( Math.max( src.bright, 0.01 ) / 4 ) / 2.4 ) );
             const target = occluded( src.pos ) ? 0 : t * t * ( 3 - 2 * t ) * edge;

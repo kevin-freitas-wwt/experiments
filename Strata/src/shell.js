@@ -36,7 +36,7 @@ export class Shell {
             terrain = { planet: body.kind, radius: body.radius, seed: body.seed, zero: this.zero, up: up.toArray(), u: u.toArray(), w: w.toArray() };
             body.group.add( this.group );
         } else scene.add( this.group );
-        this.group.updateMatrixWorld( true );
+        this.group.updateWorldMatrix( true, false );
         this.world = new World( this.group, pool, seed, radius, terrain );
         this.seaLevel = terrain && KINDS[ body.kind ].sea ? Math.round( body.radius * ( 1 + KINDS[ body.kind ].seaLevel * KINDS[ body.kind ].amp * 4 ) - this.zero ) : null;
     }
@@ -46,17 +46,17 @@ export class Shell {
     }
 
     toWorld( local, out = new THREE.Vector3() ) {
-        this.group.updateMatrixWorld( true );
+        this.group.updateWorldMatrix( true, false );
         return out.copy( local ).applyMatrix4( this.group.matrixWorld );
     }
 
     toLocal( world, out = new THREE.Vector3() ) {
-        this.group.updateMatrixWorld( true );
+        this.group.updateWorldMatrix( true, false );
         return out.copy( world ).applyMatrix4( this.group.matrixWorld.clone().invert() );
     }
 
     quaternion( out = new THREE.Quaternion() ) {
-        this.group.updateMatrixWorld( true );
+        this.group.updateWorldMatrix( true, false );
         return this.group.getWorldQuaternion( out );
     }
 
@@ -96,7 +96,7 @@ export class InteriorShell {
             this.ring = 6;
         }
         vessel.group.add( this.group );
-        this.group.updateMatrixWorld( true );
+        this.group.updateWorldMatrix( true, false );
         this.world = new World( this.group, pool, seed, this.ring, { interior: true, cls, seed: vessel.seed } );
         this.seaLevel = null;
     }
@@ -104,17 +104,17 @@ export class InteriorShell {
     get planet() { return false; }
 
     toWorld( local, out = new THREE.Vector3() ) {
-        this.group.updateMatrixWorld( true );
+        this.group.updateWorldMatrix( true, false );
         return out.copy( local ).applyMatrix4( this.group.matrixWorld );
     }
 
     toLocal( world, out = new THREE.Vector3() ) {
-        this.group.updateMatrixWorld( true );
+        this.group.updateWorldMatrix( true, false );
         return out.copy( world ).applyMatrix4( this.group.matrixWorld.clone().invert() );
     }
 
     quaternion( out = new THREE.Quaternion() ) {
-        this.group.updateMatrixWorld( true );
+        this.group.updateWorldMatrix( true, false );
         return this.group.getWorldQuaternion( out );
     }
 
@@ -151,17 +151,17 @@ export class RockFrame {
     }
 
     toWorld( local, out = new THREE.Vector3() ) {
-        this.group.updateMatrixWorld( true );
+        this.group.updateWorldMatrix( true, false );
         return out.copy( local ).applyQuaternion( this.q ).applyMatrix4( this.group.matrixWorld );
     }
 
     toLocal( world, out = new THREE.Vector3() ) {
-        this.group.updateMatrixWorld( true );
+        this.group.updateWorldMatrix( true, false );
         return out.copy( world ).applyMatrix4( this.group.matrixWorld.clone().invert() ).applyQuaternion( this.q.clone().invert() );
     }
 
     quaternion( out = new THREE.Quaternion() ) {
-        this.group.updateMatrixWorld( true );
+        this.group.updateWorldMatrix( true, false );
         return this.group.getWorldQuaternion( out ).multiply( this.q );
     }
 

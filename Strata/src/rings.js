@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+
+const REL = new THREE.Vector3();
 import { hash2 } from './noise.js';
 import { rockMat, instanceMat, fadeIn } from './materials.js';
 
@@ -81,7 +83,7 @@ export class RingField {
     }
 
     update( camPos ) {
-        const rel = camPos.clone().sub( this.body.pos );
+        const rel = REL.copy( camPos ).sub( this.body.pos );
         const h = rel.dot( this.normal ), x = rel.dot( this.u ), z = rel.dot( this.v );
         const rr = Math.hypot( x, z ), a = Math.atan2( z, x );
         const range = 7000 * Math.max( 0.75, this.space.scale );
