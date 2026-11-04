@@ -58,30 +58,19 @@ function surface( biome, depth, x, z, seed ) {
     return STONE;
 }
 
-const BASE = 64;
+const BASE = 110;
 
 function planetColumn( t ) {
     const k = KINDS[ t.planet ];
     const seaR = k.sea ? t.radius * ( 1 + k.seaLevel * k.amp * 4 ) : -1;
     const { up, u, w } = t;
-    return ( x, z, seed ) => {
+    return ( x, z ) => {
         const d = [ up[ 0 ] * t.radius + u[ 0 ] * x + w[ 0 ] * z, up[ 1 ] * t.radius + u[ 1 ] * x + w[ 1 ] * z, up[ 2 ] * t.radius + u[ 2 ] * x + w[ 2 ] * z ];
         const dl = Math.hypot( ...d ); d[ 0 ] /= dl; d[ 1 ] /= dl; d[ 2 ] /= dl;
-        const { r } = surfaceAt( t.planet, k, d, t.seed, t.radius, 8 );
+        const { r, biome } = surfaceAt( t.planet, k, d, t.seed, t.radius, 8 );
         const cosA = d[ 0 ] * up[ 0 ] + d[ 1 ] * up[ 1 ] + d[ 2 ] * up[ 2 ];
-        const h = Math.max( 1, Math.min( HEIGHT - 12, Math.round( cosA * r - t.R0 + BASE + fbm( x / 9, z / 9, seed + 5, 2 ) * 1.2 ) ) );
+        const h = Math.max( 1, Math.min( HEIGHT - 12, Math.round( cosA * r - t.R0 + BASE ) ) );
         const sea = seaR > 0 ? Math.round( cosA * seaR - t.R0 + BASE ) : -1;
-        const wet = h < sea - 2, shore = h <= sea + 1;
-        let biome;
-        if ( t.planet === 'gas' ) {
-            const puff = fbm( x / 22, z / 22, seed + 31, 4 );
-            const hh = Math.max( 1, Math.min( HEIGHT - 12, Math.round( cosA * t.radius - t.R0 + BASE + puff * 9 ) ) );
-            return { h: puff < -0.42 ? 1 : hh, biome: 13, sea: -1, liquid: WATER };
-        }
-        if ( t.planet === 'lush' ) biome = wet ? 0 : shore ? 1 : fbm( x / 160, z / 160, seed + 21, 3 ) > 0 ? 3 : 2;
-        else if ( t.planet === 'icy' ) biome = wet ? 12 : 10;
-        else if ( t.planet === 'ember' ) biome = wet ? 11 : 9;
-        else biome = fbm( x / 200, z / 200, seed + 23, 3 ) > 0.1 ? 4 : 7;
         return { h, biome, sea, liquid: t.planet === 'ember' ? LAVA : t.planet === 'icy' ? ICE : WATER };
     };
 }
@@ -188,7 +177,9 @@ function mesh( vol, cx, cz, seed ) {
     const at = ( x, y, z ) => ( y < 0 || y >= HEIGHT ) ? AIR : vol[ ( ( x + PAD ) * P + z + PAD ) * HEIGHT + y ];
     const occ = ( x, y, z ) => isOpaque( at( x, y, z ) ) ? 1 : 0;
     const ao = new Array( 4 ), rgb = [ 0, 0, 0 ];
-    for ( let x = 0; x < CHUNK; x++ ) for ( let z = 0; z < CHUNK; z++ ) for ( let y = 0; y < HEIGHT; y++ ) {
+    let yMax = 0;
+    for ( let i = 0; i < vol.length; i++ ) if ( vol[ i ] ) { const y = i % HEIGHT; if ( y > yMax ) yMax = y; }
+    for ( let x = 0; x < CHUNK; x++ ) for ( let z = 0; z < CHUNK; z++ ) for ( let y = 0; y <= Math.min( HEIGHT - 1, yMax + 1 ); y++ ) {
         const b = at( x, y, z );
         if ( b === AIR ) continue;
         if ( isLiquid( b ) ) {
@@ -276,7 +267,7 @@ function tile( { x0, z0, size, step, seed } ) {
         let rgb = PALETTE[ wet ? WATER : surface( c.biome, 0, x, z, seed ) ];
         if ( ! wet && ( c.biome === 3 || c.biome === 6 ) ) rgb = PALETTE[ c.biome === 3 ? LEAF : NEEDLE ];
         if ( wet && c.h < SEA - 6 ) rgb = [ 0x24, 0x40, 0x6c ];
-        const j = 0.95 + hash2( x, z, seed + 17 ) * 0.1;
+        const j = ( wet ? 1 : 0.9 ) * ( 0.95 + hash2( x, z, seed + 17 ) * 0.1 );
         col[ i * 3 ] = rgb[ 0 ] * j; col[ i * 3 + 1 ] = rgb[ 1 ] * j; col[ i * 3 + 2 ] = rgb[ 2 ] * j;
         i++;
     }

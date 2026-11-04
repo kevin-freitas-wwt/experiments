@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { World } from './world.js';
 import { KINDS, surfaceAt } from './planet.js';
 
-export const BASE = 64;
+export const BASE = 110;
 
 export class Shell {
     constructor( scene, pool, seed, radius, body = null, dir = null ) {

@@ -198,6 +198,7 @@ function enterShell( body ) {
     const dir = body.group.worldToLocal( wp.clone() ).normalize();
     const shell = new Shell( scene, pool, seed, radius, body, dir );
     const old = player.shell;
+    shell.age = old.planet ? ( old.age || 0 ) : 0;
     player.moveTo( shell );
     shell.world.update( player.pos.x, player.pos.z );
     if ( old.planet ) retiring.push( { shell: old, t: 0 } );
@@ -207,8 +208,8 @@ function leaveShell() {
     if ( player.shell === home ) return;
     const old = player.shell;
     player.moveTo( home );
-    old.dispose();
-    hole.r1.value = -1;
+    if ( old.planet ) { old.leaving = 0; retiring.push( { shell: old, t: 0, leaving: true } ); }
+    else { old.dispose(); hole.r1.value = -1; }
 }
 
 function enterInterior( vessel ) {
@@ -252,17 +253,25 @@ function useAirlock() {
 }
 
 function manageShells( dt ) {
+    const ringR = radius * CHUNK;
     for ( let i = retiring.length - 1; i >= 0; i-- ) {
         const r = retiring[ i ];
         r.t += dt;
-        if ( r.t > 4 || player.world.loaded( player.pos.x, player.pos.z ) ) { r.shell.dispose(); retiring.splice( i, 1 ); }
+        if ( r.leaving ) {
+            const k = 1 - Math.min( 1, r.t / 1.2 );
+            r.shell.group.traverse( ( o ) => { if ( o.isMesh ) o.visible = k > 0; } );
+            if ( ! player.shell.planet ) { r.shell.originWorld( hole.center.value ); hole.r0.value = ringR * k - 24; hole.r1.value = ringR * k + 8; }
+            if ( r.t > 1.2 ) { r.shell.dispose(); retiring.splice( i, 1 ); if ( ! player.shell.planet ) hole.r1.value = -1; }
+        } else if ( r.t > 4 || player.world.loaded( player.pos.x, player.pos.z ) ) { r.shell.dispose(); retiring.splice( i, 1 ); }
     }
     if ( player.shell.planet ) {
         const sh = player.shell, alt = player.pos.y - BASE, horiz = Math.hypot( player.pos.x, player.pos.z );
-        if ( alt > 350 || horiz > radius * CHUNK + 32 ) { leaveShell(); return; }
+        if ( alt > 350 || horiz > ringR + 32 ) { leaveShell(); return; }
         if ( horiz > 64 ) enterShell( sh.body );
+        sh.age = ( sh.age || 0 ) + dt;
+        const k = Math.min( 1, sh.age / 1.4 );
         sh.originWorld( hole.center.value );
-        hole.r0.value = radius * CHUNK - 24; hole.r1.value = radius * CHUNK + 8;
+        hole.r0.value = ringR * k - 24; hole.r1.value = ringR * k + 8;
     } else if ( player.shell.radial ) {
         const rk = player.shell.rock;
         if ( ! rk.mesh || player.pos.length() > rk.radius * 3 + 80 ) leaveShell();

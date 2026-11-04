@@ -3,7 +3,7 @@ export const AIR = 0, STONE = 1, DIRT = 2, GRASS = 3, SAND = 4, WATER = 5,
     ICE = 13, BASALT = 14, LAVA = 15, RUST = 16, CLOUD = 17,
     PLATE = 18, PANEL = 19, FLOOR = 20, GLASS = 21, LIGHT = 22, CORE = 23, DOOR = 24;
 
-export const CHUNK = 16, HEIGHT = 128, SEA = 46;
+export const CHUNK = 16, HEIGHT = 256, SEA = 46;
 
 export const PALETTE = {
     [ STONE ]:  [ 0x8a, 0x86, 0x7c ],

@@ -54,13 +54,13 @@ export function value3( x, y, z, seed ) {
     return lerp( lerp( x00, x10, v ), lerp( x01, x11, v ), w );
 }
 
+// Normalised by the infinite-series limit so more octaves add detail without changing the large shape.
 export function fbm3( x, y, z, seed, octaves = 4, gain = 0.5 ) {
-    let sum = 0, amp = 1, norm = 0, f = 1;
+    let sum = 0, amp = 1, f = 1;
     for ( let i = 0; i < octaves; i++ ) {
         sum += ( value3( x * f, y * f, z * f, seed + i * 131 ) * 2 - 1 ) * amp;
-        norm += amp;
         amp *= gain;
         f *= 2;
     }
-    return sum / norm;
+    return sum * ( 1 - gain );
 }

@@ -20,6 +20,8 @@ export class Player {
         this.locked = false;
         this.q = new THREE.Quaternion();
         this.euler = new THREE.Euler( 0, 0, 0, 'YXZ' );
+        this.frameQ = shell.quaternion( new THREE.Quaternion() );
+        this.lookQ = new THREE.Quaternion();
 
         canvas.addEventListener( 'click', () => { if ( ! this.locked ) canvas.requestPointerLock(); } );
         document.addEventListener( 'pointerlockchange', () => { this.locked = document.pointerLockElement === canvas; } );
@@ -53,6 +55,8 @@ export class Player {
     moveTo( shell ) {
         if ( shell === this.shell ) return;
         const wp = this.worldPos, wf = this.forward(), wv = this.vel.clone().applyQuaternion( this.shell.quaternion( this.q ) );
+        this.euler.set( this.pitch, this.yaw, 0 );
+        const camQ = this.frameQ.clone().multiply( this.lookQ.setFromEuler( this.euler ) );
         this.shell = shell;
         shell.toLocal( wp, this.pos );
         const inv = shell.quaternion( this.q ).invert();
@@ -60,6 +64,8 @@ export class Player {
         this.yaw = Math.atan2( -f.x, -f.z );
         this.pitch = Math.max( -1.55, Math.min( 1.55, Math.asin( Math.max( -1, Math.min( 1, f.y ) ) ) ) );
         this.vel.copy( wv.applyQuaternion( inv ) );
+        this.euler.set( this.pitch, this.yaw, 0 );
+        this.frameQ.copy( camQ ).multiply( this.lookQ.setFromEuler( this.euler ).invert() );
     }
 
     any( codes ) {
@@ -107,6 +113,7 @@ export class Player {
     }
 
     step( dt, space ) {
+        this.dt = dt;
         const high = this.inSpace;
         const ghost = ! high && ! this.world.loaded( this.pos.x, this.pos.z );
         if ( ghost && ! this.flying ) return;
@@ -197,6 +204,8 @@ export class Player {
     placeCamera() {
         this.shell.toWorld( new THREE.Vector3( this.pos.x, this.pos.y + EYE, this.pos.z ), this.camera.position );
         this.euler.set( this.pitch, this.yaw, 0 );
-        this.camera.quaternion.setFromEuler( this.euler ).premultiply( this.shell.quaternion( this.q ) );
+        const target = this.shell.quaternion( this.q );
+        this.frameQ.slerp( target, 1 - Math.exp( -( this.dt || 0.016 ) * 4.5 ) );
+        this.camera.quaternion.setFromEuler( this.euler ).premultiply( this.frameQ );
     }
 }
