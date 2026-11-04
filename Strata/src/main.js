@@ -110,28 +110,57 @@ function travel( kind, index = 0 ) {
         player.yaw = 0; player.pitch = -0.5;
         world.update( SPAWN.x, SPAWN.z );
     } else if ( kind === 'planet' ) {
-        const sys = space.nearestSystem( wp ), b = sys.bodies[ index ];
+        const b = typeof index === 'object' ? index : space.nearestSystem( wp ).bodies[ index ];
         if ( ! b ) return;
         go( away( b.pos, wp, b.rings ? b.rings.outer * 1.25 : b.radius * 2.6 ) );
         lookAt( b.pos );
     } else if ( kind === 'rock' ) {
-        const r = space.nearestRock( wp );
+        const r = typeof index === 'object' ? index : space.nearestRock( wp );
         go( away( r.pos, wp, r.radius * 4 + 60 ) );
         lookAt( r.pos );
     } else if ( kind === 'ship' ) {
-        const sh = space.nearestShip( wp );
+        const sh = typeof index === 'object' ? index : space.nearestShip( wp );
         const side = new THREE.Vector3( 1, 0.35, 0 ).applyQuaternion( sh.group.quaternion ).normalize();
         const span = sh.cls === 'capital' ? 130 : sh.cls === 'medium' ? 70 : 60;
         go( sh.group.position.clone().addScaledVector( side, span * sh.voxel ) );
         lookAt( sh.group.position );
     } else if ( kind === 'station' ) {
-        const st = space.nearestStation( wp );
+        const st = typeof index === 'object' ? index : space.nearestStation( wp );
         if ( ! st ) return;
         go( away( st.group.position, wp, 90 * st.voxel ) );
         lookAt( st.group.position );
+    } else if ( kind === 'star' ) {
+        const sys = index;
+        go( away( sys.starPos, wp, sys.starRadius * 4 ) );
+        lookAt( sys.starPos );
     }
     crumbs.last = null;
 }
+
+function aimTarget() {
+    const origin = camera.position.clone(), dir = new THREE.Vector3( 0, 0, -1 ).applyQuaternion( camera.quaternion );
+    let best = null;
+    const test = ( pos, radius, kind, obj ) => {
+        const oc = pos.clone().sub( origin ), t = oc.dot( dir );
+        if ( t < radius ) return;
+        const miss = oc.lengthSq() - t * t;
+        if ( miss > radius * radius ) return;
+        if ( ! best || t < best.t ) best = { t, kind, obj };
+    };
+    const p = new THREE.Vector3();
+    for ( const b of space.bodies ) test( b.pos, b.radius * 1.08, 'planet', b );
+    for ( const sys of space.systems.values() ) test( sys.starPos, sys.starRadius * 1.3, 'star', sys );
+    for ( const r of space.rocks ) test( r.pos, Math.max( r.radius * 1.6, 25 ), 'rock', r );
+    for ( const sh of space.ships ) test( sh.group.getWorldPosition( p ), ( sh.cls === 'capital' ? 55 : sh.cls === 'medium' ? 24 : 12 ) * sh.voxel, 'ship', sh );
+    for ( const st of space.stations ) test( st.group.getWorldPosition( p ), 32 * st.voxel, 'station', st );
+    return best;
+}
+
+canvas.addEventListener( 'mousedown', ( e ) => {
+    if ( e.button !== 0 || ! player.locked ) return;
+    const hit = aimTarget();
+    if ( hit ) travel( hit.kind, hit.obj );
+} );
 
 const NAV = { Digit1: [ 'planet', 0 ], Digit2: [ 'planet', 1 ], Digit3: [ 'planet', 2 ], Digit4: [ 'planet', 3 ], Digit5: [ 'planet', 4 ], Digit6: [ 'planet', 5 ], Digit7: [ 'planet', 6 ], Digit8: [ 'rock' ], Digit9: [ 'ship' ], Minus: [ 'station' ], Digit0: [ 'home' ] };
 document.addEventListener( 'keydown', ( e ) => {
