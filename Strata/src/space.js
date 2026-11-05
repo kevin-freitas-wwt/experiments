@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { hash2 } from './noise.js';
-import { bodyMat, rockMat, instanceMat, fadeIn } from './materials.js';
+import { bodyMat, rockMat, instanceMat, fadeIn, hazed } from './materials.js';
 import { addClouds } from './clouds.js';
 import { KINDS as SURFACE, surfaceAt, octavesFor } from './planet.js';
 import { RingField } from './rings.js';
@@ -24,6 +24,9 @@ const PATCH_N = 97;
 export const CELL = 900000;
 
 const SCRATCH = new THREE.Vector3(), AIRLOCK_P = new THREE.Vector3(), TMPQ = new THREE.Quaternion();
+
+const PLACEHOLDER = { lush: 0x55704e, icy: 0xcfd9df, rocky: 0x7f7b73, ember: 0x4a3b36 }, placeholders = {};
+const placeholderMat = ( kind ) => placeholders[ kind ] || ( placeholders[ kind ] = hazed( new THREE.MeshLambertMaterial( { color: PLACEHOLDER[ kind ] } ) ) );
 
 const rimMaterial = ( color ) => new THREE.ShaderMaterial( {
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -143,7 +146,9 @@ class System {
     addBody( i, kind, q, radius, pos ) {
         const group = new THREE.Group();
         group.position.copy( pos );
-        const mesh = new THREE.Mesh( new THREE.IcosahedronGeometry( radius, 1 ), bodyMat );
+        // Placeholder until the first detail level arrives: a flat tint of the kind, so a body never shows as
+        // a black hole with its clouds floating over it while its mesh is queued.
+        const mesh = new THREE.Mesh( new THREE.IcosahedronGeometry( radius, 2 ), placeholderMat( kind ) );
         group.add( mesh );
         const body = { i, kind, q, system: this, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: Math.min( ( 2 * Math.PI ) / ( 1200 + this.rnd( i, 7 ) * 1800 ), 60 / radius ), seed: this.seed + i * 17, patch: null, patchWant: 0 };
         if ( kind !== 'rocky' && kind !== 'ember' ) {
@@ -353,7 +358,7 @@ export class Space {
     requestBody( body, level ) {
         body.want = level;
         if ( body.geos.has( level ) ) { this.applyBody( body, level ); return; }
-        this.pool.submit( { type: 'body', kind: body.kind, radius: body.radius, detail: DETAILS[ level ], seed: body.seed, level, i: body.i }, { priority: 50 - level * 10, tag: 'body' } )
+        this.pool.submit( { type: 'body', kind: body.kind, radius: body.radius, detail: DETAILS[ level ], seed: body.seed, level, i: body.i }, { priority: level === 0 ? -5000 : 50 - level * 10, tag: 'body' } )
             .then( ( data ) => {
                 if ( body.system.disposed ) return;
                 const g = new THREE.BufferGeometry();
