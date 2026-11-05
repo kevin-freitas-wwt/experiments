@@ -41,6 +41,10 @@ Flight speed scales with clearance: 14 m/s on the deck, growing by that much aga
 
 Light always comes from the nearest star. At home the sun circles the world once every 24 minutes on a great circle through the zenith (`?hour=0` to `24` sets the phase at load; otherwise the seed picks it), and every other planet spins under its own star once every 20 to 50 minutes, so days pass while you walk. The sky dims to a deep blue at night with the star field showing through, warms to orange around the sun at dawn and dusk, and the directional, hemisphere and ambient lights follow the sun's elevation.
 
+## Start card
+
+The start card opens with a gallery of five seeds, each a still rendered from inside that world (`gallery/*.jpg`) and a link straight into it; Travel and Controls fold below.
+
 ## Palette
 
 Woodblock-print tones: Prussian-blue water, cream mist on the horizon, ochre sand, muted mosses, a vermilion seed stamp. The HUD (heads-up display) is a serif survey card; the seal in the corner is the numeric seed.
