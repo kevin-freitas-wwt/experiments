@@ -544,10 +544,15 @@ export class Space {
         this.timer = 0.5;
         this.refresh( camPos );
         for ( const sys of this.systems.values() ) for ( const rg of sys.rings ) rg.update( camPos );
+        // Sphere detail by apparent triangle size (about six pixels), nudged by the detail radius. The top
+        // level is skipped on worlds under 20 km while their heightfield tiles are up, and geometry more than
+        // one level away from the current one is released, so only the levels in play stay in memory.
         for ( const b of this.bodies ) {
-            const d = camPos.distanceTo( b.pos ) / b.radius, sc = Math.max( 0.75, this.scale );
-            const level = d < 3 * sc ? 3 : d < 7 * sc ? 2 : d < 30 * sc ? 1 : 0;
+            const d = camPos.distanceTo( b.pos ) / b.radius, sc = Math.min( 1.25, Math.max( 0.75, this.scale ) );
+            let level = d < 2.3 * sc ? 3 : d < 9 * sc ? 2 : d < 36 * sc ? 1 : 0;
+            if ( level === 3 && b.radius < 20000 && ( d - 1 ) * b.radius < Math.min( 4000 * this.scale, b.radius * 0.5 ) ) level = 2;
             if ( level !== b.level && level !== b.want ) this.requestBody( b, level );
+            for ( const [ k, g ] of b.geos ) if ( k && k !== b.level && k !== b.want && Math.abs( k - level ) > 1 ) { g.dispose(); b.geos.delete( k ); }
             this.updatePatch( b, camPos );
         }
         const nearR = 4000 * this.scale;
