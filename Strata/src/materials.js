@@ -100,14 +100,40 @@ export function tiled( material ) {
 
 export const waterTime = { value: 0 };
 
-// Animated liquid: scrolling ripples brighten and sparkle the surface, in world xz so it reads the same in any frame.
+// Planar reflection of the scene mirrored in the current liquid plane, rendered by main each frame:
+// the texture, the mirror camera's texture matrix, and a strength main sets to 0 when there is no plane.
+export const reflection = { map: { value: null }, matrix: { value: new THREE.Matrix4() }, strength: { value: 0 } };
+export const WATER_MATS = new Set();
+
+// Animated liquid: scrolling ripples bend the normal and sparkle the surface, in world xz so it reads the same
+// in any frame; the ripple also distorts the planar reflection, blended in by a Fresnel term biased so a fair
+// share of sky and land shows even looking straight down.
 export function watery( material ) {
     const prev = material.onBeforeCompile;
+    WATER_MATS.add( material );
     material.onBeforeCompile = ( shader ) => {
         prev( shader );
         shader.uniforms.time = waterTime;
+        shader.uniforms.reflMap = reflection.map;
+        shader.uniforms.reflMatrix = reflection.matrix;
+        shader.uniforms.reflStrength = reflection.strength;
+        shader.vertexShader = shader.vertexShader
+            .replace( '#include <common>', '#include <common>\nuniform mat4 reflMatrix; varying vec4 vRefl;' )
+            .replace( '#include <project_vertex>', '#include <project_vertex>\nvRefl = reflMatrix * modelMatrix * vec4( transformed, 1.0 );' );
         shader.fragmentShader = shader.fragmentShader
+            .replace( '#include <opaque_fragment>', `#include <opaque_fragment>
+                if ( reflStrength > 0.0 ) {
+                    vec3 rv = normalize( vViewPosition );
+                    float cosT = clamp( dot( normal, rv ), 0.0, 1.0 );
+                    float fres = mix( 0.4, 0.9, pow( 1.0 - cosT, 3.0 ) ) * reflStrength;
+                    vec4 rc = vRefl;
+                    rc.xy += vec2( wx, wz ) * 0.03 * rc.w;
+                    vec3 refl = texture2DProj( reflMap, rc ).rgb * vec3( 0.9, 0.94, 1.0 );
+                    gl_FragColor.rgb = mix( gl_FragColor.rgb, refl, fres );
+                    gl_FragColor.a = max( gl_FragColor.a, fres );
+                }` )
             .replace( '#include <common>', `#include <common>
+                uniform sampler2D reflMap; uniform float reflStrength; varying vec4 vRefl;
                 uniform float time; varying vec2 vCurveXZ;
                 float wave( vec2 p, float t ) {
                     return sin( p.x * 1.1 + t * 1.4 ) * sin( p.y * 0.8 - t * 1.1 ) * 0.5

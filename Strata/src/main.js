@@ -8,7 +8,7 @@ import { Player } from './player.js';
 import { Crumbs } from './crumbs.js';
 import { Flares } from './flare.js';
 import { BIOMES, SEA, CHUNK, spawnOf } from './blocks.js';
-import { tickFades, hole, tileEdge, waterTime, terrainNow, haze } from './materials.js';
+import { tickFades, hole, tileEdge, waterTime, terrainNow, haze, reflection, WATER_MATS, oceanMat } from './materials.js';
 import { KINDS } from './planet.js';
 import { cloudTime, cloudAt, homeClouds } from './clouds.js';
 
@@ -208,6 +208,7 @@ document.addEventListener( 'keydown', ( e ) => {
 } );
 
 function snapshot() {
+    renderReflection();
     renderer.render( scene, camera );
     const hl = home.toLocal( player.worldPos );
     canvas.toBlob( ( blob ) => {
@@ -274,10 +275,56 @@ document.addEventListener( 'pointerlockchange', () => {
     if ( ! document.pointerLockElement && ! pose ) overlay.classList.remove( 'hidden' );
 } );
 
+// Planar reflections: the scene mirrored in the liquid plane of the frame you stand in (the home sea, or a
+// shell's sea level), rendered at half size with everything below the plane clipped, sampled by the water.
+const reflRT = new THREE.WebGLRenderTarget( 2, 2 );
+const mirrorCam = new THREE.PerspectiveCamera();
+const reflPlane = new THREE.Plane(), noClip = new THREE.Plane( new THREE.Vector3( 0, 1, 0 ), 1e12 );
+renderer.clippingPlanes = [ noClip ];
+const R_N = new THREE.Vector3(), R_P = new THREE.Vector3(), R_V = new THREE.Vector3(), R_T = new THREE.Vector3(), R_M = new THREE.Matrix4(), R_Q = new THREE.Quaternion();
+const reflOn = params.get( 'refl' ) !== '0';
+function renderReflection() {
+    const sh = player.shell;
+    if ( ! reflOn ) { reflection.strength.value = 0; return; }
+    const level = sh === home ? SEA + 0.85 : sh.planet && sh.seaLevel !== null ? sh.seaLevel + 0.85 : null;
+    reflection.strength.value = 0;
+    if ( level === null || player.shell.interior ) return;
+    R_N.set( 0, 1, 0 ).applyQuaternion( sh.quaternion( R_Q ) );
+    sh.toWorld( R_P.set( player.pos.x, level, player.pos.z ) );
+    const camAlt = R_V.copy( camera.position ).sub( R_P ).dot( R_N );
+    if ( camAlt < 0.2 || camAlt > 6000 ) return;
+    reflPlane.setFromNormalAndCoplanarPoint( R_N, R_P );
+    R_V.copy( R_P ).sub( camera.position );
+    R_V.reflect( R_N ).negate().add( R_P );
+    R_M.extractRotation( camera.matrixWorld );
+    R_T.set( 0, 0, -1 ).applyMatrix4( R_M ).add( camera.position );
+    R_T.sub( R_P ).reflect( R_N ).add( R_P );
+    mirrorCam.position.copy( R_V );
+    mirrorCam.up.set( 0, 1, 0 ).applyMatrix4( R_M ).reflect( R_N );
+    mirrorCam.lookAt( R_T );
+    mirrorCam.near = camera.near; mirrorCam.far = camera.far;
+    mirrorCam.updateMatrixWorld();
+    mirrorCam.projectionMatrix.copy( camera.projectionMatrix );
+    reflection.matrix.value.set( 0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1 ).multiply( mirrorCam.projectionMatrix ).multiply( mirrorCam.matrixWorldInverse );
+    for ( const m of WATER_MATS ) m.visible = false;
+    oceanMat.visible = false; space.stars.visible = false;
+    renderer.clippingPlanes[ 0 ] = reflPlane;
+    renderer.setRenderTarget( reflRT );
+    renderer.render( scene, mirrorCam );
+    renderer.setRenderTarget( null );
+    renderer.clippingPlanes[ 0 ] = noClip;
+    for ( const m of WATER_MATS ) m.visible = true;
+    oceanMat.visible = true; space.stars.visible = true;
+    reflection.map.value = reflRT.texture;
+    reflection.strength.value = 1 - THREE.MathUtils.smoothstep( camAlt, 3000, 6000 );
+}
+
 function resize() {
     renderer.setSize( innerWidth, innerHeight, false );
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
+    const size = renderer.getDrawingBufferSize( new THREE.Vector2() );
+    reflRT.setSize( Math.max( 2, Math.floor( size.x / 2 ) ), Math.max( 2, Math.floor( size.y / 2 ) ) );
 }
 addEventListener( 'resize', resize );
 resize();
@@ -594,6 +641,7 @@ function frame() {
             hud[ 'st-mem' ].textContent = `${m.geometries} geometries · ${m.textures} textures`;
         }
     }
+    renderReflection();
     renderer.render( scene, camera );
     flares.update( dt, camera, [ ...space.systems.values() ].map( ( sys ) => {
         const d = sys.starPos.distanceTo( camera.position );
@@ -647,4 +695,4 @@ function restoreInterior() {
 }
 frame();
 
-window.__strata = { world, home, far, space, player, crumbs, pool, seed, renderer, scene, camera, flares, travel, enterShell, leaveShell, enterInterior, exitInterior, useAirlock };
+window.__strata = { world, home, far, space, player, crumbs, pool, seed, renderer, scene, camera, flares, reflRT, mirrorCam, travel, enterShell, leaveShell, enterInterior, exitInterior, useAirlock };
