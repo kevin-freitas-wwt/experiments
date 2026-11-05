@@ -131,6 +131,41 @@ export function watery( material ) {
     return material;
 }
 
+// Terrain fade without material clones: each vertex carries the second its chunk arrived (`born`), the
+// shader dithers it in over 0.6 s from terrainNow, and a per-world `dieAt` dithers the whole world out.
+export const terrainNow = { value: 0 };
+
+export function fading( material, die ) {
+    const prev = material.onBeforeCompile, prevKey = material.customProgramCacheKey;
+    material.onBeforeCompile = ( shader ) => {
+        prev( shader );
+        shader.uniforms.terrainNow = terrainNow;
+        shader.uniforms.dieAt = die.dieAt;
+        shader.uniforms.dieDur = die.dieDur;
+        shader.vertexShader = shader.vertexShader
+            .replace( '#include <common>', '#include <common>\nattribute float born; varying float vBorn;' )
+            .replace( '#include <begin_vertex>', '#include <begin_vertex>\nvBorn = born;' );
+        shader.fragmentShader = shader.fragmentShader
+            .replace( '#include <common>', '#include <common>\nuniform float terrainNow; uniform float dieAt; uniform float dieDur; varying float vBorn;' )
+            .replace( '#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+                float fadeT = clamp( ( terrainNow - vBorn ) / 0.6, 0.0, 1.0 );
+                if ( dieAt > 0.0 ) fadeT = min( fadeT, 1.0 - clamp( ( terrainNow - dieAt ) / dieDur, 0.0, 1.0 ) );
+                if ( fadeT < 1.0 && fract( sin( dot( gl_FragCoord.xy, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) > fadeT ) discard;` );
+    };
+    material.customProgramCacheKey = () => prevKey.call( material ) + '-fade';
+    return material;
+}
+
+// One solid and one water material per world, sharing that world's fade-out uniforms.
+export function terrainMaterials() {
+    const die = { dieAt: { value: -1 }, dieDur: { value: 1 } };
+    return {
+        die,
+        solid: fading( curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), null, true ), die ),
+        water: fading( watery( curved( new THREE.MeshLambertMaterial( { vertexColors: true, transparent: true, opacity: 0.86, depthWrite: false } ) ) ), die ),
+    };
+}
+
 const edgeUniforms = () => ( { center: { value: new THREE.Vector2() }, r0: { value: -1 }, r1: { value: -1 } } );
 
 export const solidMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), null, true );

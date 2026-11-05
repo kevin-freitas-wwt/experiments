@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { CHUNK, HEIGHT, AIR, isSolid } from './blocks.js';
-import { solidMat, waterMat, fadeIn, fadeOut } from './materials.js';
+import { terrainMaterials } from './materials.js';
 
 const key = ( cx, cz ) => `${cx},${cz}`;
+const BATCH = 4;
 
 export class World {
     constructor( scene, pool, seed, radius, terrain = null ) {
@@ -16,6 +17,9 @@ export class World {
         this.pending = new Set();
         this.inbox = [];
         this.center = null;
+        this.batches = new Map();
+        this.dirty = new Set();
+        this.mats = terrainMaterials();
     }
 
     // Chunks ahead of the facing direction are generated first; the queue is re-ranked when the view turns.
@@ -66,50 +70,90 @@ export class World {
 
     absorb( budget = 2 ) {
         while ( budget-- > 0 && this.inbox.length ) this.install( this.inbox.shift() );
+        this.flush();
     }
 
+    // Chunks are grouped into BATCH×BATCH super-chunks, one mesh per material, rebuilt when a member
+    // arrives or leaves; fade-in is per vertex from the `born` attribute, so no per-chunk mesh is needed.
     install( data ) {
         const k = key( data.cx, data.cz );
         if ( ! this.pending.has( k ) || this.chunks.has( k ) ) return;
         this.pending.delete( k );
-        const group = new THREE.Group();
-        group.position.set( data.cx * CHUNK, 0, data.cz * CHUNK );
-        for ( const [ part, mat ] of [ [ data.solid, solidMat ], [ data.water, waterMat ] ] ) {
-            if ( ! part.idx.length ) continue;
+        const near = ! this.terrain && this.center && Math.abs( data.cx - this.center.cx ) <= 1 && Math.abs( data.cz - this.center.cz ) <= 1;
+        const born = near ? -1e9 : performance.now() / 1000;
+        this.chunks.set( k, { cx: data.cx, cz: data.cz, solid: data.solid, water: data.water, fade: born, blocks: data.blocks, biomes: data.biomes, born: performance.now() } );
+        this.touch( data.cx, data.cz );
+    }
+
+    touch( cx, cz ) {
+        const bx = Math.floor( cx / BATCH ), bz = Math.floor( cz / BATCH ), bk = key( bx, bz );
+        let b = this.batches.get( bk );
+        if ( ! b ) { b = { bx, bz, meshes: {} }; this.batches.set( bk, b ); }
+        this.dirty.add( bk );
+    }
+
+    rebuild( bk ) {
+        const b = this.batches.get( bk );
+        if ( ! b ) return;
+        const members = [];
+        for ( let dx = 0; dx < BATCH; dx++ ) for ( let dz = 0; dz < BATCH; dz++ ) { const c = this.chunks.get( key( b.bx * BATCH + dx, b.bz * BATCH + dz ) ); if ( c ) members.push( c ); }
+        for ( const part of [ 'solid', 'water' ] ) {
+            let nv = 0, ni = 0;
+            for ( const c of members ) { nv += c[ part ].pos.length / 3; ni += c[ part ].idx.length; }
+            const old = b.meshes[ part ];
+            if ( old ) { this.scene.remove( old ); old.geometry.dispose(); b.meshes[ part ] = null; }
+            if ( ! ni ) continue;
+            const pos = new Float32Array( nv * 3 ), col = new Uint8Array( nv * 3 ), nrm = new Int8Array( nv * 3 ), born = new Float32Array( nv ), idx = new Uint32Array( ni );
+            let vo = 0, io = 0;
+            for ( const c of members ) {
+                const p = c[ part ], n = p.pos.length / 3, ox = ( c.cx - b.bx * BATCH ) * CHUNK, oz = ( c.cz - b.bz * BATCH ) * CHUNK;
+                for ( let i = 0; i < n; i++ ) { pos[ ( vo + i ) * 3 ] = p.pos[ i * 3 ] + ox; pos[ ( vo + i ) * 3 + 1 ] = p.pos[ i * 3 + 1 ]; pos[ ( vo + i ) * 3 + 2 ] = p.pos[ i * 3 + 2 ] + oz; }
+                col.set( p.col, vo * 3 ); nrm.set( p.nrm, vo * 3 ); born.fill( c.fade, vo, vo + n );
+                for ( let i = 0; i < p.idx.length; i++ ) idx[ io + i ] = p.idx[ i ] + vo;
+                vo += n; io += p.idx.length;
+            }
             const g = new THREE.BufferGeometry();
-            g.setAttribute( 'position', new THREE.BufferAttribute( part.pos, 3 ) );
-            g.setAttribute( 'color', new THREE.BufferAttribute( part.col, 3, true ) );
-            g.setAttribute( 'normal', new THREE.BufferAttribute( part.nrm, 3, true ) );
-            g.setIndex( new THREE.BufferAttribute( part.idx, 1 ) );
+            g.setAttribute( 'position', new THREE.BufferAttribute( pos, 3 ) );
+            g.setAttribute( 'color', new THREE.BufferAttribute( col, 3, true ) );
+            g.setAttribute( 'normal', new THREE.BufferAttribute( nrm, 3, true ) );
+            g.setAttribute( 'born', new THREE.BufferAttribute( born, 1 ) );
+            g.setIndex( new THREE.BufferAttribute( idx, 1 ) );
             g.computeBoundingSphere();
-            const m = new THREE.Mesh( g, mat );
-            if ( mat === solidMat && ( this.terrain || ( this.center && ( Math.abs( data.cx - this.center.cx ) > 1 || Math.abs( data.cz - this.center.cz ) > 1 ) ) ) ) fadeIn( m );
-            group.add( m );
+            const m = new THREE.Mesh( g, this.mats[ part ] );
+            m.position.set( b.bx * BATCH * CHUNK, 0, b.bz * BATCH * CHUNK );
+            b.meshes[ part ] = m;
+            this.scene.add( m );
         }
-        this.scene.add( group );
-        this.chunks.set( k, { cx: data.cx, cz: data.cz, group, blocks: data.blocks, biomes: data.biomes, born: performance.now() } );
+        if ( ! members.length ) this.batches.delete( bk );
+    }
+
+    flush( budget = 4 ) {
+        for ( const bk of this.dirty ) { this.rebuild( bk ); this.dirty.delete( bk ); if ( --budget <= 0 ) break; }
     }
 
     fadeOut( duration, onDone ) {
-        let n = 0;
-        for ( const c of this.chunks.values() ) c.group.children.forEach( ( m ) => { n++; fadeOut( m, duration ); } );
+        this.mats.die.dieAt.value = performance.now() / 1000;
+        this.mats.die.dieDur.value = duration;
+        for ( const m of [ this.mats.solid, this.mats.water ] ) { m.polygonOffset = true; m.polygonOffsetFactor = 2; m.polygonOffsetUnits = 2; }
         setTimeout( onDone, duration * 1000 + 50 );
-        return n;
+        return this.chunks.size;
     }
 
     dispose() {
         this.pool.cancel( this.tag );
         this.pending.clear();
         this.inbox.length = 0;
-        for ( const k of [ ...this.chunks.keys() ] ) this.unload( k );
+        this.chunks.clear();
+        for ( const b of this.batches.values() ) for ( const m of Object.values( b.meshes ) ) if ( m ) { this.scene.remove( m ); m.geometry.dispose(); }
+        this.batches.clear(); this.dirty.clear();
+        for ( const m of [ this.mats.solid, this.mats.water ] ) m.dispose();
     }
 
     unload( k ) {
         const c = this.chunks.get( k );
         if ( ! c ) return;
-        this.scene.remove( c.group );
-        c.group.traverse( ( o ) => o.geometry && o.geometry.dispose() );
         this.chunks.delete( k );
+        this.touch( c.cx, c.cz );
     }
 
     chunkAt( x, z ) {

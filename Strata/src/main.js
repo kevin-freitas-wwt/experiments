@@ -8,7 +8,7 @@ import { Player } from './player.js';
 import { Crumbs } from './crumbs.js';
 import { Flares } from './flare.js';
 import { BIOMES, SEA, CHUNK, spawnOf } from './blocks.js';
-import { tickFades, hole, tileEdge, waterTime } from './materials.js';
+import { tickFades, hole, tileEdge, waterTime, terrainNow } from './materials.js';
 import { KINDS } from './planet.js';
 
 const params = new URLSearchParams( location.search );
@@ -472,6 +472,7 @@ function frame() {
     far.update( dt, homePos, world, player.shell === home ? face : null );
     tickFades( dt );
     waterTime.value += dt;
+    terrainNow.value = performance.now() / 1000;
     lastPos.copy( worldPos );
     if ( ! spawned ) {
         if ( world.loaded( SPAWN.x, SPAWN.z ) ) { player.place( SPAWN.x, SPAWN.z ); spawned = true; }
