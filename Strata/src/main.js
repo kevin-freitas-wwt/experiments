@@ -8,8 +8,9 @@ import { Player } from './player.js';
 import { Crumbs } from './crumbs.js';
 import { Flares } from './flare.js';
 import { BIOMES, SEA, CHUNK, spawnOf } from './blocks.js';
-import { tickFades, hole, tileEdge, waterTime, terrainNow } from './materials.js';
+import { tickFades, hole, tileEdge, waterTime, terrainNow, haze } from './materials.js';
 import { KINDS } from './planet.js';
+import { cloudTime, cloudAt, homeClouds } from './clouds.js';
 
 const params = new URLSearchParams( location.search );
 const seedWord = params.get( 'seed' ) || randomWord();
@@ -85,6 +86,7 @@ const far = new FarField( home.group, pool, seed, radius );
 const space = new Space( scene, pool, seed, radius, sunDir );
 const player = new Player( camera, home, canvas );
 const crumbs = new Crumbs( home.group, spacing );
+home.cloud = homeClouds( home.group, seed, SPAWN, SEA );
 const flares = new Flares();
 const V_A = new THREE.Vector3(), V_B = new THREE.Vector3(), V_C = new THREE.Vector3();
 
@@ -92,6 +94,7 @@ const hud = {};
 for ( const id of [ 'alt', 'biome', 'coord', 'chunks', 'seed', 'mode', 'crumbs', 'speed', 'body', 'system', 'st-frame', 'st-draws', 'st-tris', 'st-workers', 'st-mem' ] ) hud[ id ] = document.getElementById( id );
 renderer.info.autoReset = false;
 const perf = { frame: 16, js: 0, t0: 0, calls: 0, tris: 0 };
+let cloudShade = 0, cloudSys = null;
 const overlay = document.getElementById( 'overlay' ), seedInput = document.getElementById( 'seed-input' );
 const tint = document.getElementById( 'tint' ), prompt = document.getElementById( 'prompt' );
 hud.seed.textContent = seedWord;
@@ -475,6 +478,7 @@ function frame() {
     far.update( dt, homePos, world, player.shell === home ? face : null );
     tickFades( dt );
     waterTime.value += dt;
+    cloudTime.value += dt;
     terrainNow.value = performance.now() / 1000;
     lastPos.copy( worldPos );
     // Bodies spin and moons orbit before the player and camera are placed, so a frame riding a planet is not a frame behind it.
@@ -501,15 +505,42 @@ function frame() {
     }
     if ( nearSys ) { V_A.copy( nearSys.starPos ).sub( camera.position ).normalize(); sun.position.copy( V_A ); fill.position.copy( V_A ).negate(); skyMat.uniforms.sunDir.value.copy( V_A ); }
     let spaceness = Math.min( 1, Math.max( 0, ( alt - 1500 ) / 9000 ) );
-    let skyUp = UP_Y, skyTop = ZENITH, skyBottom = HORIZON;
+    let skyUp = UP_Y, skyTop = ZENITH, skyBottom = HORIZON, hazeBody = null;
     for ( const b of space.bodies ) {
         const atm = ATMOS[ b.kind ];
         if ( ! atm ) continue;
         const d = worldPos.distanceTo( b.pos );
+        if ( d < b.radius * 12 && ( ! hazeBody || d / b.radius < hazeBody.d / hazeBody.b.radius ) ) hazeBody = { b, d };
         if ( d > b.radius + 11000 ) continue;
         const bAlt = d - space.surfaceRadius( b, worldPos );
         const sp = Math.min( 1, Math.max( 0, ( bAlt - 1500 ) / 9000 ) );
         if ( sp < spaceness ) { spaceness = sp; skyUp = V_A.copy( worldPos ).sub( b.pos ).normalize(); skyTop = atm.zenith; skyBottom = atm.horizon; }
+    }
+    // Aerial perspective follows the nearest atmosphere: a planet within twelve radii, or the home world on its disc.
+    if ( hazeBody ) {
+        const b = hazeBody.b, k = KINDS[ b.kind ];
+        haze.on.value = 1; haze.flat.value = 0; haze.center.value.copy( b.pos ); haze.r.value = b.radius * ( 1 + k.seaLevel * k.amp * 4 );
+        haze.k.value = b.kind === 'icy' ? 3e-5 : 4.5e-5; haze.color.value.copy( ATMOS[ b.kind ].horizon );
+        haze.sun.value.copy( b.system.starPos ).sub( b.pos ).normalize();
+    } else if ( ! offHome ) {
+        haze.on.value = 1; haze.flat.value = 1; haze.seaY.value = home.group.position.y + SEA; haze.k.value = 4.5e-5; haze.color.value.copy( HORIZON );
+        haze.sun.value.copy( sunDir );
+    } else haze.on.value = 0;
+    // Cloud cover between you and the star: dims direct light and the flare, so an overcast day reads as one.
+    cloudShade = 0;
+    home.cloud.mat.uniforms.sunLocal.value.copy( sunDir );
+    if ( ! hazeBody && ! offHome && homeLocal.y < home.cloud.y && sunDir.y > 0.02 ) {
+        const t = ( home.cloud.y - homeLocal.y ) / sunDir.y;
+        cloudShade = cloudAt( home, V_A.set( homeLocal.x + sunDir.x * t - SPAWN.x, 0, homeLocal.z + sunDir.z * t - SPAWN.z ) );
+        cloudSys = space.home;
+    } else if ( hazeBody && hazeBody.b.cloud ) {
+        const b = hazeBody.b, rc = b.cloud.radius, oc = V_A.copy( camera.position ).sub( b.pos ), r2 = oc.lengthSq();
+        if ( r2 < rc * rc ) {
+            const dir = V_B.copy( b.system.starPos ).sub( camera.position ).normalize(), tb = -oc.dot( dir );
+            const t = tb + Math.sqrt( Math.max( 0, tb * tb - ( r2 - rc * rc ) ) );
+            cloudShade = cloudAt( b, b.group.worldToLocal( V_C.copy( camera.position ).addScaledVector( dir, t ) ).normalize() );
+            cloudSys = b.system;
+        }
     }
     const ease = 1 - Math.exp( -dt * 3 );
     skyMat.uniforms.space.value += ( spaceness - skyMat.uniforms.space.value ) * ease;
@@ -521,7 +552,7 @@ function frame() {
     const day = THREE.MathUtils.smoothstep( elev, -0.1, 0.16 ) * ( 1 - sp ) + sp;
     skyMat.uniforms.night.value = 1 - day;
     skyMat.uniforms.dusk.value = ( 1 - THREE.MathUtils.smoothstep( Math.abs( elev - 0.03 ), 0, 0.3 ) ) * ( 1 - sp );
-    sun.intensity = 2.4 * ( sp + ( 1 - sp ) * THREE.MathUtils.smoothstep( elev, -0.04, 0.12 ) );
+    sun.intensity = 2.4 * ( sp + ( 1 - sp ) * THREE.MathUtils.smoothstep( elev, -0.04, 0.12 ) ) * ( 1 - 0.6 * cloudShade );
     hemi.intensity = ( 1.15 - sp * 1.0 ) * ( 0.25 + 0.75 * day );
     ambient.intensity = ( player.shell.interior ? 2.2 : 0.6 ) * ( 0.4 + 0.6 * day );
     space.night = 1 - day;
@@ -558,7 +589,7 @@ function frame() {
     renderer.render( scene, camera );
     flares.update( dt, camera, [ ...space.systems.values() ].map( ( sys ) => {
         const d = sys.starPos.distanceTo( camera.position );
-        return { pos: sys.starPos, color: starTint.set( sys.starColor ).clone(), bright: sys.lum * Math.pow( 250000 / d, 2 ) * 110 };
+        return { pos: sys.starPos, color: starTint.set( sys.starColor ).clone(), bright: sys.lum * Math.pow( 250000 / d, 2 ) * 110 * ( sys === cloudSys ? 1 - 0.95 * cloudShade : 1 ) };
     } ), ( pos ) => {
         if ( player.shell.interior ) return true;
         const dir = V_B.copy( pos ).sub( camera.position ), len = dir.length();

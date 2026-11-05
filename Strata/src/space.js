@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { hash2 } from './noise.js';
 import { bodyMat, rockMat, instanceMat, fadeIn } from './materials.js';
+import { addClouds } from './clouds.js';
 import { KINDS as SURFACE, surfaceAt, octavesFor } from './planet.js';
 import { RingField } from './rings.js';
 
@@ -22,7 +23,7 @@ const HZ_BASE = 70000;
 const PATCH_N = 97;
 export const CELL = 900000;
 
-const SCRATCH = new THREE.Vector3(), AIRLOCK_P = new THREE.Vector3();
+const SCRATCH = new THREE.Vector3(), AIRLOCK_P = new THREE.Vector3(), TMPQ = new THREE.Quaternion();
 
 const rimMaterial = ( color ) => new THREE.ShaderMaterial( {
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -130,7 +131,7 @@ class System {
             const q = ( this.home ? pos.distanceTo( this.starPos ) : dist ) / this.hz;
             const kind = this.planetKind( q, radius );
             const body = this.addBody( i, kind, q, radius, pos );
-            if ( this.rnd( i, 8 ) < ( this.home && i === 0 ? 1 : q > 2.7 ? 0.55 : 0.15 ) ) {
+            if ( this.rnd( i, 8 ) < ( this.home && i === 0 ? 1 : q > 2.7 ? 0.22 : 0.05 ) ) {
                 body.rings = new RingField( this.space, body, ( this.seed * 13 + i * 101 ) % 1000003 );
                 body.ringNormal = body.rings.normal;
                 this.rings.push( body.rings );
@@ -152,6 +153,7 @@ class System {
             group.add( rim );
             body.rim = rim;
         }
+        addClouds( body, this.rnd( i, 80 ) );
         this.scene.add( group );
         this.bodies.push( body );
         this.space.requestBody( body, 0 );
@@ -159,17 +161,17 @@ class System {
     }
 
     // Moons: ordinary bodies (same detail levels, shells and tiles) that orbit a planet beyond its rings,
-    // once every 10 to 40 minutes. Bigger planets carry more; a moon is a tenth to a third of its host.
+    // once every 10 to 40 minutes. Bigger planets carry more; a moon is a twentieth to a sixth of its host.
     makeMoons() {
         const planets = this.bodies.slice();
         let i = planets.length;
         for ( const host of planets ) {
-            if ( host.radius < 5000 ) continue;
-            const roll = this.rnd( host.i, 70 ), n = roll < 0.4 ? 0 : roll < 0.8 ? 1 : host.radius > 20000 ? 3 : 2;
+            if ( host.radius < 8000 ) continue;
+            const roll = this.rnd( host.i, 70 ), n = roll < 0.4 ? 0 : roll < 0.8 ? 1 : host.radius > 30000 ? 3 : 2;
             const inner = Math.max( host.radius * 2.6, host.rings ? host.rings.outer * 1.4 : 0 );
             const plane = new THREE.Vector3( this.rnd( host.i, 71 ) - 0.5, 1, this.rnd( host.i, 72 ) - 0.5 ).normalize();
             for ( let m = 0; m < n; m++, i++ ) {
-                const radius = Math.max( 900, host.radius * ( 0.1 + this.rnd( i, 3 ) * 0.25 ) );
+                const radius = Math.max( 700, host.radius * ( 0.05 + this.rnd( i, 3 ) * 0.11 ) );
                 const orbit = { host, orbitR: inner + host.radius * ( 1.2 * m + this.rnd( i, 4 ) * 0.8 ) + radius * 3, angle: this.rnd( i, 5 ) * Math.PI * 2, tilt: Math.acos( plane.y ) * ( this.rnd( i, 6 ) < 0.5 ? 1 : -1 ) };
                 orbit.omega = Math.min( ( 2 * Math.PI ) / ( 600 + this.rnd( i, 9 ) * 1800 ), 60 / orbit.orbitR ) * ( this.rnd( i, 10 ) < 0.85 ? 1 : -1 );
                 const pos = this.space.orbitPoint( orbit, orbit.angle, new THREE.Vector3() );
@@ -521,6 +523,7 @@ export class Space {
             for ( const b of sys.bodies ) {
                 b.group.rotation.y += b.spin * dt;
                 if ( b.orbit ) { b.orbit.angle += b.orbit.omega * dt; this.orbitPoint( b.orbit, b.orbit.angle, b.pos ); b.group.position.copy( b.pos ); }
+                if ( b.cloud ) b.cloud.mat.uniforms.sunLocal.value.copy( sys.starPos ).sub( b.pos ).normalize().applyQuaternion( TMPQ.copy( b.group.quaternion ).invert() );
                 if ( b.rim ) b.rim.material.uniforms.fade.value = Math.min( 1, Math.max( 0, ( camPos.distanceTo( b.pos ) - b.rim.userData.shellR ) / ( b.radius * 0.4 ) ) );
             }
             for ( const s of sys.ships ) {

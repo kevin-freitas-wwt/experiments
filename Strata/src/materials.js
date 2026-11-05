@@ -161,21 +161,59 @@ export function terrainMaterials() {
     const die = { dieAt: { value: -1 }, dieDur: { value: 1 } };
     return {
         die,
-        solid: fading( curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), null, true ), die ),
-        water: fading( watery( curved( new THREE.MeshLambertMaterial( { vertexColors: true, transparent: true, opacity: 0.86, depthWrite: false } ) ) ), die ),
+        solid: hazed( fading( curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), null, true ), die ) ),
+        water: hazed( fading( watery( curved( new THREE.MeshLambertMaterial( { vertexColors: true, transparent: true, opacity: 0.86, depthWrite: false } ) ) ), die ) ),
     };
+}
+
+// Aerial perspective. Optical depth along the fragment-to-camera path through an exponential atmosphere
+// (sea-level extinction hazeK per metre, scale height hazeH), around hazeCenter at radius hazeR, or above a
+// flat sea at hazeSeaY when hazeFlat is set. Colour and strength come from the sky of the body you are near.
+export const haze = {
+    on: { value: 0 }, color: { value: new THREE.Color( 0xeadfca ) }, k: { value: 4.5e-5 }, h: { value: 2500 },
+    center: { value: new THREE.Vector3() }, r: { value: 1 }, flat: { value: 1 }, seaY: { value: 0 }, sun: { value: new THREE.Vector3( 0, 1, 0 ) },
+};
+
+export function hazed( material ) {
+    const prev = material.onBeforeCompile || ( () => {} ), prevKey = material.customProgramCacheKey, prevPatch = material.userData.patch;
+    material.userData.patch = ( m ) => hazed( prevPatch ? prevPatch( m ) : m );
+    material.onBeforeCompile = ( shader ) => {
+        prev( shader );
+        for ( const [ k, u ] of Object.entries( haze ) ) shader.uniforms[ 'haze' + k[ 0 ].toUpperCase() + k.slice( 1 ) ] = u;
+        shader.vertexShader = shader.vertexShader
+            .replace( '#include <common>', '#include <common>\nvarying vec3 vHazeW;' )
+            .replace( '#include <begin_vertex>', '#include <begin_vertex>\nvHazeW = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;' );
+        shader.fragmentShader = shader.fragmentShader
+            .replace( '#include <common>', `#include <common>
+                uniform float hazeOn; uniform vec3 hazeColor; uniform float hazeK; uniform float hazeH; uniform vec3 hazeCenter; uniform float hazeR; uniform float hazeFlat; uniform float hazeSeaY; uniform vec3 hazeSun;
+                varying vec3 vHazeW;
+                float hazeAlt( vec3 p ) { return hazeFlat > 0.5 ? p.y - hazeSeaY : length( p - hazeCenter ) - hazeR; }
+                float hazeDepth( vec3 a, vec3 b ) {
+                    float a0 = max( hazeAlt( a ), 0.0 ), a1 = max( hazeAlt( b ), 0.0 ), e0 = exp( -a0 / hazeH ), e1 = exp( -a1 / hazeH );
+                    float avg = abs( a1 - a0 ) < 1.0 ? e0 : ( e0 - e1 ) * hazeH / ( a1 - a0 );
+                    return hazeK * distance( a, b ) * avg;
+                }` )
+            .replace( '#include <fog_fragment>', `#include <fog_fragment>
+                if ( hazeOn > 0.5 ) {
+                    vec3 hazeUp = hazeFlat > 0.5 ? vec3( 0.0, 1.0, 0.0 ) : normalize( vHazeW - hazeCenter );
+                    float hazeLit = 0.08 + 0.92 * smoothstep( -0.12, 0.25, dot( hazeUp, hazeSun ) );
+                    gl_FragColor.rgb = mix( gl_FragColor.rgb, hazeColor * hazeLit, 1.0 - exp( -hazeDepth( vHazeW, cameraPosition ) ) );
+                }` );
+    };
+    material.customProgramCacheKey = () => ( prevKey ? prevKey.call( material ) : '' ) + '-haze';
+    return material;
 }
 
 const edgeUniforms = () => ( { center: { value: new THREE.Vector2() }, r0: { value: -1 }, r1: { value: -1 } } );
 
 export const solidMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), null, true );
 export const waterMat = watery( curved( new THREE.MeshLambertMaterial( { vertexColors: true, transparent: true, opacity: 0.86, depthWrite: false } ) ) );
-export const fineTileMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() );
-export const midTileMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() );
-export const coarseTileMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() );
-export const oceanMat = curved( new THREE.MeshLambertMaterial( { color: 0x2d4e80 } ) );
-export const planetTileMat = tiled( new THREE.MeshLambertMaterial( { vertexColors: true } ) );
-export const bodyMat = holed( new THREE.MeshLambertMaterial( { vertexColors: true } ) );
+export const fineTileMat = hazed( curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() ) );
+export const midTileMat = hazed( curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() ) );
+export const coarseTileMat = hazed( curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() ) );
+export const oceanMat = hazed( curved( new THREE.MeshLambertMaterial( { color: 0x2d4e80 } ) ) );
+export const planetTileMat = hazed( tiled( new THREE.MeshLambertMaterial( { vertexColors: true } ) ) );
+export const bodyMat = hazed( holed( new THREE.MeshLambertMaterial( { vertexColors: true } ) ) );
 export const rockMat = new THREE.MeshLambertMaterial( { vertexColors: true } );
 export const instanceMat = new THREE.MeshLambertMaterial( { color: 0xffffff } );
 
