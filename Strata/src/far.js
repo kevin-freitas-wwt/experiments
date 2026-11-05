@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CHUNK, SEA, spawnOf } from './blocks.js';
-import { fineTileMat, midTileMat, coarseTileMat, oceanMat, fadeIn } from './materials.js';
+import { fineTileMat, midTileMat, coarseTileMat, oceanMat, fadeIn, CURVE_RADIUS } from './materials.js';
 
 const N = 33;
 
@@ -23,6 +23,8 @@ class Level {
         this.tiles = new Map();
         this.index = gridIndex();
         this.drop = this.step / 16;
+        // Frustum culling is on; the curvature shader lowers far vertices by up to range²/2R, so pad the sphere by that.
+        this.pad = range * range / ( 2 * CURVE_RADIUS );
     }
 
     key( tx, tz ) {
@@ -62,8 +64,8 @@ class Level {
         g.setIndex( this.index );
         g.computeVertexNormals();
         g.computeBoundingSphere();
+        g.boundingSphere.radius += this.pad;
         const m = new THREE.Mesh( g, this.material );
-        m.frustumCulled = false;
         m.position.set( data.x0, 0, data.z0 );
         fadeIn( m, 0.8 );
         t.mesh = m;

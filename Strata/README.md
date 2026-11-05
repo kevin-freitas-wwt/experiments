@@ -45,6 +45,10 @@ Light always comes from the nearest star. At home the sun circles the world once
 
 The start card opens with a gallery of five seeds, each a still rendered from inside that world (`gallery/*.jpg`) and a link straight into it; Travel and Controls fold below.
 
+## Measuring
+
+The survey card (altitude, terrain, position, speed, nearest body, system, loaded counts, mode, crumbs) is a diagnostic view and is hidden by default; `K` toggles it and `?stats=1` starts with it on. With it come frame time and JavaScript time per frame, draw calls, triangles, worker queue depth and GPU geometry counts, read from the renderer at the end of each frame. Numbers worth knowing on a mid detail radius: heightfield tiles, not voxels, were most of the triangle budget until they were frustum-culled (their bounding spheres are padded by the curvature drop), which halved both draw calls and triangles.
+
 ## Palette
 
 Woodblock-print tones: Prussian-blue water, cream mist on the horizon, ochre sand, muted mosses, a vermilion seed stamp. The HUD (heads-up display) is a serif survey card; the seal in the corner is the numeric seed.

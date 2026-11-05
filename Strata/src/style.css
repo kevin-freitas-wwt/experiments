@@ -117,6 +117,8 @@ body {
 #seed { font-size: 14px; font-style: italic; }
 
 .still #hud, .still #stamp-block, .still #crosshair { display: none; }
+/* The survey card and seed stamp are a diagnostic view: hidden unless stats are on. */
+body:not(.stats) #hud, body:not(.stats) #stamp-block { display: none; }
 
 #overlay {
     align-items: center;

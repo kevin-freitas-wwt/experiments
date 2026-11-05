@@ -18,6 +18,7 @@ const radius = Math.max( 4, Math.min( 14, parseInt( params.get( 'r' ) || '8', 10
 const pose = params.get( 'pose' );
 const at = params.get( 'at' ), inside = params.get( 'in' );
 const spacing = Math.max( 1, Math.min( 64, parseFloat( params.get( 'crumb' ) || '8' ) ) );
+if ( params.has( 'stats' ) && params.get( 'stats' ) !== '0' ) document.body.classList.add( 'stats' );
 
 function randomWord() {
     const a = [ 'ash', 'reed', 'moss', 'fen', 'tor', 'kelp', 'dune', 'cairn', 'scree', 'brine', 'loam', 'frost' ];
@@ -88,7 +89,9 @@ const flares = new Flares();
 const V_A = new THREE.Vector3(), V_B = new THREE.Vector3(), V_C = new THREE.Vector3();
 
 const hud = {};
-for ( const id of [ 'alt', 'biome', 'coord', 'chunks', 'seed', 'mode', 'crumbs', 'speed', 'body', 'system' ] ) hud[ id ] = document.getElementById( id );
+for ( const id of [ 'alt', 'biome', 'coord', 'chunks', 'seed', 'mode', 'crumbs', 'speed', 'body', 'system', 'st-frame', 'st-draws', 'st-tris', 'st-workers', 'st-mem' ] ) hud[ id ] = document.getElementById( id );
+renderer.info.autoReset = false;
+const perf = { frame: 16, js: 0, t0: 0, calls: 0, tris: 0 };
 const overlay = document.getElementById( 'overlay' ), seedInput = document.getElementById( 'seed-input' );
 const tint = document.getElementById( 'tint' ), prompt = document.getElementById( 'prompt' );
 hud.seed.textContent = seedWord;
@@ -198,6 +201,7 @@ document.addEventListener( 'keydown', ( e ) => {
     if ( NAV[ e.code ] ) travel( ...NAV[ e.code ] );
     if ( e.code === 'Enter' ) useAirlock();
     if ( e.code === 'KeyP' ) snapshot();
+    if ( e.code === 'KeyK' ) document.body.classList.toggle( 'stats' );
 } );
 
 function snapshot() {
@@ -451,6 +455,8 @@ const lastPos = new THREE.Vector3(), homePos = new THREE.Vector3( SPAWN.x, 60, S
 
 function frame() {
     requestAnimationFrame( frame );
+    perf.t0 = performance.now();
+    renderer.info.reset();
     player.frame++;
     timer.update();
     const dt = Math.min( 0.05, timer.getDelta() );
@@ -535,6 +541,14 @@ function frame() {
         hud.body.textContent = n ? `${n.name} (${n.kind}) ${fmtDist( Math.max( 0, n.d ) )}` : '–';
         hud.system.textContent = navSystem ? `${navSystem.name} · ${fmtDist( navSystem.center.distanceTo( worldPos ) )}` : '–';
         hud.crumbs.textContent = crumbs.on ? `every ${crumbs.spacing} m · ${crumbs.count}` : crumbs.count ? `off · ${crumbs.count}` : 'off';
+        if ( document.body.classList.contains( 'stats' ) ) {
+            const m = renderer.info.memory;
+            hud[ 'st-frame' ].textContent = `${perf.frame.toFixed( 1 )} ms · ${( 1000 / perf.frame ).toFixed( 0 )} fps · js ${perf.js.toFixed( 1 )} ms`;
+            hud[ 'st-draws' ].textContent = `${perf.calls}`;
+            hud[ 'st-tris' ].textContent = perf.tris > 1e6 ? `${( perf.tris / 1e6 ).toFixed( 2 )} M` : `${( perf.tris / 1e3 ).toFixed( 0 ) } k`;
+            hud[ 'st-workers' ].textContent = `${pool.workers.filter( ( w ) => w.job ).length} busy · ${pool.queue.length} queued`;
+            hud[ 'st-mem' ].textContent = `${m.geometries} geometries · ${m.textures} textures`;
+        }
     }
     renderer.render( scene, camera );
     flares.update( dt, camera, [ ...space.systems.values() ].map( ( sys ) => {
@@ -556,6 +570,9 @@ function frame() {
         return false;
     }, renderer );
     flares.render( renderer );
+    perf.frame += ( timer.getDelta() * 1000 - perf.frame ) * 0.08;
+    perf.calls = renderer.info.render.calls; perf.tris = renderer.info.render.triangles;
+    perf.js += ( performance.now() - perf.t0 - perf.js ) * 0.08;
     if ( spawned && ! pose ) {
         if ( performance.now() - urlTimer > 1000 ) { urlTimer = performance.now(); shareUrl(); }
         if ( inside && ! insideDone ) restoreInterior();
