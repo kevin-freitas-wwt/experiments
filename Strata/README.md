@@ -14,7 +14,7 @@ python3 -m http.server 8765      # from the experiments folder
 
 Open http://localhost:8765/Strata/. Everything Strata needs lives in its own folder: Three.js 0.187.0 and the Shippori Mincho font are in `Strata/vendor/` (see the README there for licenses). There is no build step and no network request at all; the folder can be copied anywhere and served as is.
 
-URL parameters: `?seed=word` picks a world, `?at=x,y,z,yaw,pitch,fly` is a place in it (the address bar is rewritten every second as you move, so the current URL is always a shareable link to where you stand; `in=` adds the vessel when you are aboard one), `?r=11` sets the detail radius in chunks (4 to 14; it also scales the heightfield ranges and the distances at which planets and asteroids step up in detail), `?crumb=8` sets breadcrumb spacing in metres, `?hour=18` sets the home sun's phase at load, and `?pose=x,y,z,yaw,pitch` frames a still with the overlay hidden (used for the thumbnail).
+URL parameters: `?seed=word` picks a world, `?at=x,y,z,yaw,pitch,fly` is a place in it (the address bar is rewritten every second as you move, so the current URL is always a shareable link to where you stand; `in=` adds the vessel when you are aboard one, and `on=` adds the body and your body-local position when you stand on a planet or moon, since it will have turned by the time the link is opened), `?r=11` sets the detail radius in chunks (4 to 14; it also scales the heightfield ranges and the distances at which planets and asteroids step up in detail), `?crumb=8` sets breadcrumb spacing in metres, `?hour=18` sets the home sun's phase at load, and `?pose=x,y,z,yaw,pitch` frames a still with the overlay hidden (used for the thumbnail).
 
 ## How it is made
 

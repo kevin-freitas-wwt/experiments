@@ -16,7 +16,7 @@ const seedWord = params.get( 'seed' ) || randomWord();
 const seed = hashSeed( seedWord );
 const radius = Math.max( 4, Math.min( 14, parseInt( params.get( 'r' ) || '8', 10 ) ) );
 const pose = params.get( 'pose' );
-const at = params.get( 'at' ), inside = params.get( 'in' );
+const at = params.get( 'at' ), inside = params.get( 'in' ), onBody = params.get( 'on' );
 const spacing = Math.max( 1, Math.min( 64, parseFloat( params.get( 'crumb' ) || '8' ) ) );
 if ( params.has( 'stats' ) && params.get( 'stats' ) !== '0' ) document.body.classList.add( 'stats' );
 
@@ -223,6 +223,8 @@ function shareUrl() {
     q.set( 'seed', seedWord );
     q.set( 'at', [ hl.x.toFixed( 1 ), hl.y.toFixed( 1 ), hl.z.toFixed( 1 ), player.yaw.toFixed( 2 ), player.pitch.toFixed( 2 ), player.flying ? 1 : 0 ].join( ',' ) );
     if ( player.shell.interior ) { const v = player.shell.vessel; q.set( 'in', `${v.system.key}/${v.cls ? 'ship' : 'station'}/${v.i}` ); } else q.delete( 'in' );
+    // On a planet the place is kept body-local too, since the body has spun (or orbited) by the time the link is opened.
+    if ( player.shell.planet ) { const b = player.shell.body, l = b.group.worldToLocal( V_A.copy( player.worldPos ) ); q.set( 'on', `${b.system.key}/${b.system.bodies.indexOf( b )}/${l.x.toFixed( 1 )},${l.y.toFixed( 1 )},${l.z.toFixed( 1 )}` ); } else q.delete( 'on' );
     q.delete( 'pose' );
     const url = `${location.pathname}?${q.toString()}`;
     if ( url !== lastUrl ) { history.replaceState( null, '', url ); lastUrl = url; }
@@ -419,6 +421,7 @@ function manageShells( dt ) {
     }
     if ( player.shell.planet ) {
         const sh = player.shell, alt = player.pos.y - sh.base, horiz = Math.hypot( player.pos.x, player.pos.z );
+        if ( onLook && onLook.body === sh.body ) { player.yaw = onLook.yaw; player.pitch = onLook.pitch; player.frameQ.copy( sh.quaternion( player.q ) ); onLook = null; }
         const covered = Math.min( ringR, sh.world.coveredRadius( player.pos.x, player.pos.z ) );
         r0 = Math.max( r0, covered - 24 ); r1 = Math.max( r1, covered + 8 );
         tileEdge.r0.value = covered - 48; tileEdge.r1.value = covered + 16;
@@ -474,6 +477,8 @@ function frame() {
     waterTime.value += dt;
     terrainNow.value = performance.now() / 1000;
     lastPos.copy( worldPos );
+    // Bodies spin and moons orbit before the player and camera are placed, so a frame riding a planet is not a frame behind it.
+    space.update( dt, camera.position, skyMat.uniforms.space.value );
     if ( ! spawned ) {
         if ( world.loaded( SPAWN.x, SPAWN.z ) ) { player.place( SPAWN.x, SPAWN.z ); spawned = true; }
         if ( spawned && ! pose ) crumbs.last = null;
@@ -521,7 +526,6 @@ function frame() {
     ambient.intensity = ( player.shell.interior ? 2.2 : 0.6 ) * ( 0.4 + 0.6 * day );
     space.night = 1 - day;
     sky.position.copy( camera.position );
-    space.update( dt, camera.position, skyMat.uniforms.space.value );
     const under = player.eyeInWater();
     tint.classList.toggle( 'on', under );
     hudTimer += dt;
@@ -577,9 +581,23 @@ function frame() {
     if ( spawned && ! pose ) {
         if ( performance.now() - urlTimer > 1000 ) { urlTimer = performance.now(); shareUrl(); }
         if ( inside && ! insideDone ) restoreInterior();
+        if ( onBody && ! onDone ) restoreOn();
     }
 }
-let insideDone = false;
+let insideDone = false, onDone = false, onLook = null;
+function restoreOn() {
+    const [ key, idx, pos ] = onBody.split( '/' );
+    const sys = space.systems.get( key );
+    if ( ! sys ) { if ( space.stats.systems > 1 || key === '0,0,0' ) onDone = true; return; }
+    const b = sys.bodies[ Number( idx ) ];
+    onDone = true;
+    if ( ! b ) return;
+    const [ x, y, z ] = pos.split( ',' ).map( Number );
+    leaveShell();
+    home.toLocal( b.group.localToWorld( new THREE.Vector3( x, y, z ) ), player.pos );
+    player.vel.set( 0, 0, 0 );
+    onLook = { yaw: player.yaw, pitch: player.pitch, body: b };
+}
 function restoreInterior() {
     const [ key, kind, idx ] = inside.split( '/' );
     const sys = space.systems.get( key );
