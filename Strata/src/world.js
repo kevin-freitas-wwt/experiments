@@ -71,6 +71,8 @@ export class World {
     absorb( budget = 2 ) {
         while ( budget-- > 0 && this.inbox.length ) this.install( this.inbox.shift() );
         this.flush();
+        this.scene.updateWorldMatrix( true, false );
+        ( this.mats.water.userData.frameInv || ( this.mats.water.userData.frameInv = { value: new THREE.Matrix4() } ) ).value.copy( this.scene.matrixWorld ).invert();
     }
 
     // Chunks are grouped into BATCH×BATCH super-chunks, one mesh per material, rebuilt when a member

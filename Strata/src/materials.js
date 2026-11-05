@@ -105,8 +105,8 @@ export const waterTime = { value: 0 };
 export const reflection = { map: { value: null }, matrix: { value: new THREE.Matrix4() }, strength: { value: 0 } };
 export const WATER_MATS = new Set();
 
-// Animated liquid: scrolling ripples bend the normal and sparkle the surface, in world xz so it reads the same
-// in any frame; the ripple also distorts the planar reflection, blended in by a Fresnel term biased so a fair
+// Animated liquid: scrolling ripples bend the normal and sparkle the surface, in the frame's own xz (frameInv, kept
+// current by the World) so a spinning planet does not drag the pattern across its seas; the ripple also distorts the planar reflection, blended in by a Fresnel term biased so a fair
 // share of sky and land shows even looking straight down.
 export function watery( material ) {
     const prev = material.onBeforeCompile;
@@ -117,9 +117,10 @@ export function watery( material ) {
         shader.uniforms.reflMap = reflection.map;
         shader.uniforms.reflMatrix = reflection.matrix;
         shader.uniforms.reflStrength = reflection.strength;
+        shader.uniforms.frameInv = material.userData.frameInv || ( material.userData.frameInv = { value: new THREE.Matrix4() } );
         shader.vertexShader = shader.vertexShader
-            .replace( '#include <common>', '#include <common>\nuniform mat4 reflMatrix; varying vec4 vRefl;' )
-            .replace( '#include <project_vertex>', '#include <project_vertex>\nvRefl = reflMatrix * modelMatrix * vec4( transformed, 1.0 );' );
+            .replace( '#include <common>', '#include <common>\nuniform mat4 reflMatrix; uniform mat4 frameInv; varying vec4 vRefl; varying vec2 vWaveXZ;' )
+            .replace( '#include <project_vertex>', '#include <project_vertex>\nvRefl = reflMatrix * modelMatrix * vec4( transformed, 1.0 );\nvWaveXZ = ( frameInv * modelMatrix * vec4( position, 1.0 ) ).xz;' );
         shader.fragmentShader = shader.fragmentShader
             .replace( '#include <opaque_fragment>', `#include <opaque_fragment>
                 if ( reflStrength > 0.0 ) {
@@ -133,7 +134,7 @@ export function watery( material ) {
                     gl_FragColor.a = max( gl_FragColor.a, fres );
                 }` )
             .replace( '#include <common>', `#include <common>
-                uniform sampler2D reflMap; uniform float reflStrength; varying vec4 vRefl;
+                uniform sampler2D reflMap; uniform float reflStrength; varying vec4 vRefl; varying vec2 vWaveXZ;
                 uniform float time; varying vec2 vCurveXZ;
                 float wave( vec2 p, float t ) {
                     return sin( p.x * 1.1 + t * 1.4 ) * sin( p.y * 0.8 - t * 1.1 ) * 0.5
@@ -141,15 +142,15 @@ export function watery( material ) {
                          + sin( ( p.x * 0.6 - p.y * 1.4 ) * 2.7 - t * 1.7 ) * 0.2;
                 }` )
             .replace( '#include <color_fragment>', `#include <color_fragment>
-                float w0 = wave( vCurveXZ, time );
+                float w0 = wave( vWaveXZ, time );
                 float ripple = 0.5 + 0.5 * w0;
-                float cells = abs( sin( ( vCurveXZ.x * 2.3 + w0 * 2.0 ) ) * sin( ( vCurveXZ.y * 2.1 - w0 * 2.0 + time * 0.6 ) ) );
+                float cells = abs( sin( ( vWaveXZ.x * 2.3 + w0 * 2.0 ) ) * sin( ( vWaveXZ.y * 2.1 - w0 * 2.0 + time * 0.6 ) ) );
                 diffuseColor.rgb *= 0.86 + ripple * 0.22;
                 diffuseColor.rgb += vec3( 0.18, 0.2, 0.22 ) * pow( cells, 6.0 ) * ( 0.4 + 0.6 * ripple );` )
             .replace( '#include <normal_fragment_begin>', `#include <normal_fragment_begin>
                 float eps = 0.35;
-                float wx = wave( vCurveXZ + vec2( eps, 0.0 ), time ) - w0;
-                float wz = wave( vCurveXZ + vec2( 0.0, eps ), time ) - w0;
+                float wx = wave( vWaveXZ + vec2( eps, 0.0 ), time ) - w0;
+                float wz = wave( vWaveXZ + vec2( 0.0, eps ), time ) - w0;
                 normal = normalize( normal + vec3( -wx, 0.0, -wz ) * 0.9 );` );
     };
     material.customProgramCacheKey = () => 'curved-water';

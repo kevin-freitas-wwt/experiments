@@ -584,6 +584,8 @@ function frame() {
     // Cloud cover between you and the star: dims direct light and the flare, so an overcast day reads as one.
     cloudShade = 0;
     home.cloud.mat.uniforms.sunLocal.value.copy( sunDir );
+    // The home layer only exists for someone over the disc: from below or beyond it, the curvature drop would bend it into view.
+    home.cloud.mesh.visible = ! offHome && homeLocal.y > -500;
     if ( ! hazeBody && ! offHome && homeLocal.y < home.cloud.y && sunDir.y > 0.02 ) {
         const t = ( home.cloud.y - homeLocal.y ) / sunDir.y;
         cloudShade = cloudAt( home, V_A.set( homeLocal.x + sunDir.x * t - SPAWN.x, 0, homeLocal.z + sunDir.z * t - SPAWN.z ) );

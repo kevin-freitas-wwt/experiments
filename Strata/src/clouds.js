@@ -102,11 +102,11 @@ export function addClouds( body, rnd ) {
     body.cloud = { mesh, mat, cover, radius, seed: body.seed % 1000003 };
 }
 
-// The home world's layer: a flat sheet 1.6 km over the sea, curved down with the ground, 400 km across.
+// The home world's layer: a flat disc 1.6 km over the sea, curved down with the ground, matching the sea disc.
 export function homeClouds( group, seed, spawn, seaY ) {
     const cover = 0.15 + ( seed % 97 ) / 97 * 0.5;
     const mat = hazed( cloudMaterial( seed % 1000003, cover, 0xffffff, true ) );
-    const mesh = new THREE.Mesh( new THREE.PlaneGeometry( 400000, 400000, 64, 64 ).rotateX( -Math.PI / 2 ), mat );
+    const mesh = new THREE.Mesh( new THREE.RingGeometry( 1, 200000, 128, 40 ).rotateX( -Math.PI / 2 ), mat );
     mesh.position.set( spawn.x, seaY + 1600, spawn.z );
     mesh.renderOrder = 4;
     mesh.frustumCulled = false;
