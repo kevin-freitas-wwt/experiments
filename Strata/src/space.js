@@ -132,7 +132,7 @@ class System {
             group.position.copy( pos );
             const mesh = new THREE.Mesh( new THREE.IcosahedronGeometry( radius, 1 ), bodyMat );
             group.add( mesh );
-            const body = { i, kind, q, system: this, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: 0.00015 + this.rnd( i, 7 ) * 0.0003, seed: this.seed + i * 17, patch: null, patchWant: 0 };
+            const body = { i, kind, q, system: this, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: ( 2 * Math.PI ) / ( 1200 + this.rnd( i, 7 ) * 1800 ), seed: this.seed + i * 17, patch: null, patchWant: 0 };
             if ( kind !== 'rocky' && kind !== 'ember' ) {
                 const shellR = radius * ( 1 + SURFACE[ kind ].amp * 2 ) * 1.015;
                 const rim = new THREE.Mesh( new THREE.SphereGeometry( shellR, 48, 32 ), rimMaterial( kind === 'icy' ? 0xbfe0ff : 0x7fb4ff ) );
@@ -231,6 +231,13 @@ class System {
                 this.space.airlock( st, new THREE.Vector3( 0, 13 * st.voxel + 2, 0 ) );
             } );
         }
+    }
+
+    // Home only: the sun circles the home world, so its position follows the current sun direction.
+    setSunDir( dir ) {
+        this.starPos.copy( this.center ).addScaledVector( dir, 300000 );
+        this.star.position.copy( this.starPos );
+        this.starBall.position.copy( this.starPos );
     }
 
     rebase( delta ) {
@@ -477,7 +484,7 @@ export class Space {
     }
 
     update( dt, camPos, space ) {
-        this.starMat.opacity = space * space;
+        this.starMat.opacity = Math.max( space * space, ( this.night || 0 ) ** 2 * 0.85 );
         this.stars.position.copy( camPos );
         const ahead = new THREE.Vector3();
         for ( const sys of this.systems.values() ) {

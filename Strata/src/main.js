@@ -43,16 +43,31 @@ const camera = new THREE.PerspectiveCamera( 72, 1, 0.1, 3000000 );
 
 const skyMat = new THREE.ShaderMaterial( {
     side: THREE.BackSide, depthWrite: false, depthTest: false,
-    uniforms: { top: { value: ZENITH.clone() }, bottom: { value: HORIZON.clone() }, space: { value: 0 }, up: { value: new THREE.Vector3( 0, 1, 0 ) } },
-    vertexShader: 'uniform vec3 up; varying float h; void main(){ h = dot( normalize( position ), up ); gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }',
-    fragmentShader: 'uniform vec3 top; uniform vec3 bottom; uniform float space; varying float h; void main(){ float t = smoothstep( -0.02, 0.75, h ); vec3 c = mix( bottom, top, t ); float up = smoothstep( -0.25, 0.15, h ); c = mix( c, vec3( 0.008, 0.012, 0.04 ), space * up + space * space * ( 1.0 - up ) ); gl_FragColor = vec4( c, 1.0 ); }',
+    uniforms: { top: { value: ZENITH.clone() }, bottom: { value: HORIZON.clone() }, space: { value: 0 }, up: { value: new THREE.Vector3( 0, 1, 0 ) }, sunDir: { value: new THREE.Vector3( 0, 1, 0 ) }, night: { value: 0 }, dusk: { value: 0 } },
+    vertexShader: 'uniform vec3 up; varying float h; varying vec3 vDir; void main(){ vDir = normalize( position ); h = dot( vDir, up ); gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }',
+    fragmentShader: `uniform vec3 top; uniform vec3 bottom; uniform float space; uniform vec3 sunDir; uniform float night; uniform float dusk; varying float h; varying vec3 vDir;
+void main(){
+    float t = smoothstep( -0.02, 0.75, h );
+    vec3 c = mix( bottom, top, t );
+    float toSun = max( 0.0, dot( vDir, sunDir ) );
+    c = mix( c, vec3( 0.85, 0.5, 0.3 ), dusk * pow( toSun, 5.0 ) * ( 1.0 - t * 0.7 ) );
+    c = mix( c, mix( vec3( 0.075, 0.085, 0.14 ), vec3( 0.025, 0.03, 0.07 ), t ), night );
+    float up = smoothstep( -0.25, 0.15, h );
+    c = mix( c, vec3( 0.008, 0.012, 0.04 ), space * up + space * space * ( 1.0 - up ) );
+    gl_FragColor = vec4( c, 1.0 );
+}`,
 } );
 const sky = new THREE.Mesh( new THREE.SphereGeometry( 300000, 32, 16 ), skyMat );
 sky.frustumCulled = false;
 sky.renderOrder = -10;
 scene.add( sky );
 
-const sunDir = new THREE.Vector3( 0.6, 0.55, 0.35 );
+// The home sun circles the home world once per HOME_DAY seconds on a great circle through the zenith; its
+// phase at load comes from the seed. Elsewhere light comes from the nearest star and planets spin under it.
+const HOME_DAY = 1440, SUN0 = new THREE.Vector3( 0.6, 0.55, 0.35 ).normalize();
+const SUN_AXIS = new THREE.Vector3().crossVectors( SUN0, new THREE.Vector3( 0, 1, 0 ) ).normalize();
+const sunDir = SUN0.clone();
+const NOON = Math.acos( SUN0.y ), sunPhase0 = ( params.has( 'hour' ) ? ( parseFloat( params.get( 'hour' ) ) - 12 ) / 24 : ( seed % 1000 ) / 1000 - 0.5 ) * Math.PI * 2 + NOON;
 const sun = new THREE.DirectionalLight( 0xfff1d6, 2.4 );
 sun.position.copy( sunDir );
 const hemi = new THREE.HemisphereLight( 0xdcd8ea, 0x7a6a50, 1.15 );
@@ -448,7 +463,6 @@ function frame() {
     if ( player.shell.planet || player.shell.interior ) { player.world.update( player.pos.x, player.pos.z, face.x, face.z ); player.world.absorb( 4 ); }
     if ( player.shell === home ) homePos.copy( player.pos );
     far.update( dt, homePos, world, player.shell === home ? face : null );
-    ambient.intensity = player.shell.interior ? 2.2 : 0.6;
     tickFades( dt );
     waterTime.value += dt;
     lastPos.copy( worldPos );
@@ -468,6 +482,11 @@ function frame() {
     const nearSys = space.nearestSystem( player.worldPos );
     if ( nearSys && nearSys !== navSystem ) buildNav( nearSys );
     if ( nearSys ) sun.color.lerp( starTint.set( nearSys.starColor ).lerp( WHITE, 0.4 ), 1 - Math.exp( -dt * 2 ) );
+    if ( space.home ) {
+        sunDir.copy( SUN0 ).applyAxisAngle( SUN_AXIS, sunPhase0 + ( pose ? 0 : timer.getElapsed() ) / HOME_DAY * Math.PI * 2 );
+        space.home.setSunDir( sunDir );
+    }
+    if ( nearSys ) { V_A.copy( nearSys.starPos ).sub( camera.position ).normalize(); sun.position.copy( V_A ); fill.position.copy( V_A ).negate(); skyMat.uniforms.sunDir.value.copy( V_A ); }
     let spaceness = Math.min( 1, Math.max( 0, ( alt - 1500 ) / 9000 ) );
     let skyUp = UP_Y, skyTop = ZENITH, skyBottom = HORIZON;
     for ( const b of space.bodies ) {
@@ -485,7 +504,14 @@ function frame() {
     skyMat.uniforms.top.value.lerp( skyTop, ease );
     skyMat.uniforms.bottom.value.lerp( skyBottom, ease );
     hemi.position.copy( skyMat.uniforms.up.value );
-    hemi.intensity = 1.15 - skyMat.uniforms.space.value * 1.0;
+    const elev = skyMat.uniforms.sunDir.value.dot( skyMat.uniforms.up.value ), sp = skyMat.uniforms.space.value;
+    const day = THREE.MathUtils.smoothstep( elev, -0.1, 0.16 ) * ( 1 - sp ) + sp;
+    skyMat.uniforms.night.value = 1 - day;
+    skyMat.uniforms.dusk.value = ( 1 - THREE.MathUtils.smoothstep( Math.abs( elev - 0.03 ), 0, 0.3 ) ) * ( 1 - sp );
+    sun.intensity = 2.4 * ( sp + ( 1 - sp ) * THREE.MathUtils.smoothstep( elev, -0.04, 0.12 ) );
+    hemi.intensity = ( 1.15 - sp * 1.0 ) * ( 0.25 + 0.75 * day );
+    ambient.intensity = ( player.shell.interior ? 2.2 : 0.6 ) * ( 0.4 + 0.6 * day );
+    space.night = 1 - day;
     sky.position.copy( camera.position );
     space.update( dt, camera.position, skyMat.uniforms.space.value );
     const under = player.eyeInWater();
