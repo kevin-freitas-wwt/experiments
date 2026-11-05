@@ -520,12 +520,20 @@ function frame() {
     if ( hazeBody ) {
         const b = hazeBody.b, k = KINDS[ b.kind ];
         haze.on.value = 1; haze.flat.value = 0; haze.center.value.copy( b.pos ); haze.r.value = b.radius * ( 1 + k.seaLevel * k.amp * 4 );
-        haze.k.value = b.kind === 'icy' ? 3e-5 : 4.5e-5; haze.color.value.copy( ATMOS[ b.kind ].horizon );
+        haze.k.value = b.kind === 'icy' ? 3e-5 : 4.5e-5; haze.color.value.copy( ATMOS[ b.kind ].horizon ); haze.zenith.value.copy( ATMOS[ b.kind ].zenith );
         haze.sun.value.copy( b.system.starPos ).sub( b.pos ).normalize();
     } else if ( ! offHome ) {
-        haze.on.value = 1; haze.flat.value = 1; haze.seaY.value = home.group.position.y + SEA; haze.k.value = 4.5e-5; haze.color.value.copy( HORIZON );
+        haze.on.value = 1; haze.flat.value = 1; haze.seaY.value = home.group.position.y + SEA; haze.k.value = 4.5e-5; haze.color.value.copy( HORIZON ); haze.zenith.value.copy( ZENITH );
         haze.sun.value.copy( sunDir );
     } else haze.on.value = 0;
+    // How much a day sky washes out things beyond the air (zenith value): used for star glows and flares.
+    if ( haze.on.value ) {
+        const camAlt = haze.flat.value ? camera.position.y - haze.seaY.value : camera.position.distanceTo( haze.center.value ) - haze.r.value;
+        const up = haze.flat.value ? UP_Y : V_A.copy( camera.position ).sub( haze.center.value ).normalize();
+        const tau = haze.k.value * haze.h.value * Math.exp( -Math.max( 0, camAlt ) / haze.h.value );
+        space.skyVeil = THREE.MathUtils.smoothstep( up.dot( haze.sun.value ), -0.1, 0.2 ) * ( 1 - Math.exp( -tau * haze.veil.value ) );
+        space.lit = hazeBody ? hazeBody.b.system : space.home;
+    } else { space.skyVeil = 0; space.lit = null; }
     // Cloud cover between you and the star: dims direct light and the flare, so an overcast day reads as one.
     cloudShade = 0;
     home.cloud.mat.uniforms.sunLocal.value.copy( sunDir );
@@ -589,7 +597,7 @@ function frame() {
     renderer.render( scene, camera );
     flares.update( dt, camera, [ ...space.systems.values() ].map( ( sys ) => {
         const d = sys.starPos.distanceTo( camera.position );
-        return { pos: sys.starPos, color: starTint.set( sys.starColor ).clone(), bright: sys.lum * Math.pow( 250000 / d, 2 ) * 110 * ( sys === cloudSys ? 1 - 0.95 * cloudShade : 1 ) };
+        return { pos: sys.starPos, color: starTint.set( sys.starColor ).clone(), bright: sys.lum * Math.pow( 250000 / d, 2 ) * 110 * ( sys === cloudSys ? 1 - 0.95 * cloudShade : 1 ) * ( sys === space.lit ? 1 : 1 - ( space.skyVeil || 0 ) ) };
     } ), ( pos ) => {
         if ( player.shell.interior ) return true;
         const dir = V_B.copy( pos ).sub( camera.position ), len = dir.length();

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 const REL = new THREE.Vector3();
 import { hash2 } from './noise.js';
-import { rockMat, instanceMat, fadeIn } from './materials.js';
+import { rockMat, instanceMat, fadeIn, hazed } from './materials.js';
 
 const CAP = 3500, CELL = 2000;
 const TINTS = [ [ 0xd9c7a6, 0xb89b74 ], [ 0xe6eef4, 0xb9cfe0 ], [ 0x9a948c, 0x6f6a64 ], [ 0xd8b08a, 0x8a5a3a ] ];
@@ -13,7 +13,9 @@ const discMaterial = ( lanes, colors, R, seedF ) => new THREE.ShaderMaterial( {
     vertexShader: `#include <common>
 #include <logdepthbuf_pars_vertex>
 varying vec2 vLocal; varying vec3 vWorld;
-void main(){ vLocal = position.xy; vWorld = ( modelMatrix * vec4( position, 1.0 ) ).xyz; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+void main(){
+#include <begin_vertex>
+vLocal = position.xy; vWorld = ( modelMatrix * vec4( position, 1.0 ) ).xyz; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
 #include <logdepthbuf_vertex>
 }`,
     fragmentShader: `#include <common>
@@ -38,6 +40,7 @@ void main(){
     if ( a <= 0.001 ) discard;
     a *= smoothstep( nearCut * 0.4, nearCut, distance( vWorld, cameraPosition ) ) * fade;
     gl_FragColor = vec4( c, a );
+#include <fog_fragment>
 }`,
 } );
 
@@ -61,7 +64,7 @@ export class RingField {
         const lanesU = [ 0, 1, 2, 3 ].map( ( i ) => { const L = this.lanes[ i ]; return L ? new THREE.Vector4( L.r0, L.r1, L.opacity, L.band ) : new THREE.Vector4( 0, 0, 0, 0 ); } );
         const colorsU = [ 0, 1, 2, 3 ].map( ( i ) => new THREE.Color( this.lanes[ i ] ? this.lanes[ i ].color : 0 ) );
         const outer = this.lanes[ this.lanes.length - 1 ].r1;
-        this.disc = new THREE.Mesh( new THREE.RingGeometry( R * this.lanes[ 0 ].r0 * 0.98, R * outer * 1.02, 160, 1 ), discMaterial( lanesU, colorsU, R, seed % 1000 ) );
+        this.disc = new THREE.Mesh( new THREE.RingGeometry( R * this.lanes[ 0 ].r0 * 0.98, R * outer * 1.02, 160, 1 ), hazed( discMaterial( lanesU, colorsU, R, seed % 1000 ) ) );
         this.disc.quaternion.setFromUnitVectors( new THREE.Vector3( 0, 0, 1 ), this.normal );
         this.disc.position.copy( body.pos );
         this.disc.frustumCulled = false;

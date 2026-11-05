@@ -147,7 +147,8 @@ class System {
         group.add( mesh );
         const body = { i, kind, q, system: this, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: Math.min( ( 2 * Math.PI ) / ( 1200 + this.rnd( i, 7 ) * 1800 ), 60 / radius ), seed: this.seed + i * 17, patch: null, patchWant: 0 };
         if ( kind !== 'rocky' && kind !== 'ember' ) {
-            const shellR = radius * ( 1 + SURFACE[ kind ].amp * 2 ) * 1.015;
+            // The atmosphere sphere sits above the cloud shell (which is above the peaks).
+            const shellR = radius * ( 1 + SURFACE[ kind ].amp * 4 ) + Math.max( 1500, radius * 0.02 );
             const rim = new THREE.Mesh( new THREE.SphereGeometry( shellR, 48, 32 ), rimMaterial( kind === 'icy' ? 0xbfe0ff : 0x7fb4ff ) );
             rim.userData.shellR = shellR;
             group.add( rim );
@@ -519,7 +520,7 @@ export class Space {
         this.stars.position.copy( camPos );
         const ahead = new THREE.Vector3();
         for ( const sys of this.systems.values() ) {
-            sys.star.material.opacity = sys.home ? 0.35 + space * 0.65 : 1;
+            sys.star.material.opacity = ( sys.home ? 0.35 + space * 0.65 : 1 ) * ( sys === this.lit ? 1 : 1 - ( this.skyVeil || 0 ) );
             for ( const b of sys.bodies ) {
                 b.group.rotation.y += b.spin * dt;
                 if ( b.orbit ) { b.orbit.angle += b.orbit.omega * dt; this.orbitPoint( b.orbit, b.orbit.angle, b.pos ); b.group.position.copy( b.pos ); }

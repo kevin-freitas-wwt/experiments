@@ -172,6 +172,7 @@ export function terrainMaterials() {
 export const haze = {
     on: { value: 0 }, color: { value: new THREE.Color( 0xeadfca ) }, k: { value: 4.5e-5 }, h: { value: 2500 },
     center: { value: new THREE.Vector3() }, r: { value: 1 }, flat: { value: 1 }, seaY: { value: 0 }, sun: { value: new THREE.Vector3( 0, 1, 0 ) },
+    zenith: { value: new THREE.Color( 0x5d73a3 ) }, top: { value: 12000 }, veil: { value: 6.3 },
 };
 
 export function hazed( material ) {
@@ -185,7 +186,7 @@ export function hazed( material ) {
             .replace( '#include <begin_vertex>', '#include <begin_vertex>\nvHazeW = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;' );
         shader.fragmentShader = shader.fragmentShader
             .replace( '#include <common>', `#include <common>
-                uniform float hazeOn; uniform vec3 hazeColor; uniform float hazeK; uniform float hazeH; uniform vec3 hazeCenter; uniform float hazeR; uniform float hazeFlat; uniform float hazeSeaY; uniform vec3 hazeSun;
+                uniform float hazeOn; uniform vec3 hazeColor; uniform float hazeK; uniform float hazeH; uniform vec3 hazeCenter; uniform float hazeR; uniform float hazeFlat; uniform float hazeSeaY; uniform vec3 hazeSun; uniform vec3 hazeZenith; uniform float hazeTop; uniform float hazeVeil;
                 varying vec3 vHazeW;
                 float hazeAlt( vec3 p ) { return hazeFlat > 0.5 ? p.y - hazeSeaY : length( p - hazeCenter ) - hazeR; }
                 float hazeDepth( vec3 a, vec3 b ) {
@@ -195,9 +196,20 @@ export function hazed( material ) {
                 }` )
             .replace( '#include <fog_fragment>', `#include <fog_fragment>
                 if ( hazeOn > 0.5 ) {
-                    vec3 hazeUp = hazeFlat > 0.5 ? vec3( 0.0, 1.0, 0.0 ) : normalize( vHazeW - hazeCenter );
-                    float hazeLit = 0.08 + 0.92 * smoothstep( -0.12, 0.25, dot( hazeUp, hazeSun ) );
-                    gl_FragColor.rgb = mix( gl_FragColor.rgb, hazeColor * hazeLit, 1.0 - exp( -hazeDepth( vHazeW, cameraPosition ) ) );
+                    if ( hazeAlt( vHazeW ) > hazeTop ) {
+                        // Beyond the air: the whole column's airlight lies in front, so by day the sky washes the object out.
+                        vec3 camUp = hazeFlat > 0.5 ? vec3( 0.0, 1.0, 0.0 ) : normalize( cameraPosition - hazeCenter );
+                        vec3 view = normalize( vHazeW - cameraPosition );
+                        float sinE = max( dot( view, camUp ), 0.04 ), aC = max( hazeAlt( cameraPosition ), 0.0 );
+                        float tau = hazeK * hazeH * exp( -aC / hazeH ) / sinE;
+                        float lit = smoothstep( -0.1, 0.2, dot( camUp, hazeSun ) );
+                        vec3 sky = mix( hazeColor, hazeZenith, smoothstep( -0.02, 0.75, dot( view, camUp ) ) );
+                        gl_FragColor.rgb = gl_FragColor.rgb * exp( -tau ) + sky * lit * ( 1.0 - exp( -tau * hazeVeil ) );
+                    } else {
+                        vec3 hazeUp = hazeFlat > 0.5 ? vec3( 0.0, 1.0, 0.0 ) : normalize( vHazeW - hazeCenter );
+                        float hazeLit = 0.08 + 0.92 * smoothstep( -0.12, 0.25, dot( hazeUp, hazeSun ) );
+                        gl_FragColor.rgb = mix( gl_FragColor.rgb, hazeColor * hazeLit, 1.0 - exp( -hazeDepth( vHazeW, cameraPosition ) ) );
+                    }
                 }` );
     };
     material.customProgramCacheKey = () => ( prevKey ? prevKey.call( material ) : '' ) + '-haze';
@@ -214,8 +226,8 @@ export const coarseTileMat = hazed( curved( new THREE.MeshLambertMaterial( { ver
 export const oceanMat = hazed( curved( new THREE.MeshLambertMaterial( { color: 0x2d4e80 } ) ) );
 export const planetTileMat = hazed( tiled( new THREE.MeshLambertMaterial( { vertexColors: true } ) ) );
 export const bodyMat = hazed( holed( new THREE.MeshLambertMaterial( { vertexColors: true } ) ) );
-export const rockMat = new THREE.MeshLambertMaterial( { vertexColors: true } );
-export const instanceMat = new THREE.MeshLambertMaterial( { color: 0xffffff } );
+export const rockMat = hazed( new THREE.MeshLambertMaterial( { vertexColors: true } ) );
+export const instanceMat = hazed( new THREE.MeshLambertMaterial( { color: 0xffffff } ) );
 
 const fades = [];
 
