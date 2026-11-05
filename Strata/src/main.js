@@ -235,8 +235,9 @@ let navSystem = null;
 function buildNav( sys ) {
     navSystem = sys;
     nav.innerHTML = '';
-    document.getElementById( 'nav-title' ).textContent = `${sys.name}, a ${sys.starType.name} (${sys.starType.cls}) · ${sys.bodies.length} planet${sys.bodies.length === 1 ? '' : 's'}, ${sys.rocks.length} asteroids, ${sys.ships.length} ships, ${sys.stations.length} station${sys.stations.length === 1 ? '' : 's'}`;
-    const items = [ ...sys.bodies.slice( 0, 7 ).map( ( b, i ) => [ `${i + 1}`, b.name, `${b.kind}, ${( b.radius / 1000 ).toFixed( 1 )} km`, [ 'planet', i ] ] ),
+    const nPlanets = sys.bodies.length - sys.moons.length;
+    document.getElementById( 'nav-title' ).textContent = `${sys.name}, a ${sys.starType.name} (${sys.starType.cls}) · ${nPlanets} planet${nPlanets === 1 ? '' : 's'}, ${sys.moons.length} moon${sys.moons.length === 1 ? '' : 's'}, ${sys.rocks.length} asteroids, ${sys.ships.length} ships, ${sys.stations.length} station${sys.stations.length === 1 ? '' : 's'}`;
+    const items = [ ...sys.bodies.slice( 0, 7 ).map( ( b, i ) => [ `${i + 1}`, b.name, `${b.orbit ? 'moon of ' + b.orbit.host.name + ', ' : ''}${b.kind}, ${( b.radius / 1000 ).toFixed( 1 )} km`, [ 'planet', i ] ] ),
         [ '8', 'Nearest asteroid', 'belt and strays', [ 'rock' ] ], [ '9', 'Nearest ship', 'skiffs to capitals', [ 'ship' ] ] ];
     if ( sys.stations.length ) items.push( [ '-', 'Nearest station', 'in orbit', [ 'station' ] ] );
     items.push( [ '0', 'Home', 'the spawn shore', [ 'home' ] ] );

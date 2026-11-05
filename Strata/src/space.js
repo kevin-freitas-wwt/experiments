@@ -102,6 +102,7 @@ class System {
         const maxN = this.starType.cls === 'M' ? 7 : this.starType.cls === 'K' ? 8 : 8;
         const n = Math.min( maxN, ( this.home ? 4 : 2 ) + Math.floor( this.rnd( 1, 1 ) * ( this.home ? 4 : 7 ) ) );
         this.rings = [];
+        this.moons = [];
         const inner = this.home ? 60000 : Math.max( this.hz * 0.22, this.starRadius * 4 );
         const spread = this.home ? 1.6 : this.starType.cls === 'M' ? 1.6 : 1.9;
         const plane = new THREE.Vector3( ( this.rnd( 1, 2 ) - 0.5 ) * 0.4, 1, ( this.rnd( 1, 3 ) - 0.5 ) * 0.4 ).normalize();
@@ -128,25 +129,53 @@ class System {
             // Home orbits are measured from the home world, so temperature uses the true distance to its sun.
             const q = ( this.home ? pos.distanceTo( this.starPos ) : dist ) / this.hz;
             const kind = this.planetKind( q, radius );
-            const group = new THREE.Group();
-            group.position.copy( pos );
-            const mesh = new THREE.Mesh( new THREE.IcosahedronGeometry( radius, 1 ), bodyMat );
-            group.add( mesh );
-            const body = { i, kind, q, system: this, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: ( 2 * Math.PI ) / ( 1200 + this.rnd( i, 7 ) * 1800 ), seed: this.seed + i * 17, patch: null, patchWant: 0 };
-            if ( kind !== 'rocky' && kind !== 'ember' ) {
-                const shellR = radius * ( 1 + SURFACE[ kind ].amp * 2 ) * 1.015;
-                const rim = new THREE.Mesh( new THREE.SphereGeometry( shellR, 48, 32 ), rimMaterial( kind === 'icy' ? 0xbfe0ff : 0x7fb4ff ) );
-                rim.userData.shellR = shellR;
-                group.add( rim );
-                body.rim = rim;
-            }
-            this.scene.add( group );
-            this.bodies.push( body );
-            this.space.requestBody( body, 0 );
+            const body = this.addBody( i, kind, q, radius, pos );
             if ( this.rnd( i, 8 ) < ( this.home && i === 0 ? 1 : q > 2.7 ? 0.55 : 0.15 ) ) {
                 body.rings = new RingField( this.space, body, ( this.seed * 13 + i * 101 ) % 1000003 );
                 body.ringNormal = body.rings.normal;
                 this.rings.push( body.rings );
+            }
+        }
+        this.makeMoons();
+    }
+
+    addBody( i, kind, q, radius, pos ) {
+        const group = new THREE.Group();
+        group.position.copy( pos );
+        const mesh = new THREE.Mesh( new THREE.IcosahedronGeometry( radius, 1 ), bodyMat );
+        group.add( mesh );
+        const body = { i, kind, q, system: this, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: Math.min( ( 2 * Math.PI ) / ( 1200 + this.rnd( i, 7 ) * 1800 ), 60 / radius ), seed: this.seed + i * 17, patch: null, patchWant: 0 };
+        if ( kind !== 'rocky' && kind !== 'ember' ) {
+            const shellR = radius * ( 1 + SURFACE[ kind ].amp * 2 ) * 1.015;
+            const rim = new THREE.Mesh( new THREE.SphereGeometry( shellR, 48, 32 ), rimMaterial( kind === 'icy' ? 0xbfe0ff : 0x7fb4ff ) );
+            rim.userData.shellR = shellR;
+            group.add( rim );
+            body.rim = rim;
+        }
+        this.scene.add( group );
+        this.bodies.push( body );
+        this.space.requestBody( body, 0 );
+        return body;
+    }
+
+    // Moons: ordinary bodies (same detail levels, shells and tiles) that orbit a planet beyond its rings,
+    // once every 10 to 40 minutes. Bigger planets carry more; a moon is a tenth to a third of its host.
+    makeMoons() {
+        const planets = this.bodies.slice();
+        let i = planets.length;
+        for ( const host of planets ) {
+            if ( host.radius < 5000 ) continue;
+            const roll = this.rnd( host.i, 70 ), n = roll < 0.4 ? 0 : roll < 0.8 ? 1 : host.radius > 20000 ? 3 : 2;
+            const inner = Math.max( host.radius * 2.6, host.rings ? host.rings.outer * 1.4 : 0 );
+            const plane = new THREE.Vector3( this.rnd( host.i, 71 ) - 0.5, 1, this.rnd( host.i, 72 ) - 0.5 ).normalize();
+            for ( let m = 0; m < n; m++, i++ ) {
+                const radius = Math.max( 900, host.radius * ( 0.1 + this.rnd( i, 3 ) * 0.25 ) );
+                const orbit = { host, orbitR: inner + host.radius * ( 1.2 * m + this.rnd( i, 4 ) * 0.8 ) + radius * 3, angle: this.rnd( i, 5 ) * Math.PI * 2, tilt: Math.acos( plane.y ) * ( this.rnd( i, 6 ) < 0.5 ? 1 : -1 ) };
+                orbit.omega = Math.min( ( 2 * Math.PI ) / ( 600 + this.rnd( i, 9 ) * 1800 ), 60 / orbit.orbitR ) * ( this.rnd( i, 10 ) < 0.85 ? 1 : -1 );
+                const pos = this.space.orbitPoint( orbit, orbit.angle, new THREE.Vector3() );
+                const body = this.addBody( i, this.planetKind( host.q, radius ), host.q, radius, pos );
+                body.orbit = orbit;
+                this.moons.push( body );
             }
         }
     }
@@ -349,9 +378,9 @@ export class Space {
 
     // Cached per body against the last query point: every caller in a frame asks about the same spot.
     surfaceRadius( body, worldPos ) {
-        const c = body.srCache || ( body.srCache = { pos: new THREE.Vector3( Infinity, 0, 0 ), r: 0 } );
-        if ( c.pos.distanceToSquared( worldPos ) < 0.04 ) return c.r;
-        c.pos.copy( worldPos );
+        const c = body.srCache || ( body.srCache = { pos: new THREE.Vector3( Infinity, 0, 0 ), bpos: new THREE.Vector3(), r: 0 } );
+        if ( c.pos.distanceToSquared( worldPos ) < 0.04 && c.bpos.equals( body.pos ) ) return c.r;
+        c.pos.copy( worldPos ); c.bpos.copy( body.pos );
         const local = body.group.worldToLocal( SCRATCH.copy( worldPos ) ).normalize();
         c.r = surfaceAt( body.kind, SURFACE[ body.kind ], [ local.x, local.y, local.z ], body.seed, body.radius, octavesFor( body.radius, 6 ) ).r;
         return c.r;
@@ -491,6 +520,7 @@ export class Space {
             sys.star.material.opacity = sys.home ? 0.35 + space * 0.65 : 1;
             for ( const b of sys.bodies ) {
                 b.group.rotation.y += b.spin * dt;
+                if ( b.orbit ) { b.orbit.angle += b.orbit.omega * dt; this.orbitPoint( b.orbit, b.orbit.angle, b.pos ); b.group.position.copy( b.pos ); }
                 if ( b.rim ) b.rim.material.uniforms.fade.value = Math.min( 1, Math.max( 0, ( camPos.distanceTo( b.pos ) - b.rim.userData.shellR ) / ( b.radius * 0.4 ) ) );
             }
             for ( const s of sys.ships ) {
