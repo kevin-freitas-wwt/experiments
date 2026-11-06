@@ -57,6 +57,10 @@ The home world lies at 47° north on a planet tilted 23°, so the sun's noon hei
 
 Rivers wind across the lowlands: the zero crossings of a slow noise, cut a few blocks below the sea where the land is low enough to reach it, with banks tapering over a second band width, so the sea fills them and they run to the coast; lush planets get the same from their surface function, so sphere, tiles and voxels agree. With your eye under the surface the world sinks into the liquid's own murk (a short, even extinction in deep blue-green, darker at night; lava is a glowing red wall a couple of metres deep) and, by day on living worlds, caustics play over the bed: two drifting noise sheets interfering, fading with depth. At night on those seas plankton light up along the ripple crests in slow drifting patches. The planar reflection stands in for refraction; the view through the surface is not bent.
 
+## Ruins
+
+Someone was here first. On any solid ground, seeded and sparse, the chunk generator leaves cairns on high or bare ground (a ring of stone and gravel and a stack two to four high), monoliths (a basalt pillar one or two blocks square and nine to fourteen tall, sunk two into the ground) and, once in a few hundred chunks, a crashed hull: a plate-and-panel wreck seven blocks long, half sunk and torn open toward its tail. In orbit, about a third of the stations beyond the first are dead: dark, holed, missing a wedge of their ring and tumbling slowly, listed as the wreck of the station they were.
+
 ## Start card
 
 The start card opens with a gallery of five seeds, each a still rendered from inside that world (`gallery/*.jpg`) and a link straight into it; Travel and Controls fold below.

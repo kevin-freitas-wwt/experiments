@@ -144,7 +144,48 @@ function generate( cx, cz, seed, terrain ) {
         const col = cols[ px * P + pz ], x = ox + px, z = oz + pz;
         if ( col.h > col.sea + 1 && hash2( x, z, seed + 99 ) < DENSITY[ col.biome ] ) stampTree( vol, px, pz, col.h, col.biome, x, z, seed );
     }
+    stampRuins( vol, cols, cx, cz, seed );
     return { vol, cols };
+}
+
+// Ruins, sparse and seeded, on any solid ground: cairns on high or bare ground (a stone ring and a stack),
+// monoliths (a basalt pillar, one or two blocks square, nine to fourteen tall) and crashed hulls (a plate-and-
+// panel wreck seven long, half sunk, torn open) once in a few hundred chunks. Blocks only go into air.
+function stampRuins( vol, cols, cx, cz, seed ) {
+    const ox = cx * CHUNK - PAD, oz = cz * CHUNK - PAD;
+    const set = ( px, y, pz, b ) => {
+        if ( px < 0 || pz < 0 || px >= P || pz >= P || y < 0 || y >= HEIGHT ) return;
+        const i = ( px * P + pz ) * HEIGHT + y;
+        if ( vol[ i ] === AIR ) vol[ i ] = b;
+    };
+    const land = ( px, pz ) => { const c = cols[ px * P + pz ]; return c && c.h > c.sea + 1 && c.biome !== 14 ? c : null; };
+    for ( let px = PAD; px < P - PAD; px++ ) for ( let pz = PAD; pz < P - PAD; pz++ ) {
+        const col = land( px, pz );
+        if ( ! col ) continue;
+        const x = ox + px, z = oz + pz, r = hash2( x, z, seed + 301 );
+        if ( r < 0.00012 && ( col.biome === 5 || col.biome === 6 || col.biome === 7 || col.biome === 15 || col.biome === 9 ) ) {
+            const h = col.h, n = 2 + Math.floor( hash2( x, z, seed + 302 ) * 3 );
+            for ( let dx = -1; dx <= 1; dx++ ) for ( let dz = -1; dz <= 1; dz++ ) if ( ( dx || dz ) && hash2( x + dx, z + dz, seed + 303 ) < 0.7 ) set( px + dx, h + 1, pz + dz, hash2( x + dx, z + dz, seed + 304 ) < 0.5 ? STONE : GRAVEL );
+            for ( let y = 1; y <= n; y++ ) set( px, h + y, pz, STONE );
+        } else if ( r > 0.99997 ) {
+            const h = col.h, tall = 9 + Math.floor( hash2( x, z, seed + 305 ) * 6 ), wide = hash2( x, z, seed + 306 ) < 0.4 ? 2 : 1;
+            for ( let dx = 0; dx < wide; dx++ ) for ( let dz = 0; dz < wide; dz++ ) for ( let y = -2; y <= tall; y++ ) set( px + dx, h + y, pz + dz, BASALT );
+        }
+    }
+    // One hull per chunk at most, and rarely: centred, so its seven blocks stay inside the padding.
+    if ( hash2( cx, cz, seed + 310 ) < 0.004 ) {
+        const px = PAD + Math.floor( CHUNK / 2 ), pz = PAD + Math.floor( CHUNK / 2 ), col = land( px, pz );
+        if ( col ) {
+            const along = hash2( cx, cz, seed + 311 ) < 0.5, h = col.h - 1, hs = seed + cx * 7 + cz * 13;
+            for ( let a = -3; a <= 3; a++ ) for ( let t = -1; t <= 1; t++ ) for ( let y = 0; y <= 2; y++ ) {
+                const edge = Math.abs( t ) === 1 || y === 0 || y === 2 || Math.abs( a ) === 3;
+                if ( ! edge ) continue;
+                if ( hash3( a, y, t, hs ) < ( a > 1 ? 0.45 : 0.12 ) ) continue;
+                const dx = along ? a : t, dz = along ? t : a, lift = Math.round( ( a + 3 ) * 0.35 );
+                set( px + dx, h + y + lift, pz + dz, hash3( a, y, t, hs + 1 ) < 0.3 ? PANEL : PLATE );
+            }
+        }
+    }
 }
 
 const DIRS = [
@@ -529,7 +570,7 @@ function ship( { seed, cls = 'small' } ) {
     } );
 }
 
-function station( { seed } ) {
+function station( { seed, dead } ) {
     const N = 60, H = 26, c = N / 2, cy = H / 2;
     const grid = new Uint8Array( N * H * N );
     const put = ( x, y, z, k ) => { if ( x >= 0 && x < N && y >= 0 && y < H && z >= 0 && z < N ) grid[ ( z * N + x ) * H + y ] = k; };
@@ -565,10 +606,17 @@ function station( { seed } ) {
         }
     }
     for ( let y = 0; y < H; y++ ) for ( let dx = -1; dx <= 1; dx++ ) for ( let dz = -1; dz <= 1; dz++ ) put( c + dx, y, c + dz, 1 );
-    const colors = { 1: hull, 2: [ 0x1e, 0x2c, 0x4a ], 3: [ 0xff, 0xb0, 0x50 ] };
+    const colors = dead ? { 1: hull.map( ( c0 ) => c0 * 0.45 ), 2: [ 0x1a, 0x1c, 0x22 ], 3: [ 0x3a, 0x30, 0x28 ] } : { 1: hull, 2: [ 0x1e, 0x2c, 0x4a ], 3: [ 0xff, 0xb0, 0x50 ] };
+    // A dead station is dark, holed, and missing a wedge of its ring.
+    const gone = dead ? hash2( seed, 8, 9 ) * Math.PI * 2 : -1;
     return meshVolume( N, H, N, ( x, y, z ) => {
         const k = grid[ ( z * N + x ) * H + y ];
         if ( ! k ) return null;
+        if ( dead ) {
+            const a = Math.atan2( z - c + 0.5, x - c + 0.5 ), rr = Math.hypot( x - c + 0.5, z - c + 0.5 );
+            if ( rr > 9 && Math.abs( ( ( a - gone + Math.PI * 3 ) % ( Math.PI * 2 ) ) - Math.PI ) < 0.45 ) return null;
+            if ( hash3( x, y, z, seed + 12 ) < 0.07 ) return null;
+        }
         const j = 0.9 + hash3( x, y, z, seed + 1 ) * 0.2;
         return colors[ k ].map( ( c0 ) => c0 * j );
     } );
