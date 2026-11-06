@@ -1,5 +1,5 @@
 import { fbm3 } from './noise.js';
-import { PALETTE, STONE, GRASS, SAND, WATER, SNOW, LEAF, TUNDRA, CLAY, ICE, BASALT, LAVA, RUST, GRAVEL } from './blocks.js';
+import { PALETTE, STONE, GRASS, SAND, WATER, SNOW, LEAF, NEEDLE, TUNDRA, CLAY, ICE, BASALT, LAVA, RUST, GRAVEL } from './blocks.js';
 
 const mix = ( a, b, t ) => a.map( ( c, i ) => c + ( b[ i ] - c ) * t );
 
@@ -14,20 +14,25 @@ export const KINDS = {
     gas:   { amp: 0.025, freq: 1.8, sea: true, seaLevel: -0.15, atmosphere: { horizon: 0xb9ad62, zenith: 0x4f4b2c }, deck: true },
 };
 
-const SHORE = 0.03;
 
 // Biome ids match blocks.js BIOMES and the worker's surface() stack.
-export function classify( kind, k, v, e, seed ) {
+export function classify( kind, k, v, e, seed, radius = 4000 ) {
     const wet = k.sea && e < k.seaLevel;
-    const shore = k.sea && ! wet && e < k.seaLevel + SHORE;
+    const relief = reliefOf( k, radius ), above = ( e - k.seaLevel ) * relief;
+    // Beaches are a few metres of height whatever the world's size, and nothing grows within twelve.
+    const shore = k.sea && ! wet && above < 7;
     const patch = fbm3( v[ 0 ] * 6 + 3, v[ 1 ] * 6, v[ 2 ] * 6, seed + 21, 3 );
-    const polar = Math.abs( v[ 1 ] ) > 0.86 + e * 0.3;
+    const lat = Math.abs( v[ 1 ] ), polar = lat > 0.86 + e * 0.3;
     if ( kind === 'lush' ) {
         if ( wet ) return 0;
         if ( shore ) return 1;
         if ( e > 0.42 || polar ) return 8;
         if ( e > 0.3 ) return 7;
-        return patch > 0.05 ? 3 : 2;
+        // Deserts where a slow moisture noise runs dry, most readily in the subtropics; tundra and taiga toward the poles.
+        const moist = fbm3( v[ 0 ] * 1.6 + 90, v[ 1 ] * 1.6, v[ 2 ] * 1.6, seed + 43, 3 ) + 0.16 * Math.min( 1, Math.abs( lat - 0.4 ) / 0.3 );
+        if ( moist < -0.2 && above > 12 ) return 4;
+        if ( lat > 0.7 - e * 0.2 && above > 12 ) return patch > 0.05 ? 6 : 5;
+        return patch > 0.05 && above > 12 ? 3 : 2;
     }
     if ( kind === 'icy' ) return wet ? 12 : ( e > 0.38 ? 7 : 10 );
     if ( kind === 'ember' || kind === 'gas' ) return wet ? 11 : 9;
@@ -39,7 +44,7 @@ export function classify( kind, k, v, e, seed ) {
 const AO = 0.88, dim = ( c, f = AO ) => c.map( ( v ) => v * f );
 const BIOME_RGB = {
     0: mix( PALETTE[ WATER ], PALETTE[ GRAVEL ], 0.12 ), 1: dim( PALETTE[ SAND ] ), 2: dim( PALETTE[ GRASS ] ), 3: dim( mix( PALETTE[ GRASS ], PALETTE[ LEAF ], 0.9 ), 0.8 ),
-    4: dim( mix( PALETTE[ SAND ], PALETTE[ CLAY ], 0.3 ) ), 7: dim( mix( PALETTE[ STONE ], PALETTE[ TUNDRA ], 0.25 ) ), 8: dim( PALETTE[ SNOW ] ),
+    4: dim( mix( PALETTE[ SAND ], PALETTE[ CLAY ], 0.3 ) ), 5: dim( PALETTE[ TUNDRA ] ), 6: dim( mix( PALETTE[ TUNDRA ], PALETTE[ NEEDLE ], 0.7 ), 0.8 ), 7: dim( mix( PALETTE[ STONE ], PALETTE[ TUNDRA ], 0.25 ) ), 8: dim( PALETTE[ SNOW ] ),
     9: dim( mix( PALETTE[ BASALT ], PALETTE[ RUST ], 0.3 ) ), 10: dim( PALETTE[ SNOW ] ), 11: mix( PALETTE[ LAVA ], PALETTE[ BASALT ], 0.14 ), 12: dim( PALETTE[ ICE ] ),
     15: dim( mix( PALETTE[ STONE ], PALETTE[ GRAVEL ], 0.35 ) ),
 };
@@ -65,6 +70,6 @@ export function surfaceAt( kind, k, v, seed, radius, octaves ) {
     }
     const wet = k.sea && e < k.seaLevel;
     const r = radius + ( wet ? k.seaLevel : e ) * reliefOf( k, radius );
-    const biome = classify( kind, k, v, e, seed );
+    const biome = classify( kind, k, v, e, seed, radius );
     return { r, rgb: BIOME_RGB[ biome ], biome, e };
 }

@@ -87,7 +87,7 @@ function planetColumn( t ) {
     };
 }
 
-const DENSITY = [ 0, 0, 0.007, 0.08, 0.004, 0.001, 0.05, 0.012, 0, 0, 0, 0, 0, 0, 0, 0 ];
+const DENSITY = [ 0, 0, 0.007, 0.08, 0, 0.001, 0.05, 0.012, 0, 0, 0, 0, 0, 0, 0, 0 ];
 
 function stampTree( vol, px, pz, h, biome, x, z, seed ) {
     const r = hash2( x, z, seed + 77 );
