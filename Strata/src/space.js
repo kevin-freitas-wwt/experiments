@@ -177,22 +177,41 @@ class System {
 
     // Moons: ordinary bodies (same detail levels, shells and tiles) that orbit a planet beyond its rings,
     // once every 10 to 40 minutes. Bigger planets carry more; a moon is a twentieth to a sixth of its host.
+    // About one world in eight over 5 km is a double planet: a companion more than half its size, close in
+    // and tidally locked, with any moons beyond it. A third of moons ride eccentric orbits (faster near the
+    // host, slower far out) and most keep one face to their host.
     makeMoons() {
         const planets = this.bodies.slice();
         let i = planets.length;
+        const orbitOf = ( host, orbitR, radius, locked ) => {
+            const plane = new THREE.Vector3( this.rnd( host.i, 71 ) - 0.5, 1, this.rnd( host.i, 72 ) - 0.5 ).normalize();
+            const orbit = { host, orbitR, angle: this.rnd( i, 5 ) * Math.PI * 2, tilt: Math.acos( plane.y ) * ( this.rnd( i, 6 ) < 0.5 ? 1 : -1 ), e: this.rnd( i, 11 ) < 0.33 ? 0.08 + this.rnd( i, 12 ) * 0.27 : 0, locked };
+            orbit.omega = Math.min( ( 2 * Math.PI ) / ( 600 + this.rnd( i, 9 ) * 1800 ), 60 / ( orbitR * ( 1 + orbit.e ) ) ) * ( this.rnd( i, 10 ) < 0.85 ? 1 : -1 );
+            return orbit;
+        };
+        const place = ( host, orbit, radius, twin ) => {
+            const pos = this.space.orbitPoint( orbit, orbit.angle, new THREE.Vector3() );
+            const body = this.addBody( i, this.planetKind( host.q, radius ), host.q, radius, pos );
+            body.orbit = orbit; orbit.twin = twin;
+            this.moons.push( body );
+            i++;
+            return body;
+        };
         for ( const host of planets ) {
+            let inner = Math.max( host.size * 2.6, host.rings ? host.rings.outer * 1.4 : 0 );
+            if ( host.size >= 5000 && host.kind !== 'gas' && this.rnd( host.i, 73 ) < 0.12 ) {
+                const radius = host.radius * ( 0.55 + this.rnd( i, 3 ) * 0.4 );
+                const orbit = orbitOf( host, inner + radius * 3.5, radius, true );
+                orbit.e = Math.min( orbit.e, 0.1 );
+                place( host, orbit, radius, true );
+                inner = orbit.orbitR * ( 1 + orbit.e ) + radius * 4;
+            }
             if ( host.size < 8000 ) continue;
             const roll = this.rnd( host.i, 70 ), n = roll < 0.4 ? 0 : roll < 0.8 ? 1 : host.size > 30000 ? ( host.kind === 'gas' ? 4 : 3 ) : 2;
-            const inner = Math.max( host.size * 2.6, host.rings ? host.rings.outer * 1.4 : 0 );
-            const plane = new THREE.Vector3( this.rnd( host.i, 71 ) - 0.5, 1, this.rnd( host.i, 72 ) - 0.5 ).normalize();
-            for ( let m = 0; m < n; m++, i++ ) {
+            for ( let m = 0; m < n; m++ ) {
                 const radius = Math.max( 700, host.radius * ( 0.05 + this.rnd( i, 3 ) * 0.11 ) );
-                const orbit = { host, orbitR: inner + host.size * ( 1.2 * m + this.rnd( i, 4 ) * 0.8 ) + radius * 3, angle: this.rnd( i, 5 ) * Math.PI * 2, tilt: Math.acos( plane.y ) * ( this.rnd( i, 6 ) < 0.5 ? 1 : -1 ) };
-                orbit.omega = Math.min( ( 2 * Math.PI ) / ( 600 + this.rnd( i, 9 ) * 1800 ), 60 / orbit.orbitR ) * ( this.rnd( i, 10 ) < 0.85 ? 1 : -1 );
-                const pos = this.space.orbitPoint( orbit, orbit.angle, new THREE.Vector3() );
-                const body = this.addBody( i, this.planetKind( host.q, radius ), host.q, radius, pos );
-                body.orbit = orbit;
-                this.moons.push( body );
+                const orbit = orbitOf( host, inner + host.size * ( 1.2 * m + this.rnd( i, 4 ) * 0.8 ) + radius * 3, radius, this.rnd( i, 13 ) < 0.7 || m === 0 );
+                place( host, orbit, radius, false );
             }
         }
     }
@@ -473,8 +492,10 @@ export class Space {
         return best && best.rock;
     }
 
+    // Position on a (possibly eccentric) orbit at true anomaly `angle`: r = a(1 - e^2) / (1 + e cos angle).
     orbitPoint( o, angle, out ) {
-        return out.set( Math.cos( angle ) * o.orbitR, Math.sin( angle ) * o.orbitR * Math.sin( o.tilt ), Math.sin( angle ) * o.orbitR * Math.cos( o.tilt ) ).add( o.host.pos );
+        const e = o.e || 0, r = o.orbitR * ( 1 - e * e ) / ( 1 + e * Math.cos( angle ) );
+        return out.set( Math.cos( angle ) * r, Math.sin( angle ) * r * Math.sin( o.tilt ), Math.sin( angle ) * r * Math.cos( o.tilt ) ).add( o.host.pos );
     }
 
     nearestStation( pos ) {
@@ -530,8 +551,14 @@ export class Space {
         for ( const sys of this.systems.values() ) {
             sys.star.material.opacity = ( sys.home ? 0.35 + space * 0.65 : 1 ) * ( sys === this.lit ? 1 : 1 - ( this.skyVeil || 0 ) );
             for ( const b of sys.bodies ) {
-                b.group.rotation.y += b.spin * dt;
-                if ( b.orbit ) { b.orbit.angle += b.orbit.omega * dt; this.orbitPoint( b.orbit, b.orbit.angle, b.pos ); b.group.position.copy( b.pos ); }
+                if ( b.orbit ) {
+                    // Equal areas in equal times: the angular rate scales with (a / r)^2 on an eccentric orbit.
+                    const o = b.orbit, e = o.e || 0, ra = ( 1 + e * Math.cos( o.angle ) ) / ( 1 - e * e );
+                    o.angle += o.omega * ra * ra * dt;
+                    this.orbitPoint( o, o.angle, b.pos ); b.group.position.copy( b.pos );
+                    // Tidally locked: the same face turns toward the host as the moon goes round.
+                    if ( o.locked ) { const dx = o.host.pos.x - b.pos.x, dz = o.host.pos.z - b.pos.z; b.group.rotation.y = Math.atan2( -dz, dx ); } else b.group.rotation.y += b.spin * dt;
+                } else b.group.rotation.y += b.spin * dt;
                 if ( b.cloud ) {
                     const sl = b.cloud.mat.uniforms.sunLocal.value.copy( sys.starPos ).sub( b.pos ).normalize().applyQuaternion( TMPQ.copy( b.group.quaternion ).invert() );
                     if ( b.decks ) for ( const deck of b.decks ) deck.mat.uniforms.sunLocal.value.copy( sl );
