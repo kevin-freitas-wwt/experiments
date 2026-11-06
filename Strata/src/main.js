@@ -635,6 +635,7 @@ function frame() {
     ambient.intensity = ( player.shell.interior ? 2.2 : 0.6 ) * ( 0.4 + 0.6 * day );
     space.night = 1 - day;
     sky.position.copy( camera.position );
+    space.stars.position.copy( camera.position ); // after the camera is placed, so the star shell never lags it
     const under = player.eyeInWater();
     tint.classList.toggle( 'on', under );
     hudTimer += dt;

@@ -485,7 +485,8 @@ export class Space {
         const g = new THREE.BufferGeometry();
         g.setAttribute( 'position', new THREE.BufferAttribute( pos, 3 ) );
         g.setAttribute( 'color', new THREE.BufferAttribute( col, 3 ) );
-        this.starMat = new THREE.PointsMaterial( { size: 2.2, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0, depthWrite: false } );
+        // Soft round sprites rather than bare pixels: a hard 2 px square snaps to the pixel grid as the view turns and reads as jitter.
+        this.starMat = new THREE.PointsMaterial( { size: 4, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0, depthWrite: false, map: this.glow, blending: THREE.AdditiveBlending } );
         this.stars = new THREE.Points( g, this.starMat );
         this.stars.frustumCulled = false;
         this.scene.add( this.stars );
@@ -522,7 +523,6 @@ export class Space {
 
     update( dt, camPos, space ) {
         this.starMat.opacity = Math.max( space * space, ( this.night || 0 ) ** 2 * 0.85 );
-        this.stars.position.copy( camPos );
         const ahead = new THREE.Vector3();
         for ( const sys of this.systems.values() ) {
             sys.star.material.opacity = ( sys.home ? 0.35 + space * 0.65 : 1 ) * ( sys === this.lit ? 1 : 1 - ( this.skyVeil || 0 ) );
