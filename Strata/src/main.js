@@ -11,6 +11,7 @@ import { BIOMES, SEA, CHUNK, spawnOf } from './blocks.js';
 import { tickFades, hole, tileEdge, waterTime, terrainNow, haze, reflection, WATER_MATS, oceanMat } from './materials.js';
 import { KINDS } from './planet.js';
 import { cloudTime, cloudAt, homeClouds } from './clouds.js';
+import { is as key, buildControls } from './keys.js';
 
 const params = new URLSearchParams( location.search );
 const seedWord = params.get( 'seed' ) || randomWord();
@@ -110,8 +111,13 @@ document.getElementById( 'enter' ).addEventListener( 'click', () => {
         return;
     }
     overlay.classList.add( 'hidden' );
-    canvas.requestPointerLock();
+    lockPointer();
 } );
+// Chrome refuses a new lock for about a second after Esc released the last one, so retry quietly until it takes.
+function lockPointer( tries = 8 ) {
+    const p = canvas.requestPointerLock();
+    if ( p && p.catch ) p.catch( () => { if ( tries > 0 && overlay.classList.contains( 'hidden' ) ) setTimeout( () => lockPointer( tries - 1 ), 300 ); } );
+}
 document.getElementById( 'crumb-spacing' ).value = String( spacing );
 document.getElementById( 'crumb-spacing' ).addEventListener( 'change', ( e ) => { crumbs.spacing = parseFloat( e.target.value ); } );
 function lookAt( target ) {
@@ -198,13 +204,15 @@ canvas.addEventListener( 'mousedown', ( e ) => {
 
 const NAV = { Digit1: [ 'planet', 0 ], Digit2: [ 'planet', 1 ], Digit3: [ 'planet', 2 ], Digit4: [ 'planet', 3 ], Digit5: [ 'planet', 4 ], Digit6: [ 'planet', 5 ], Digit7: [ 'planet', 6 ], Digit8: [ 'rock' ], Digit9: [ 'ship' ], Minus: [ 'station' ], Digit0: [ 'home' ] };
 document.addEventListener( 'keydown', ( e ) => {
+    // Esc on the start card is the same as pressing Set out; in play the browser's own Esc releases the pointer and the card returns.
+    if ( e.code === 'Escape' && ! overlay.classList.contains( 'hidden' ) && ! pose ) { e.preventDefault(); document.getElementById( 'enter' ).click(); return; }
     if ( e.repeat || ! overlay.classList.contains( 'hidden' ) ) return;
-    if ( e.code === 'KeyB' ) crumbs.toggle();
-    if ( e.code === 'KeyX' ) crumbs.clear();
+    if ( key( e.code, 'crumbs' ) ) crumbs.toggle();
+    if ( key( e.code, 'clear' ) ) crumbs.clear();
     if ( NAV[ e.code ] ) travel( ...NAV[ e.code ] );
-    if ( e.code === 'Enter' ) useAirlock();
-    if ( e.code === 'KeyP' ) snapshot();
-    if ( e.code === 'KeyK' ) document.body.classList.toggle( 'stats' );
+    if ( key( e.code, 'airlock' ) ) useAirlock();
+    if ( key( e.code, 'snapshot' ) ) snapshot();
+    if ( key( e.code, 'stats' ) ) document.body.classList.toggle( 'stats' );
 } );
 
 function snapshot() {
@@ -255,11 +263,16 @@ function buildNav( sys ) {
         const b = document.createElement( 'button' );
         b.type = 'button';
         b.innerHTML = `<kbd>${key}</kbd><span>${name}</span><small>${sub}</small>`;
-        b.addEventListener( 'click', () => { travel( ...args ); overlay.classList.add( 'hidden' ); canvas.requestPointerLock(); } );
+        b.addEventListener( 'click', () => { travel( ...args ); overlay.classList.add( 'hidden' ); lockPointer(); } );
         nav.appendChild( b );
     }
 }
 buildNav( space.home );
+buildControls( document.querySelector( '.controls' ), [
+    [ '<kbd>1</kbd>&ndash;<kbd>7</kbd> <kbd>8</kbd> <kbd>9</kbd> <kbd>-</kbd> <kbd>0</kbd>', 'jump to a planet of the nearest system, the nearest asteroid, ship or station, or home' ],
+    [ '<kbd>Esc</kbd>', 'on this card, the same as Set out; in play, back to this card' ],
+    [ 'mouse', 'look &middot; click with the ring on a planet, star, asteroid, ship or station to jump to it' ],
+] );
 
 document.getElementById( 'reroll' ).addEventListener( 'click', () => { seedInput.value = randomWord(); } );
 const radiusSelect = document.getElementById( 'radius' );

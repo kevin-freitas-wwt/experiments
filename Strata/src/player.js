@@ -1,7 +1,7 @@
 import * as THREE from 'three';
+import { bind, is } from './keys.js';
 import { SEA, isLiquid, spawnOf } from './blocks.js';
 
-const KEYS = { fwd: [ 'KeyE', 'ArrowUp' ], back: [ 'KeyD', 'ArrowDown' ], left: [ 'KeyS', 'ArrowLeft' ], right: [ 'KeyF', 'ArrowRight' ], up: [ 'KeyA' ], down: [ 'KeyZ' ] };
 
 const HALF = 0.3, TALL = 1.8, EYE = 1.62, GRAVITY = 26, JUMP = 8.6;
 
@@ -12,7 +12,7 @@ export class Player {
         this.camera = camera;
         this.shell = shell;
         this.home = shell;
-        this.keys = KEYS;
+        this.keys = bind;
         this.down = new Set();
         this.pos = new THREE.Vector3( 8, 90, 8 );
         this.vel = new THREE.Vector3();
@@ -35,7 +35,7 @@ export class Player {
         document.addEventListener( 'keydown', ( e ) => {
             if ( e.repeat ) return;
             this.down.add( e.code );
-            if ( e.code === 'KeyV' ) { this.flying = ! this.flying; this.vel.y = 0; }
+            if ( is( e.code, 'fly' ) ) { this.flying = ! this.flying; this.vel.y = 0; }
         } );
         document.addEventListener( 'keyup', ( e ) => this.down.delete( e.code ) );
         window.addEventListener( 'blur', () => this.down.clear() );
@@ -132,7 +132,7 @@ export class Player {
         if ( ghost && ! this.flying ) return;
         if ( ! high && ! ghost ) this.unstick();
         if ( high && ! this.flying ) this.vel.y = Math.max( this.vel.y, -60 );
-        const run = this.any( [ 'ShiftLeft', 'ShiftRight' ] );
+        const run = this.any( this.keys.sprint );
         const swim = this.inWater() && ! this.flying;
         let clearance;
         const radial = this.shell.radial;

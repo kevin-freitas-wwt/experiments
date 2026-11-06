@@ -335,7 +335,33 @@ body:not(.stats) #hud, body:not(.stats) #stamp-block { display: none; }
     color: var(--ink-soft);
     font-size: 11px;
 }
-.controls dt { display: flex; gap: 3px; }
+.controls dt {
+    align-items: flex-start;
+    align-self: start;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+}
+.controls .key {
+    background: var(--paper-deep);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    color: var(--ink);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    min-width: 22px;
+    padding: 2px 5px;
+    text-align: center;
+}
+.controls .key:hover, .controls .key.waiting { border-color: var(--vermilion); }
+.controls .key.waiting { color: var(--vermilion); }
+.controls .key.reset { font-family: var(--serif); letter-spacing: 0.04em; }
+.hint {
+    color: var(--ink-soft);
+    font-size: 12px;
+    margin: 0 0 8px;
+}
 .controls dd {
     color: var(--ink-soft);
     font-size: 14px;
@@ -343,6 +369,7 @@ body:not(.stats) #hud, body:not(.stats) #stamp-block { display: none; }
     padding-top: 2px;
 }
 kbd {
+    align-self: flex-start;
     background: var(--paper-deep);
     border-radius: 3px;
     font-family: var(--mono);
