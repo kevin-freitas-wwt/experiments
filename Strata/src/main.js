@@ -13,6 +13,7 @@ import { KINDS } from './planet.js';
 import { cloudTime, cloudAt, homeClouds } from './clouds.js';
 import { densityAt } from './galaxy.js';
 import { is as key, buildControls } from './keys.js';
+import { Sound } from './sound.js';
 
 const params = new URLSearchParams( location.search );
 const seedWord = params.get( 'seed' ) || randomWord();
@@ -91,6 +92,7 @@ const player = new Player( camera, home, canvas );
 const crumbs = new Crumbs( home.group, spacing );
 home.cloud = homeClouds( home.group, seed, SPAWN, SEA );
 const flares = new Flares();
+const sound = new Sound();
 const V_A = new THREE.Vector3(), V_B = new THREE.Vector3(), V_C = new THREE.Vector3();
 const shineColor = new THREE.Color(), BODY_TINT = { icy: 0xe8f0ff, lush: 0xc8d8ee, rocky: 0xd8d2c8, ember: 0xffa070, gas: 0xd8c8a0 };
 
@@ -118,6 +120,7 @@ document.getElementById( 'enter' ).addEventListener( 'click', () => {
 } );
 // Chrome refuses a new lock for about a second after Esc released the last one, so retry quietly until it takes.
 function lockPointer( tries = 8 ) {
+    sound.start();
     const p = canvas.requestPointerLock();
     if ( p && p.catch ) p.catch( () => { if ( tries > 0 && overlay.classList.contains( 'hidden' ) ) setTimeout( () => lockPointer( tries - 1 ), 300 ); } );
 }
@@ -221,6 +224,7 @@ document.addEventListener( 'keydown', ( e ) => {
     if ( key( e.code, 'airlock' ) ) useAirlock();
     if ( key( e.code, 'snapshot' ) ) snapshot();
     if ( key( e.code, 'stats' ) ) document.body.classList.toggle( 'stats' );
+    if ( key( e.code, 'mute' ) ) sound.toggleMute();
 } );
 
 function snapshot() {
@@ -529,7 +533,7 @@ function manageShells( dt ) {
 }
 
 const timer = new THREE.Timer();
-let hudTimer = 0;
+let hudTimer = 0, soundTimer = 0;
 const lastPos = new THREE.Vector3(), homePos = new THREE.Vector3( SPAWN.x, 60, SPAWN.z );
 
 function frame() {
@@ -697,6 +701,17 @@ function frame() {
             hud[ 'st-mem' ].textContent = `${m.geometries} geometries · ${m.textures} textures`;
         }
     }
+    soundTimer += dt;
+    if ( soundTimer > 0.25 ) {
+        soundTimer = 0;
+        const w = player.world, px = Math.floor( player.pos.x ), pz = Math.floor( player.pos.z ), seaY = player.shell === home ? SEA : player.shell.seaLevel;
+        let wet = 0;
+        if ( seaY !== null && seaY !== undefined && ( player.shell === home || player.shell.planet ) ) for ( let i = 0; i < 12; i++ ) { const a = i / 12 * Math.PI * 2; for ( const r of [ 6, 18, 40 ] ) { const tt = w.top( Math.floor( px + Math.cos( a ) * r ), Math.floor( pz + Math.sin( a ) * r ) ); if ( tt > 0 && tt <= seaY ) { wet += r === 6 ? 1 : r === 18 ? 0.6 : 0.3; break; } } }
+        const kind = player.shell.body ? player.shell.body.kind : 'lush';
+        const airless = player.shell.planet && ! KINDS[ kind ].atmosphere;
+        const top = w.top( px, pz ), height = top < 380 ? Math.max( 0, player.pos.y - top ) : ( player.shell === home ? Math.max( 0, player.pos.y - SEA ) : 0 );
+        sound.update( 0.25, { speed: lastPos.distanceTo( player.worldPos ) / Math.max( dt, 0.001 ), height, air: airless ? 0 : 1 - skyMat.uniforms.space.value, water: Math.min( 1, wet / 6 ), inside: !! player.shell.interior, space: skyMat.uniforms.space.value } );
+    }
     renderReflection();
     renderer.render( scene, camera );
     flares.update( dt, camera, [ ...space.systems.values() ].map( ( sys ) => {
@@ -751,4 +766,4 @@ function restoreInterior() {
 }
 frame();
 
-window.__strata = { world, home, far, space, player, crumbs, pool, seed, renderer, scene, camera, flares, reflRT, mirrorCam, travel, enterShell, leaveShell, enterInterior, exitInterior, useAirlock };
+window.__strata = { world, home, far, space, player, crumbs, pool, seed, renderer, scene, camera, flares, reflRT, mirrorCam, sound, travel, enterShell, leaveShell, enterInterior, exitInterior, useAirlock };

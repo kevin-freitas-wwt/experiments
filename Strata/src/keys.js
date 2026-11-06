@@ -14,6 +14,7 @@ export const ACTIONS = [
     { id: 'clear', keys: [ 'KeyX' ], text: 'clear the breadcrumb trail' },
     { id: 'airlock', keys: [ 'Enter' ], text: 'use an airlock: board a ship or station at its beacon, or step back out at the door' },
     { id: 'snapshot', keys: [ 'KeyP' ], text: 'save a PNG of the view, no overlays; the address bar always holds a link to where you are' },
+    { id: 'mute', keys: [ 'KeyM' ], text: 'sound on/off (wind, surf, hull, the deep)' },
     { id: 'stats', keys: [ 'KeyK' ], text: 'survey card with frame time, draw calls, triangles and worker queue (<code>?stats=1</code> starts with it on)' },
 ];
 
