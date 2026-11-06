@@ -145,12 +145,12 @@ export class Player {
             if ( space ) { const n = space.nearest( this.worldPos ); if ( n ) clearance = Math.min( clearance, Math.max( 0, n.d ) ); }
         }
         const thrusting = this.flying && ( this.any( this.keys.fwd ) || this.any( this.keys.back ) || this.any( this.keys.left ) || this.any( this.keys.right ) );
-        this.boost = thrusting ? Math.min( 8, ( this.boost || 1 ) + dt * 1.75 ) : Math.max( 1, ( this.boost || 1 ) - dt * 12 );
+        this.boost = thrusting ? Math.min( 8, ( this.boost || 1 ) + dt * ( clearance > 2e5 ? 6 : 1.75 ) ) : Math.max( 1, ( this.boost || 1 ) - dt * 12 );
         const boostK = 1 + ( this.boost - 1 ) * Math.min( 1, clearance / 6000 );
         const flySpeed = 14 * ( 1 + clearance / 120 ) * ( 1 + clearance / 30000 ) * boostK;
-        // Time as distance: inside a system flight tops out at 500 km/s; the cap only climbs toward 6000 km/s
-        // in the deep between systems, so a neighbouring sun is seconds away and the far side of the arm is minutes.
-        const cap = 500000 + 5500000 * THREE.MathUtils.smoothstep( clearance, 2e6, 3e7 );
+        // Time as distance: inside a system flight tops out at 500 km/s; clear of the outer planets the cap climbs
+        // fast toward 3000 km/s, so a neighbouring sun is a second or two away and the boost winds up quicker.
+        const cap = 500000 + 2500000 * THREE.MathUtils.smoothstep( clearance, 2e5, 1.5e6 );
         const speed = this.flying ? Math.min( cap, flySpeed * ( run ? 3 : 1 ) ) : swim ? 3 : ( run ? 9 : 5 );
         const sin = Math.sin( this.yaw ), cos = Math.cos( this.yaw );
         const cp = this.flying ? Math.cos( this.pitch ) : 1, sp = this.flying ? Math.sin( this.pitch ) : 0;

@@ -22,9 +22,9 @@ const STARS = [
     { cls: 'F', share: 0.05, lum: [ 1.6, 4.5 ], color: 0xf4f6ff, radius: 7500, name: 'white star' },
     { cls: 'A', share: 0.03, lum: [ 5, 20 ], color: 0xbfd4ff, radius: 10000, name: 'blue-white star' },
 ];
-const HZ_BASE = 3e6;
+const HZ_BASE = 300000;
 const PATCH_N = 97;
-export const CELL = 3e7;
+export const CELL = 2.4e6;
 
 const SCRATCH = new THREE.Vector3(), AIRLOCK_P = new THREE.Vector3(), TMPQ = new THREE.Quaternion();
 
@@ -81,7 +81,7 @@ class System {
         if ( ! this.home ) for ( const t of STARS ) { if ( roll < t.share ) { type = t; break; } roll -= t.share; }
         this.starType = type;
         this.lum = type.lum[ 0 ] + this.rnd( 0, 2 ) * ( type.lum[ 1 ] - type.lum[ 0 ] );
-        this.hz = this.home ? 1500000 : HZ_BASE * Math.sqrt( this.lum );
+        this.hz = this.home ? 600000 : HZ_BASE * Math.sqrt( this.lum );
         this.frost = this.hz * 2.7;
         this.starRadius = type.radius * ( 0.85 + this.rnd( 0, 3 ) * 0.3 );
         this.starColor = type.color;
@@ -107,24 +107,24 @@ class System {
 
     makeBodies() {
         const maxN = this.starType.cls === 'M' ? 7 : this.starType.cls === 'K' ? 8 : 8;
-        const n = Math.min( maxN, ( this.home ? 4 : 2 ) + Math.floor( this.rnd( 1, 1 ) * ( this.home ? 4 : 7 ) ) );
+        const n = Math.min( maxN, ( this.home ? 2 : 1 ) + Math.floor( this.rnd( 1, 1 ) * ( this.home ? 2 : 4 ) ) );
         this.rings = [];
         this.moons = [];
-        const inner = this.home ? 280000 : Math.max( this.hz * 0.22, this.starRadius * 4 );
-        const spread = this.home ? 1.6 : this.starType.cls === 'M' ? 1.6 : 1.9;
+        const inner = this.home ? 280000 : Math.max( this.hz * 0.3, this.starRadius * 6 );
+        const spread = this.home ? 2.0 : this.starType.cls === 'M' ? 2.0 : 2.3;
         const plane = new THREE.Vector3( ( this.rnd( 1, 2 ) - 0.5 ) * 0.4, 1, ( this.rnd( 1, 3 ) - 0.5 ) * 0.4 ).normalize();
         const pu = new THREE.Vector3( 1, 0, 0 ).cross( plane ).normalize(), pv = plane.clone().cross( pu );
-        // Radii on a rough power law, 1.3 km to 100 km. Orbits are spaced so no planet is wider than about
-        // 1.5 degrees from any other (forty radii apart); the home system keeps one showpiece, a 20 to 30 km
-        // ringed world 300 km out, and everything else beyond it.
+        // Radii on a rough power law, 1.3 km to 100 km. Few planets, spaced wide: at least six summed radii
+        // plus 40 km between neighbours, on a geometric ladder out to 1200 km; the home system keeps one
+        // showpiece, a 20 to 30 km ringed world 300 km out, and everything else beyond it.
         let prevDist = 0, prevR = 0;
         for ( let i = 0; i < n; i++ ) {
             const u = this.rnd( i, 3 ), big = this.rnd( i, 12 );
             const showpiece = this.home && i === 0;
             const radius = showpiece ? 20000 + u * 10000 : big < 0.12 ? 40000 + u * 60000 : big < 0.4 ? 9000 + u * 31000 : 1300 + u * 7700;
-            const gap = 40 * Math.max( prevR, radius * 2.2 ) + 40000;
+            const gap = ( prevR + radius ) * 6 + 40000;
             const dist = showpiece ? inner + u * 60000 : Math.max( inner * Math.pow( spread, i ) * ( 0.88 + this.rnd( i, 4 ) * 0.24 ), prevDist + gap );
-            if ( dist > 1.2e7 ) continue;
+            if ( dist > 1.2e6 ) continue;
             prevDist = dist; prevR = radius;
             const az = this.rnd( i, 5 ) * Math.PI * 2;
             let pos;
