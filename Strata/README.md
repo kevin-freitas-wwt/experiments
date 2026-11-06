@@ -71,7 +71,7 @@ The survey card (altitude, terrain, position, speed, nearest body, system, loade
 
 ## Sound
 
-All of it is synthesised in the browser (`sound.js`): pink noise through a wandering band-pass for a light, steady breeze wherever there is air (it does not rise with speed or height, so flight is quiet) that dies on airless worlds and in vacuum; a bright hiss in the rain; low-passed noise swelling on a slow cycle for surf, heard within a few tens of metres of water; a filtered sawtooth hum with random ticks aboard a vessel; and three slow detuned sines as a pad in the deep. `M` mutes, remembered per browser.
+All of it is synthesised in the browser (`sound.js`): pink noise through a wandering band-pass for a light, steady breeze wherever there is air (it does not rise with speed or height, so flight is quiet) that dies on airless worlds and in vacuum; a bright hiss in the rain; low-passed noise swelling on a slow cycle for surf, heard within a few tens of metres of water; and a filtered sawtooth hum with random ticks aboard a vessel. Space and airless worlds are silent. `M` mutes, remembered per browser.
 
 ## Palette
 

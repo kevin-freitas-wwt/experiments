@@ -1,8 +1,8 @@
 // Procedural ambience, no files: a light breeze wherever there is air, surf near water, a hull hum and
-// ticks aboard a vessel, a low pad in the deep, and nothing at all on an airless world.
+// ticks aboard a vessel, and nothing at all on an airless world or in vacuum.
 export class Sound {
     constructor() {
-        this.ctx = null; this.muted = false; this.level = { wind: 0, surf: 0, hull: 0, pad: 0 };
+        this.ctx = null; this.muted = false; this.level = { wind: 0, surf: 0, hull: 0, rain: 0 };
         try { this.muted = localStorage.getItem( 'strata-mute' ) === '1'; } catch {}
     }
 
@@ -34,10 +34,6 @@ export class Sound {
         const hum = ctx.createOscillator(), humF = ctx.createBiquadFilter(); hum.type = 'sawtooth'; hum.frequency.value = 55; humF.type = 'lowpass'; humF.frequency.value = 160;
         hum.connect( humF ).connect( this.hullG ).connect( this.master ); hum.start();
         this.tickG = ctx.createGain(); this.tickG.gain.value = 0; noise.connect( this.tickG ).connect( this.hullG );
-        // pad: two slow detuned sines
-        this.padG = ctx.createGain(); this.padG.gain.value = 0;
-        for ( const f of [ 41, 41.6, 82.4 ] ) { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f; g.gain.value = f > 60 ? 0.25 : 0.5; o.connect( g ).connect( this.padG ); o.start(); }
-        this.padG.connect( this.master );
         this.nextTick = 0;
     }
 
@@ -55,13 +51,12 @@ export class Sound {
         const t = this.ctx.currentTime, ease = ( node, v, tc = 0.4 ) => node.gain.setTargetAtTime( v, t, tc );
         // A gentle breeze on any world with air; it does not rise with speed or height, so flight is quiet.
         const wind = air * 0.18 * ( inside ? 0.1 : 1 );
-        this.level = { wind, surf: air * water, hull: inside ? 1 : 0, pad: Math.max( space, 1 - air ), rain: rain * air };
+        this.level = { wind, surf: air * water, hull: inside ? 1 : 0, rain: rain * air };
         ease( this.windG, wind * 0.9 );
         this.windF.frequency.setTargetAtTime( 300, t, 0.5 );
         ease( this.surfG, air * water * ( inside ? 0 : 1 ) * 0.7, 0.8 );
         ease( this.hullG, inside ? 0.35 : 0, 0.6 );
         ease( this.rainG, rain * air * ( inside ? 0.25 : 1 ) * 0.5, 1 );
-        ease( this.padG, ( inside ? 0.3 : 1 ) * Math.max( space, 1 - air ) * 0.22, 1.5 );
         if ( inside && t > this.nextTick ) { this.tickG.gain.setValueAtTime( 1.5, t ); this.tickG.gain.exponentialRampToValueAtTime( 0.001, t + 0.05 ); this.nextTick = t + 2 + Math.random() * 9; }
     }
 }
