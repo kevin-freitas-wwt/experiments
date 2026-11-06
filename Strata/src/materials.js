@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
-export const CURVE_RADIUS = 90000;
+// The old flat home world curved its ground in the shader; every world is a true sphere now, so the drop is off.
+export const CURVE_RADIUS = 1e12;
 
 // Drops vertices by d²/2R in local y, so curved meshes must carry no rotation.
 // With `edge`, fragments inside edge.r0 of edge.center are dithered away and fade in by edge.r1.

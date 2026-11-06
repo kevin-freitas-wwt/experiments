@@ -111,11 +111,9 @@ export class Player {
         return isLiquid( this.world.block( Math.floor( this.pos.x ), Math.floor( this.pos.y + EYE ), Math.floor( this.pos.z ) ) );
     }
 
+    // The home frame is open space: every world, the home one included, is a planet shell.
     get inSpace() {
-        if ( this.shell !== this.home ) return false;
-        if ( this.pos.y > 400 || this.pos.y < -400 ) return true;
-        if ( ! this.spawn ) this.spawn = spawnOf( this.home.world.seed );
-        return Math.hypot( this.pos.x - this.spawn.x, this.pos.z - this.spawn.z ) > 200000;
+        return this.shell === this.home;
     }
 
     unstick() {
@@ -139,9 +137,7 @@ export class Player {
         if ( radial ) clearance = Math.max( 0, this.pos.length() - this.shell.rock.radius - 2 );
         else if ( this.shell.planet || this.shell.interior ) clearance = Math.max( 0, this.pos.y - this.world.top( Math.floor( this.pos.x ), Math.floor( this.pos.z ) ) - 3 );
         else {
-            if ( ! this.spawn ) this.spawn = spawnOf( this.home.world.seed );
-            const onDisc = Math.hypot( this.pos.x - this.spawn.x, this.pos.z - this.spawn.z ) < 200000;
-            clearance = onDisc ? Math.max( 0, this.pos.y - SEA - 40 ) : 1e9;
+            clearance = 1e9;
             if ( space ) { const n = space.nearest( this.worldPos ); if ( n ) clearance = Math.min( clearance, Math.max( 0, n.d ) ); }
         }
         const thrusting = this.flying && ( this.any( this.keys.fwd ) || this.any( this.keys.back ) || this.any( this.keys.left ) || this.any( this.keys.right ) );

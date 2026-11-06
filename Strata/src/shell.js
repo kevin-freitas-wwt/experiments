@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { World } from './world.js';
 import { HEIGHT } from './blocks.js';
-import { KINDS, surfaceAt, octavesFor } from './planet.js';
+import { KINDS, surfaceAt, octavesFor, reliefOf } from './planet.js';
 
 export const BASE = 110;
 
@@ -25,7 +25,7 @@ export class Shell {
                 if ( r < rMin ) rMin = r;
                 if ( r > rMax ) rMax = r;
             }
-            const seaR = k.sea ? body.radius * ( 1 + k.seaLevel * k.amp * 4 ) : 0;
+            const seaR = k.sea ? body.radius + k.seaLevel * reliefOf( k, body.radius ) : 0;
             // A sea only lowers the origin if it is near enough to show inside the ring.
             if ( seaR && seaR < rMin ) rMin = Math.max( seaR, rMin - 60 );
             this.zero = rMin - 30;
@@ -38,7 +38,7 @@ export class Shell {
         } else scene.add( this.group );
         this.group.updateWorldMatrix( true, false );
         this.world = new World( this.group, pool, seed, radius, terrain );
-        this.seaLevel = terrain && KINDS[ body.kind ].sea ? Math.round( body.radius * ( 1 + KINDS[ body.kind ].seaLevel * KINDS[ body.kind ].amp * 4 ) - this.zero ) : null;
+        this.seaLevel = terrain && KINDS[ body.kind ].sea ? Math.round( body.radius + KINDS[ body.kind ].seaLevel * reliefOf( KINDS[ body.kind ], body.radius ) - this.zero ) : null;
     }
 
     get planet() {

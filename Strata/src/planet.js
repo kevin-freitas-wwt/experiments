@@ -45,6 +45,12 @@ const BIOME_RGB = {
 };
 
 // Extra noise octaves on bigger worlds so detail keeps pace with the voxel scale; every consumer uses this so they agree.
+// Vertical relief of a world: four amplitudes of its radius, capped at 4 km so big worlds roll rather than
+// stand on end (slopes come from relief over feature width, and feature width grows with the radius).
+export function reliefOf( k, radius ) {
+    return Math.min( radius * k.amp * 4, 4000 );
+}
+
 export function octavesFor( radius, base ) {
     return base + Math.max( 0, Math.round( Math.log2( radius / 4000 ) ) );
 }
@@ -58,7 +64,7 @@ export function surfaceAt( kind, k, v, seed, radius, octaves ) {
         if ( rv < RW * 2.2 ) { const t = rv < RW ? 1 : 1 - ( rv - RW ) / ( RW * 1.2 ), ease = t * t * ( 3 - 2 * t ); e += ( k.seaLevel - 0.01 - e ) * ease; }
     }
     const wet = k.sea && e < k.seaLevel;
-    const r = radius * ( 1 + ( wet ? k.seaLevel : e ) * k.amp * 4 );
+    const r = radius + ( wet ? k.seaLevel : e ) * reliefOf( k, radius );
     const biome = classify( kind, k, v, e, seed );
     return { r, rgb: BIOME_RGB[ biome ], biome, e };
 }

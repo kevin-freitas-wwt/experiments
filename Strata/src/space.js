@@ -5,7 +5,8 @@ import { addClouds } from './clouds.js';
 import { addAuroras } from './weather.js';
 import { StarField } from './starfield.js';
 import { densityAt } from './galaxy.js';
-import { KINDS as SURFACE, surfaceAt, octavesFor } from './planet.js';
+import { KINDS as SURFACE, surfaceAt, octavesFor, reliefOf } from './planet.js';
+import { SEA, spawnOf } from './blocks.js';
 import { RingField } from './rings.js';
 
 const KINDS = [ 'lush', 'icy', 'rocky', 'ember' ];
@@ -22,7 +23,7 @@ const STARS = [
     { cls: 'F', share: 0.05, lum: [ 1.6, 4.5 ], color: 0xf4f6ff, radius: 7500, name: 'white star' },
     { cls: 'A', share: 0.03, lum: [ 5, 20 ], color: 0xbfd4ff, radius: 10000, name: 'blue-white star' },
 ];
-const HZ_BASE = 300000;
+const HZ_BASE = 300000, HOME_R = 100000, HOME_LAT = 47;
 const PATCH_N = 97;
 export const CELL = 2.4e6;
 
@@ -85,7 +86,7 @@ class System {
         this.frost = this.hz * 2.7;
         this.starRadius = type.radius * ( 0.85 + this.rnd( 0, 3 ) * 0.3 );
         this.starColor = type.color;
-        this.starPos = this.home ? this.center.clone().addScaledVector( this.space.sunDir, 300000 ) : this.center.clone();
+        this.starPos = this.home ? this.center.clone().addScaledVector( this.space.sunDir, 800000 ) : this.center.clone();
         this.star = new THREE.Sprite( new THREE.SpriteMaterial( { map: this.space.glow, color: type.color, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true } ) );
         this.star.scale.setScalar( this.starRadius * ( 3 + Math.sqrt( this.lum ) ) );
         this.star.position.copy( this.starPos );
@@ -121,7 +122,7 @@ class System {
         for ( let i = 0; i < n; i++ ) {
             const u = this.rnd( i, 3 ), big = this.rnd( i, 12 );
             const showpiece = this.home && i === 0;
-            const radius = showpiece ? 20000 + u * 10000 : big < 0.12 ? 40000 + u * 60000 : big < 0.4 ? 9000 + u * 31000 : 1300 + u * 7700;
+            const radius = showpiece ? 20000 + u * 10000 : big < 0.12 ? 40000 + u * 110000 : big < 0.4 ? 9000 + u * 31000 : 1300 + u * 7700;
             const gap = ( prevR + radius ) * 6 + 40000;
             const dist = showpiece ? inner + u * 60000 : Math.max( inner * Math.pow( spread, i ) * ( 0.88 + this.rnd( i, 4 ) * 0.24 ), prevDist + gap );
             if ( dist > 1.2e6 ) continue;
@@ -146,6 +147,16 @@ class System {
                 this.rings.push( body.rings );
             }
         }
+        if ( this.home ) {
+            // The home world: a 100 km living planet whose top (straight above its centre) is the spawn shore. It
+            // does not spin; its sun circles it instead (main's homeSun), and it is tilted so the shore sits at
+            // 47 degrees north for the seasons and the snow line.
+            const sp = spawnOf( this.seed );
+            const w = this.addBody( 99, 'lush', 1, HOME_R, this.center.clone().add( new THREE.Vector3( sp.x, SEA - HOME_R, sp.z ) ) );
+            w.name = 'Home'; w.spin = 0; w.isHome = true;
+            w.group.rotation.x = ( 90 - HOME_LAT ) * Math.PI / 180;
+            this.world = w;
+        }
         this.makeMoons();
     }
 
@@ -161,7 +172,7 @@ class System {
         const body = { i, kind, q, system: this, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, size, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: Math.min( ( 2 * Math.PI ) / ( 1200 + this.rnd( i, 7 ) * 1800 ), 60 / radius ), seed: this.seed + i * 17, patch: null, patchWant: 0 };
         if ( kind !== 'rocky' && kind !== 'ember' ) {
             // The atmosphere sphere sits above the cloud shell (which is above the peaks).
-            const shellR = kind === 'gas' ? size * 1.03 : radius * ( 1 + SURFACE[ kind ].amp * 4 ) + Math.max( 1500, radius * 0.02 );
+            const shellR = kind === 'gas' ? size * 1.03 : radius + reliefOf( SURFACE[ kind ], radius ) + Math.max( 1500, radius * 0.02 );
             const rim = new THREE.Mesh( new THREE.SphereGeometry( shellR, 48, 32 ), rimMaterial( kind === 'icy' ? 0xbfe0ff : kind === 'gas' ? 0xc8bc70 : 0x7fb4ff ) );
             rim.userData.shellR = shellR;
             group.add( rim );
@@ -301,7 +312,7 @@ class System {
 
     // Home only: the sun circles the home world, so its position follows the current sun direction.
     setSunDir( dir ) {
-        this.starPos.copy( this.center ).addScaledVector( dir, 300000 );
+        this.starPos.copy( this.center ).addScaledVector( dir, 800000 );
         this.star.position.copy( this.starPos );
         this.starBall.position.copy( this.starPos );
     }
@@ -421,6 +432,21 @@ export class Space {
     }
 
     // Cached per body against the last query point: every caller in a frame asks about the same spot.
+    // The nearest low, dry ground to a world direction (a spiral out to about 20 degrees), for setting someone down.
+    landfall( body, dir ) {
+        const k = SURFACE[ body.kind ], q = body.group.quaternion, best = new THREE.Vector3(), d = new THREE.Vector3(), l = new THREE.Vector3();
+        const ref = Math.abs( dir.y ) < 0.9 ? new THREE.Vector3( 0, 1, 0 ) : new THREE.Vector3( 1, 0, 0 );
+        const u = new THREE.Vector3().crossVectors( ref, dir ).normalize(), w = new THREE.Vector3().crossVectors( u, dir );
+        for ( let i = 0; i < 400; i++ ) {
+            const r = i * 0.0009, a = i * 2.4;
+            d.copy( dir ).addScaledVector( u, Math.cos( a ) * r ).addScaledVector( w, Math.sin( a ) * r ).normalize();
+            l.copy( d ).applyQuaternion( TMPQ.copy( q ).invert() );
+            const e = surfaceAt( body.kind, k, [ l.x, l.y, l.z ], body.seed, body.radius, octavesFor( body.radius, 6 ) ).e;
+            if ( ! k.sea || ( e > k.seaLevel + 0.03 && e < k.seaLevel + 0.16 ) ) return best.copy( d );
+        }
+        return best.copy( dir );
+    }
+
     surfaceRadius( body, worldPos ) {
         const c = body.srCache || ( body.srCache = { pos: new THREE.Vector3( Infinity, 0, 0 ), bpos: new THREE.Vector3(), r: 0 } );
         if ( c.pos.distanceToSquared( worldPos ) < 0.04 && c.bpos.equals( body.pos ) ) return c.r;

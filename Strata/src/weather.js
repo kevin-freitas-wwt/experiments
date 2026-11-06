@@ -114,14 +114,3 @@ export function addAuroras( body ) {
     }
 }
 
-// The home world is a plain, so its lights hang as one wall far to the north, following you so the
-// north always has them.
-export function homeAurora( group ) {
-    const mat = auroraMaterial( true );
-    AURORA_MATS.push( mat );
-    const mesh = new THREE.Mesh( new THREE.PlaneGeometry( 120000, 14000, 64, 1 ), mat );
-    mesh.renderOrder = 3;
-    mesh.frustumCulled = false;
-    group.add( mesh );
-    return { mesh, mat };
-}

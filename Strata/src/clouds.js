@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { fbm3 } from './noise.js';
-import { KINDS } from './planet.js';
+import { KINDS, reliefOf } from './planet.js';
 import { hazed } from './materials.js';
 
 export const cloudTime = { value: 0 };
@@ -98,7 +98,7 @@ export function addClouds( body, rnd ) {
     if ( ! k.atmosphere ) return;
     if ( k.deck ) return addDecks( body, rnd );
     const cover = body.kind === 'icy' ? 0.1 + rnd * 0.4 : 0.12 + rnd * 0.6;
-    const radius = body.radius * ( 1 + k.amp * 4 ) + Math.max( 500, body.radius * 0.012 );
+    const radius = body.radius + reliefOf( k, body.radius ) + Math.max( 500, body.radius * 0.012 );
     const mat = hazed( cloudMaterial( body.seed % 1000003, cover, body.kind === 'icy' ? 0xf4f7fb : 0xffffff ) );
     const mesh = new THREE.Mesh( new THREE.SphereGeometry( radius, 72, 48 ), mat );
     mesh.renderOrder = 4;
@@ -122,14 +122,3 @@ function addDecks( body, rnd ) {
     body.cloud = body.decks[ 0 ];
 }
 
-// The home world's layer: a flat disc 1.6 km over the sea, curved down with the ground, matching the sea disc.
-export function homeClouds( group, seed, spawn, seaY ) {
-    const cover = 0.15 + ( seed % 97 ) / 97 * 0.5;
-    const mat = hazed( cloudMaterial( seed % 1000003, cover, 0xffffff, true ) );
-    const mesh = new THREE.Mesh( new THREE.RingGeometry( 1, 200000, 128, 40 ).rotateX( -Math.PI / 2 ), mat );
-    mesh.position.set( spawn.x, seaY + 1600, spawn.z );
-    mesh.renderOrder = 4;
-    mesh.frustumCulled = false;
-    group.add( mesh );
-    return { mesh, mat, cover, flat: true, y: seaY + 1600, seed: seed % 1000003 };
-}

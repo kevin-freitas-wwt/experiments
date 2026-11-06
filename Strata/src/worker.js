@@ -1,5 +1,5 @@
 import { fbm, ridged, hash2, fbm3, hash3 } from './noise.js';
-import { KINDS, surfaceAt, octavesFor } from './planet.js';
+import { KINDS, surfaceAt, octavesFor, reliefOf } from './planet.js';
 import { AIR, STONE, DIRT, GRASS, SAND, WATER, SNOW, LOG, LEAF, NEEDLE, GRAVEL, TUNDRA, CLAY, ICE, BASALT, LAVA, RUST, CLOUD,
     PLATE, PANEL, FLOOR, GLASS, LIGHT, CORE, DOOR, CHUNK, HEIGHT, SEA, PALETTE, isSolid, isLiquid, isOpaque, spawnOf } from './blocks.js';
 
@@ -70,7 +70,7 @@ const BASE = 110;
 
 function planetColumn( t ) {
     const k = KINDS[ t.planet ];
-    const seaR = k.sea ? t.radius * ( 1 + k.seaLevel * k.amp * 4 ) : -1;
+    const seaR = k.sea ? t.radius + k.seaLevel * reliefOf( k, t.radius ) : -1;
     const { up, u, w } = t;
     return ( x, z ) => {
         const d = [ up[ 0 ] * t.radius + u[ 0 ] * x + w[ 0 ] * z, up[ 1 ] * t.radius + u[ 1 ] * x + w[ 1 ] * z, up[ 2 ] * t.radius + u[ 2 ] * x + w[ 2 ] * z ];
@@ -79,7 +79,7 @@ function planetColumn( t ) {
         const cosA = d[ 0 ] * up[ 0 ] + d[ 1 ] * up[ 1 ] + d[ 2 ] * up[ 2 ];
         const sea = seaR > 0 ? Math.round( cosA * seaR - t.zero ) : -1;
         const wet = seaR > 0 && e < k.seaLevel;
-        const floor = wet ? Math.max( seaR - 14, t.radius * ( 1 + e * k.amp * 4 ) ) : r;
+        const floor = wet ? Math.max( seaR - 14, t.radius + e * reliefOf( k, t.radius ) ) : r;
         let h = Math.round( cosA * floor - t.zero );
         if ( wet ) h = Math.min( h, sea - 2 );
         h = Math.max( 1, Math.min( HEIGHT - 12, h ) );
@@ -330,7 +330,7 @@ function tile( { x0, z0, size, step, seed, terrain } ) {
     const n = size / step + 1;
     const pos = new Float32Array( n * n * 3 ), col = new Uint8Array( n * n * 3 );
     const k = terrain ? KINDS[ terrain.planet ] : null, oct = terrain ? octavesFor( terrain.radius, 8 ) : 0;
-    const seaR = k && k.sea ? terrain.radius * ( 1 + k.seaLevel * k.amp * 4 ) : -1;
+    const seaR = k && k.sea ? terrain.radius + k.seaLevel * reliefOf( k, terrain.radius ) : -1;
     let i = 0;
     for ( let gz = 0; gz < n; gz++ ) for ( let gx = 0; gx < n; gx++ ) {
         const x = x0 + gx * step, z = z0 + gz * step;
@@ -342,7 +342,7 @@ function tile( { x0, z0, size, step, seed, terrain } ) {
             const { r, biome, e } = surfaceAt( terrain.planet, k, d, seed, radius, oct );
             wet = seaR > 0 && e < k.seaLevel;
             const rr = wet ? seaR : r;
-            bedDepth = wet ? seaR - Math.max( seaR - 14, radius * ( 1 + e * k.amp * 4 ) ) : 0;
+            bedDepth = wet ? seaR - Math.max( seaR - 14, radius + e * reliefOf( k, radius ) ) : 0;
             pos[ i * 3 ] = d[ 0 ] * rr; pos[ i * 3 + 1 ] = d[ 1 ] * rr; pos[ i * 3 + 2 ] = d[ 2 ] * rr;
             c = { biome };
             liquid = terrain.planet === 'ember' ? LAVA : terrain.planet === 'icy' ? ICE : WATER;

@@ -1,6 +1,18 @@
 import * as THREE from 'three';
-import { gridIndex } from './far.js';
 import { planetTileMat, fadeIn, fadeOut } from './materials.js';
+
+const N = 33;
+// Shared triangle index for an N x N heightfield tile.
+export function gridIndex() {
+    const idx = new Uint16Array( ( N - 1 ) * ( N - 1 ) * 6 );
+    let i = 0;
+    for ( let z = 0; z < N - 1; z++ ) for ( let x = 0; x < N - 1; x++ ) {
+        const a = z * N + x, b = a + 1, c = a + N, d = c + 1;
+        idx.set( [ a, c, b, b, c, d ], i );
+        i += 6;
+    }
+    return new THREE.BufferAttribute( idx, 1 );
+}
 
 const SIZE = 256, STEP = 8;
 
