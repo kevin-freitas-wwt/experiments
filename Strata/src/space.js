@@ -24,7 +24,7 @@ const STARS = [
 ];
 const HZ_BASE = 3e6;
 const PATCH_N = 97;
-export const CELL = 6e7;
+export const CELL = 3e7;
 
 const SCRATCH = new THREE.Vector3(), AIRLOCK_P = new THREE.Vector3(), TMPQ = new THREE.Quaternion();
 
@@ -124,7 +124,7 @@ class System {
             const radius = showpiece ? 20000 + u * 10000 : big < 0.12 ? 40000 + u * 60000 : big < 0.4 ? 9000 + u * 31000 : 1300 + u * 7700;
             const gap = 40 * Math.max( prevR, radius * 2.2 ) + 40000;
             const dist = showpiece ? inner + u * 60000 : Math.max( inner * Math.pow( spread, i ) * ( 0.88 + this.rnd( i, 4 ) * 0.24 ), prevDist + gap );
-            if ( dist > 2.5e7 ) continue;
+            if ( dist > 1.2e7 ) continue;
             prevDist = dist; prevR = radius;
             const az = this.rnd( i, 5 ) * Math.PI * 2;
             let pos;
@@ -282,12 +282,13 @@ class System {
         const nSt = hosts.length ? Math.floor( this.rnd( 5, 1 ) * Math.min( 5, hosts.length + 1 ) ) + ( this.home ? 1 : 0 ) : 0;
         for ( let i = 0; i < nSt; i++ ) {
             const host = hosts[ i % hosts.length ];
-            const st = { i, host, system: this, name: `${host.name} Station`, group: new THREE.Group(), mesh: null, voxel: 7 + this.rnd( i, 50 ) * 3, seed: this.seed * 11 + i,
+            const dead = i > 0 && this.rnd( i, 55 ) < 0.3;
+            const st = { i, host, system: this, name: dead ? `wreck of ${host.name} Station` : `${host.name} Station`, dead, group: new THREE.Group(), mesh: null, voxel: 7 + this.rnd( i, 50 ) * 3, seed: this.seed * 11 + i,
                 orbitR: ( host.size || host.radius ) * ( 1.9 + this.rnd( i, 51 ) * 0.5 ), angle: this.rnd( i, 52 ) * Math.PI * 2, tilt: ( this.rnd( i, 53 ) - 0.5 ) * 0.8, spin: 0.015 + this.rnd( i, 54 ) * 0.02 };
             st.omega = 25 / st.orbitR;
             this.scene.add( st.group );
             this.stations.push( st );
-            this.pool.submit( { type: 'station', seed: st.seed }, { priority: 45, tag: 'ship' } ).then( ( data ) => {
+            this.pool.submit( { type: 'station', seed: st.seed, dead }, { priority: 45, tag: 'ship' } ).then( ( data ) => {
                 if ( this.disposed ) return;
                 const m = new THREE.Mesh( voxelGeometry( data ), rockMat );
                 m.scale.setScalar( st.voxel );
@@ -351,11 +352,11 @@ export class Space {
         return new THREE.Vector3( ( i + 0.5 + ( h( 1 ) - 0.5 ) * 0.5 ) * CELL, ( j + ( h( 2 ) - 0.5 ) * 0.3 ) * CELL, ( k + 0.5 + ( h( 3 ) - 0.5 ) * 0.5 ) * CELL ).sub( this.offset );
     }
 
-    // A cell holds a system with a probability set by the galaxy's density there (about one cell in three at home).
+    // A cell holds a system with a probability set by the galaxy's density there (about one cell in two at home).
     hasSystem( i, j, k ) {
         if ( i === 0 && j === 0 && k === 0 ) return true;
         const c = this.cellCenter( i, j, k ), d = densityAt( c.x + this.offset.x, c.y + this.offset.y, c.z + this.offset.z, this.seed );
-        return hash2( i * 73 + j * 31 + k * 17, 9, this.seed + 5 ) < Math.min( 0.85, 0.3 * d );
+        return hash2( i * 73 + j * 31 + k * 17, 9, this.seed + 5 ) < Math.min( 0.9, 0.45 * d );
     }
 
     loadSystem( i, j, k, home = false ) {
@@ -373,7 +374,7 @@ export class Space {
         const wanted = new Set();
         for ( let i = ci - 2; i <= ci + 2; i++ ) for ( let j = cj - 2; j <= cj + 2; j++ ) for ( let k = ck - 2; k <= ck + 2; k++ ) {
             const c = this.cellCenter( i, j, k );
-            if ( ( c.distanceTo( camPos ) < CELL * 1.1 || ( i === 0 && j === 0 && k === 0 ) ) && this.hasSystem( i, j, k ) ) { wanted.add( `${i},${j},${k}` ); this.loadSystem( i, j, k ); }
+            if ( ( c.distanceTo( camPos ) < CELL * 2 || ( i === 0 && j === 0 && k === 0 ) ) && this.hasSystem( i, j, k ) ) { wanted.add( `${i},${j},${k}` ); this.loadSystem( i, j, k ); }
         }
         for ( const [ key, sys ] of this.systems ) if ( ! wanted.has( key ) && ! sys.home ) { sys.dispose(); this.systems.delete( key ); }
         this.homeLoaded = wanted.has( '0,0,0' );
@@ -582,6 +583,7 @@ export class Space {
                 st.angle += st.omega * dt;
                 this.orbitPoint( st, st.angle, st.group.position );
                 st.group.rotation.y += st.spin * dt;
+                if ( st.dead ) st.group.rotation.x += st.spin * 0.6 * dt; // a wreck tumbles
             }
             for ( const r of sys.rocks ) if ( r.mesh ) { r.rot.x += r.spin.x * dt; r.rot.y += r.spin.y * dt; r.rot.z += r.spin.z * dt; r.mesh.rotation.copy( r.rot ); r.frame.rotation.copy( r.rot ); }
             for ( const rg of sys.rings ) rg.tick( dt );
