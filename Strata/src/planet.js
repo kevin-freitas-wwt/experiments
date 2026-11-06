@@ -7,7 +7,7 @@ const mix = ( a, b, t ) => a.map( ( c, i ) => c + ( b[ i ] - c ) * t );
 // so the smooth sphere, the high-res patch and the voxel shell agree.
 export const KINDS = {
     rocky: { amp: 0.06, freq: 2.2, sea: false, atmosphere: null },
-    lush:  { amp: 0.04, freq: 2.6, sea: true, seaLevel: 0.1, atmosphere: { horizon: 0xdfe8f2, zenith: 0x4f86c6 } },
+    lush:  { amp: 0.04, freq: 2.6, sea: true, seaLevel: 0.1, rivers: true, atmosphere: { horizon: 0xdfe8f2, zenith: 0x4f86c6 } },
     icy:   { amp: 0.03, freq: 3.0, sea: true, seaLevel: -0.2, atmosphere: { horizon: 0xeef3f6, zenith: 0x7f9fbf } },
     ember: { amp: 0.07, freq: 2.0, sea: true, seaLevel: -0.3, atmosphere: null },
     // A gas giant's solid core: dim, hot, lava seas under tens of kilometres of sickly cloud. Its visible size is the deck above.
@@ -52,6 +52,11 @@ export function octavesFor( radius, base ) {
 export function surfaceAt( kind, k, v, seed, radius, octaves ) {
     let e = fbm3( v[ 0 ] * k.freq + 10, v[ 1 ] * k.freq, v[ 2 ] * k.freq, seed, octaves );
     if ( kind === 'rocky' ) e -= 0.08 * Math.max( 0, 1 - 30 * Math.abs( fbm3( v[ 0 ] * 5, v[ 1 ] * 5, v[ 2 ] * 5, seed + 3, 2 ) ) );
+    if ( k.rivers && e > k.seaLevel - 0.02 && e < k.seaLevel + 0.14 ) {
+        // Rivers on living worlds: zero crossings of a slow noise, cut just below the sea so it fills them.
+        const rv = Math.abs( fbm3( v[ 0 ] * 2.6 + 40, v[ 1 ] * 2.6, v[ 2 ] * 2.6, seed + 53, 3 ) ), RW = 0.006;
+        if ( rv < RW * 2.2 ) { const t = rv < RW ? 1 : 1 - ( rv - RW ) / ( RW * 1.2 ), ease = t * t * ( 3 - 2 * t ); e += ( k.seaLevel - 0.01 - e ) * ease; }
+    }
     const wet = k.sea && e < k.seaLevel;
     const r = radius * ( 1 + ( wet ? k.seaLevel : e ) * k.amp * 4 );
     const biome = classify( kind, k, v, e, seed );

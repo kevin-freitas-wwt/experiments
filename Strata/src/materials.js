@@ -103,6 +103,8 @@ export const waterTime = { value: 0 };
 // Planar reflection of the scene mirrored in the current liquid plane, rendered by main each frame:
 // the texture, the mirror camera's texture matrix, and a strength main sets to 0 when there is no plane.
 export const reflection = { map: { value: null }, matrix: { value: new THREE.Matrix4() }, strength: { value: 0 } };
+// Night glow of a living sea: main sets it from darkness and the world's kind (lush only).
+export const bioGlow = { value: 0 };
 export const WATER_MATS = new Set();
 
 // Animated liquid: scrolling ripples bend the normal and sparkle the surface, in the frame's own xz (frameInv, kept
@@ -117,6 +119,7 @@ export function watery( material ) {
         shader.uniforms.reflMap = reflection.map;
         shader.uniforms.reflMatrix = reflection.matrix;
         shader.uniforms.reflStrength = reflection.strength;
+        shader.uniforms.bioGlow = bioGlow;
         shader.uniforms.frameInv = material.userData.frameInv || ( material.userData.frameInv = { value: new THREE.Matrix4() } );
         shader.vertexShader = shader.vertexShader
             .replace( '#include <common>', '#include <common>\nuniform mat4 reflMatrix; uniform mat4 frameInv; varying vec4 vRefl; varying vec2 vWaveXZ;' )
@@ -134,7 +137,7 @@ export function watery( material ) {
                     gl_FragColor.a = max( gl_FragColor.a, fres );
                 }` )
             .replace( '#include <common>', `#include <common>
-                uniform sampler2D reflMap; uniform float reflStrength; varying vec4 vRefl; varying vec2 vWaveXZ;
+                uniform sampler2D reflMap; uniform float reflStrength; uniform float bioGlow; varying vec4 vRefl; varying vec2 vWaveXZ;
                 uniform float time; varying vec2 vCurveXZ;
                 float wave( vec2 p, float t ) {
                     return sin( p.x * 1.1 + t * 1.4 ) * sin( p.y * 0.8 - t * 1.1 ) * 0.5
@@ -147,6 +150,13 @@ export function watery( material ) {
                 float cells = abs( sin( ( vWaveXZ.x * 2.3 + w0 * 2.0 ) ) * sin( ( vWaveXZ.y * 2.1 - w0 * 2.0 + time * 0.6 ) ) );
                 diffuseColor.rgb *= 0.86 + ripple * 0.22;
                 diffuseColor.rgb += vec3( 0.18, 0.2, 0.22 ) * pow( cells, 6.0 ) * ( 0.4 + 0.6 * ripple );` )
+            .replace( '#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+                if ( bioGlow > 0.001 ) {
+                    // Bioluminescence: plankton light up along the ripple crests in drifting patches.
+                    float bloom = 0.5 + 0.5 * sin( vWaveXZ.x * 0.07 + time * 0.05 ) * sin( vWaveXZ.y * 0.05 - time * 0.04 + sin( vWaveXZ.x * 0.03 ) * 2.0 );
+                    float crest = pow( ripple, 3.0 ) * ( 0.5 + 0.5 * pow( cells, 2.0 ) );
+                    totalEmissiveRadiance += vec3( 0.15, 0.9, 0.8 ) * crest * smoothstep( 0.55, 0.9, bloom ) * bioGlow * 0.45;
+                }` )
             .replace( '#include <normal_fragment_begin>', `#include <normal_fragment_begin>
                 float eps = 0.35;
                 float wx = wave( vWaveXZ + vec2( eps, 0.0 ), time ) - w0;
@@ -197,7 +207,7 @@ export function terrainMaterials() {
 // line (metres above the sea, lowered toward the poles and into the winter hemisphere) whitens upward faces
 // above it, so seasons move the snow without regenerating a block. wxUp is the frame's up for flat worlds.
 export const wx = {
-    wet: { value: 0 }, snowLine: { value: 1e9 }, season: { value: 0 }, polar: { value: 0 }, soft: { value: 40 },
+    wet: { value: 0 }, time: { value: 0 }, caustic: { value: 0 }, snowLine: { value: 1e9 }, season: { value: 0 }, polar: { value: 0 }, soft: { value: 40 },
     flat: { value: 1 }, center: { value: new THREE.Vector3() }, r: { value: 1 }, seaY: { value: 0 }, axis: { value: new THREE.Vector3( 0, 1, 0 ) }, sky: { value: new THREE.Color( 0x9fb4d6 ) },
 };
 
@@ -212,7 +222,7 @@ export function weathered( material ) {
             .replace( '#include <begin_vertex>', '#include <begin_vertex>\nvWxW = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz; vWxN = normalize( mat3( modelMatrix ) * objectNormal );' );
         shader.fragmentShader = shader.fragmentShader
             .replace( '#include <common>', `#include <common>
-                uniform float wxWet; uniform float wxSnowLine; uniform float wxSeason; uniform float wxPolar; uniform float wxSoft; uniform float wxFlat; uniform vec3 wxCenter; uniform float wxR; uniform float wxSeaY; uniform vec3 wxAxis; uniform vec3 wxSky;
+                uniform float wxWet; uniform float wxTime; uniform float wxCaustic; uniform float wxSnowLine; uniform float wxSeason; uniform float wxPolar; uniform float wxSoft; uniform float wxFlat; uniform vec3 wxCenter; uniform float wxR; uniform float wxSeaY; uniform vec3 wxAxis; uniform vec3 wxSky;
                 varying vec3 vWxW; varying vec3 vWxN;
                 float wxHash( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }
                 float wxNoise( vec2 p ) { vec2 i = floor( p ), f = fract( p ); f = f * f * ( 3.0 - 2.0 * f ); return mix( mix( wxHash( i ), wxHash( i + vec2( 1, 0 ) ), f.x ), mix( wxHash( i + vec2( 0, 1 ) ), wxHash( i + vec2( 1, 1 ) ), f.x ), f.y ); }` )
@@ -226,6 +236,13 @@ export function weathered( material ) {
                         float line = wxSnowLine + wxSeason * wxLat - wxPolar * wxLat * wxLat;
                         float snow = smoothstep( line, line + wxSoft, wxAlt + wxNoise( vWxW.xz * 0.05 + vWxW.yz * 0.03 ) * wxSoft * 0.8 ) * smoothstep( 0.35, 0.8, wxFace ) * smoothstep( 0.3, 1.5, wxAlt );
                         diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.82, 0.85, 0.9 ), snow );
+                    }
+                    if ( wxCaustic > 0.001 && wxAlt < -0.2 ) {
+                        // Caustics on the bed: two drifting noise sheets interfering, fading with depth.
+                        vec2 cp = vWxW.xz * 0.45 + vWxW.yz * 0.2;
+                        float c1 = wxNoise( cp + vec2( wxTime * 0.35, wxTime * 0.2 ) ), c2 = wxNoise( cp * 1.27 + vec2( 11.0 - wxTime * 0.3, wxTime * 0.27 ) );
+                        float caus = pow( max( 0.0, 1.0 - abs( c1 + c2 - 1.0 ) * 2.6 ), 3.0 );
+                        diffuseColor.rgb *= 1.0 + caus * wxCaustic * exp( wxAlt / 9.0 ) * 0.9 * smoothstep( 0.2, 0.7, wxFace );
                     }
                     if ( wxWet > 0.001 ) {
                         diffuseColor.rgb *= 1.0 - 0.3 * wxWet;
@@ -245,6 +262,7 @@ export const haze = {
     on: { value: 0 }, color: { value: new THREE.Color( 0xeadfca ) }, k: { value: 4.5e-5 }, h: { value: 2500 },
     center: { value: new THREE.Vector3() }, r: { value: 1 }, flat: { value: 1 }, seaY: { value: 0 }, sun: { value: new THREE.Vector3( 0, 1, 0 ) },
     zenith: { value: new THREE.Color( 0x5d73a3 ) }, top: { value: 12000 }, veil: { value: 6.3 }, fog: { value: 0 }, fogH: { value: 60 },
+    under: { value: 0 }, underColor: { value: new THREE.Color( 0x0b3340 ) }, underK: { value: 0.045 },
 };
 
 export function hazed( material ) {
@@ -258,7 +276,7 @@ export function hazed( material ) {
             .replace( '#include <begin_vertex>', '#include <begin_vertex>\nvHazeW = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;' );
         shader.fragmentShader = shader.fragmentShader
             .replace( '#include <common>', `#include <common>
-                uniform float hazeOn; uniform vec3 hazeColor; uniform float hazeK; uniform float hazeH; uniform vec3 hazeCenter; uniform float hazeR; uniform float hazeFlat; uniform float hazeSeaY; uniform vec3 hazeSun; uniform vec3 hazeZenith; uniform float hazeTop; uniform float hazeVeil; uniform float hazeFog; uniform float hazeFogH;
+                uniform float hazeOn; uniform vec3 hazeColor; uniform float hazeK; uniform float hazeH; uniform vec3 hazeCenter; uniform float hazeR; uniform float hazeFlat; uniform float hazeSeaY; uniform vec3 hazeSun; uniform vec3 hazeZenith; uniform float hazeTop; uniform float hazeVeil; uniform float hazeFog; uniform float hazeFogH; uniform float hazeUnder; uniform vec3 hazeUnderColor; uniform float hazeUnderK;
                 varying vec3 vHazeW;
                 float hazeAlt( vec3 p ) { return hazeFlat > 0.5 ? p.y - hazeSeaY : length( p - hazeCenter ) - hazeR; }
                 float hazeDepth( vec3 a, vec3 b ) {
@@ -274,7 +292,10 @@ export function hazed( material ) {
                     return tau;
                 }` )
             .replace( '#include <fog_fragment>', `#include <fog_fragment>
-                if ( hazeOn > 0.5 ) {
+                if ( hazeUnder > 0.5 ) {
+                    // Eye under the surface: a short, even murk in the liquid's colour, whatever the air is doing.
+                    gl_FragColor.rgb = mix( gl_FragColor.rgb, hazeUnderColor, 1.0 - exp( -hazeUnderK * distance( vHazeW, cameraPosition ) ) );
+                } else if ( hazeOn > 0.5 ) {
                     if ( hazeAlt( vHazeW ) > hazeTop ) {
                         // Beyond the air: the whole column's airlight lies in front, so by day the sky washes the object out.
                         vec3 camUp = hazeFlat > 0.5 ? vec3( 0.0, 1.0, 0.0 ) : normalize( cameraPosition - hazeCenter );
@@ -313,9 +334,11 @@ const fades = [];
 export function fadeIn( mesh, duration = 0.6, onDone = null, out = false ) {
     const existing = fades.find( ( f ) => f.mesh === mesh );
     const base = existing ? existing.base : mesh.material;
-    if ( existing ) { existing.m.dispose(); fades.splice( fades.indexOf( existing ), 1 ); }
+    if ( existing ) { existing.m.dispose(); WATER_MATS.delete( existing.m ); fades.splice( fades.indexOf( existing ), 1 ); }
     const m = base.clone();
     if ( base.userData.patch ) base.userData.patch( m );
+    // A fading water clone must hide from the reflection pass like its base.
+    if ( WATER_MATS.has( base ) ) WATER_MATS.add( m );
     m.alphaHash = true;
     m.opacity = out ? 1 : 0;
     if ( out ) { m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; }
@@ -336,7 +359,7 @@ export function tickFades( dt ) {
         if ( f.t < f.duration ) continue;
         if ( f.out ) f.mesh.visible = false;
         f.mesh.material = f.base;
-        f.m.dispose();
+        f.m.dispose(); WATER_MATS.delete( f.m );
         fades.splice( i, 1 );
         if ( f.onDone ) f.onDone();
     }

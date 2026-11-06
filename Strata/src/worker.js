@@ -22,6 +22,13 @@ function column( x, z, seed ) {
     const d = fbm( x / 38, z / 38, seed + 13, 3 );
     const land = smooth( 0.02, 0.3, c );
     let h = Math.round( SEA + 1 + c * 46 + m * m * m * 64 * land + d * 3 );
+    // Rivers: the zero crossings of a slow noise, cut down below the sea where the land is low enough to
+    // reach it, with banks tapering over a second band width, so the sea fills them and they wind to the coast.
+    const rv = Math.abs( fbm( x / 900 + 5, z / 900, seed + 53, 3 ) ), RW = 0.008;
+    if ( rv < RW * 2.2 && h > SEA - 2 && h < SEA + 34 ) {
+        const t = rv < RW ? 1 : 1 - ( rv - RW ) / ( RW * 1.2 ), ease = t * t * ( 3 - 2 * t );
+        h = Math.round( h + ( SEA - 3 - h ) * ease );
+    }
     h = Math.max( 2, Math.min( HEIGHT - 12, h ) );
     const t = fbm( x / 750 + 31, z / 750, seed + 29, 3 ) - ( h - SEA ) / 110;
     const w = fbm( x / 520 - 77, z / 520, seed + 41, 3 );

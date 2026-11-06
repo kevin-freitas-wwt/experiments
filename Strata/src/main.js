@@ -7,8 +7,8 @@ import { Space } from './space.js';
 import { Player } from './player.js';
 import { Crumbs } from './crumbs.js';
 import { Flares } from './flare.js';
-import { BIOMES, SEA, CHUNK, spawnOf } from './blocks.js';
-import { tickFades, hole, tileEdge, waterTime, terrainNow, haze, wx, reflection, WATER_MATS, oceanMat } from './materials.js';
+import { BIOMES, SEA, CHUNK, LAVA, spawnOf } from './blocks.js';
+import { tickFades, hole, tileEdge, waterTime, terrainNow, haze, wx, bioGlow, reflection, WATER_MATS, oceanMat } from './materials.js';
 import { Precip, homeAurora, AURORA_MATS } from './weather.js';
 import { KINDS } from './planet.js';
 import { cloudTime, cloudAt, homeClouds } from './clouds.js';
@@ -726,6 +726,13 @@ function frame() {
     space.starField.place( homeLocal );
     const under = player.eyeInWater();
     tint.classList.toggle( 'on', under );
+    // Under the surface everything sinks into the liquid's own murk; lava is a glowing red wall.
+    const eyeBlock = under ? player.world.block( Math.floor( player.pos.x ), Math.floor( player.pos.y + 1.6 ), Math.floor( player.pos.z ) ) : 0;
+    haze.under.value = under ? 1 : 0;
+    if ( under ) { const lava = eyeBlock === LAVA; haze.underColor.value.set( lava ? 0x7a2208 : 0x0b3340 ).multiplyScalar( lava ? 1 : 0.35 + 0.65 * day ); haze.underK.value = lava ? 0.4 : 0.045; tint.style.background = lava ? 'rgba(140, 50, 12, 0.5)' : ''; }
+    wx.time.value += dt;
+    wx.caustic.value = ( player.shell === home || ( player.shell.body && player.shell.body.kind === 'lush' ) ) ? day * ( 1 - 0.7 * cloudShade ) : 0;
+    bioGlow.value = ( player.shell === home || ( player.shell.body && player.shell.body.kind === 'lush' ) ) ? ( 1 - day ) * ( 1 - day ) : 0;
     hudTimer += dt;
     if ( hudTimer > 0.15 ) {
         const speed = lastPos.distanceTo( player.worldPos ) / dt;
