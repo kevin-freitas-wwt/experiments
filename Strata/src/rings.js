@@ -48,7 +48,7 @@ export class RingField {
     constructor( space, body, seed ) {
         this.space = space; this.body = body; this.seed = seed;
         const r = ( i, j ) => hash2( i, j, seed );
-        const R = body.radius;
+        const R = body.size || body.radius;
         this.normal = new THREE.Vector3( ( r( 1, 1 ) - 0.5 ) * 0.9, 1, ( r( 1, 2 ) - 0.5 ) * 0.9 ).normalize();
         this.u = new THREE.Vector3( 1, 0, 0 ).cross( this.normal ).normalize();
         this.v = new THREE.Vector3().crossVectors( this.normal, this.u );
@@ -81,7 +81,7 @@ export class RingField {
     }
 
     laneAt( rr ) {
-        const q = rr / this.body.radius;
+        const q = rr / ( this.body.size || this.body.radius );
         return this.lanes.find( ( L ) => q >= L.r0 && q <= L.r1 ) || null;
     }
 

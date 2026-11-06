@@ -10,6 +10,8 @@ export const KINDS = {
     lush:  { amp: 0.04, freq: 2.6, sea: true, seaLevel: 0.1, atmosphere: { horizon: 0xdfe8f2, zenith: 0x4f86c6 } },
     icy:   { amp: 0.03, freq: 3.0, sea: true, seaLevel: -0.2, atmosphere: { horizon: 0xeef3f6, zenith: 0x7f9fbf } },
     ember: { amp: 0.07, freq: 2.0, sea: true, seaLevel: -0.3, atmosphere: null },
+    // A gas giant's solid core: dim, hot, lava seas under tens of kilometres of sickly cloud. Its visible size is the deck above.
+    gas:   { amp: 0.025, freq: 1.8, sea: true, seaLevel: -0.15, atmosphere: { horizon: 0xb9ad62, zenith: 0x4f4b2c }, deck: true },
 };
 
 const SHORE = 0.03;
@@ -28,7 +30,7 @@ export function classify( kind, k, v, e, seed ) {
         return patch > 0.05 ? 3 : 2;
     }
     if ( kind === 'icy' ) return wet ? 12 : ( e > 0.38 ? 7 : 10 );
-    if ( kind === 'ember' ) return wet ? 11 : 9;
+    if ( kind === 'ember' || kind === 'gas' ) return wet ? 11 : 9;
     if ( polar ) return 8;
     return patch > 0.1 ? 4 : 15;
 }

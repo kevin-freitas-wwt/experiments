@@ -27,7 +27,7 @@ export const CELL = 6e7;
 
 const SCRATCH = new THREE.Vector3(), AIRLOCK_P = new THREE.Vector3(), TMPQ = new THREE.Quaternion();
 
-const PLACEHOLDER = { lush: 0x55704e, icy: 0xcfd9df, rocky: 0x7f7b73, ember: 0x4a3b36 }, placeholders = {};
+const PLACEHOLDER = { lush: 0x55704e, icy: 0xcfd9df, rocky: 0x7f7b73, ember: 0x4a3b36, gas: 0x8f8a58 }, placeholders = {};
 const placeholderMat = ( kind ) => placeholders[ kind ] || ( placeholders[ kind ] = hazed( new THREE.MeshLambertMaterial( { color: PLACEHOLDER[ kind ] } ) ) );
 
 const rimMaterial = ( color ) => new THREE.ShaderMaterial( {
@@ -101,7 +101,7 @@ class System {
         if ( q < 0.8 ) return 'rocky';
         if ( q < 1.6 ) return radius > 2400 ? 'lush' : 'rocky';
         if ( q < 2.7 ) return this.rnd( Math.round( q * 100 ), 14 ) < 0.5 ? 'rocky' : 'icy';
-        return 'icy';
+        return radius > 25000 && this.rnd( Math.round( q * 100 ), 15 ) < 0.55 ? 'gas' : 'icy';
     }
 
     makeBodies() {
@@ -121,7 +121,7 @@ class System {
             const u = this.rnd( i, 3 ), big = this.rnd( i, 12 );
             const showpiece = this.home && i === 0;
             const radius = showpiece ? 20000 + u * 10000 : big < 0.12 ? 40000 + u * 60000 : big < 0.4 ? 9000 + u * 31000 : 1300 + u * 7700;
-            const gap = 40 * Math.max( prevR, radius ) + 40000;
+            const gap = 40 * Math.max( prevR, radius * 2.2 ) + 40000;
             const dist = showpiece ? inner + u * 60000 : Math.max( inner * Math.pow( spread, i ) * ( 0.88 + this.rnd( i, 4 ) * 0.24 ), prevDist + gap );
             if ( dist > 2.5e7 ) continue;
             prevDist = dist; prevR = radius;
@@ -138,6 +138,7 @@ class System {
             const q = ( this.home ? pos.distanceTo( this.starPos ) : dist ) / this.hz;
             const kind = this.planetKind( q, radius );
             const body = this.addBody( i, kind, q, radius, pos );
+            prevR = body.size;
             if ( this.rnd( i, 8 ) < ( this.home && i === 0 ? 1 : q > 2.7 ? 0.22 : 0.05 ) ) {
                 body.rings = new RingField( this.space, body, ( this.seed * 13 + i * 101 ) % 1000003 );
                 body.ringNormal = body.rings.normal;
@@ -150,15 +151,17 @@ class System {
     addBody( i, kind, q, radius, pos ) {
         const group = new THREE.Group();
         group.position.copy( pos );
+        // A gas giant's visible size is its cloud top; the rocky core (radius) sits far below.
+        const size = kind === 'gas' ? radius * ( 1.6 + this.rnd( i, 16 ) * 0.5 ) : radius;
         // Placeholder until the first detail level arrives: a flat tint of the kind, so a body never shows as
         // a black hole with its clouds floating over it while its mesh is queued.
-        const mesh = new THREE.Mesh( new THREE.IcosahedronGeometry( radius, 2 ), placeholderMat( kind ) );
+        const mesh = new THREE.Mesh( new THREE.IcosahedronGeometry( size, 2 ), placeholderMat( kind ) );
         group.add( mesh );
-        const body = { i, kind, q, system: this, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: Math.min( ( 2 * Math.PI ) / ( 1200 + this.rnd( i, 7 ) * 1800 ), 60 / radius ), seed: this.seed + i * 17, patch: null, patchWant: 0 };
+        const body = { i, kind, q, system: this, name: NAMES[ ( this.seed + i * 3 ) % NAMES.length ], radius, size, pos, group, mesh, level: -1, want: -1, geos: new Map(), spin: Math.min( ( 2 * Math.PI ) / ( 1200 + this.rnd( i, 7 ) * 1800 ), 60 / radius ), seed: this.seed + i * 17, patch: null, patchWant: 0 };
         if ( kind !== 'rocky' && kind !== 'ember' ) {
             // The atmosphere sphere sits above the cloud shell (which is above the peaks).
-            const shellR = radius * ( 1 + SURFACE[ kind ].amp * 4 ) + Math.max( 1500, radius * 0.02 );
-            const rim = new THREE.Mesh( new THREE.SphereGeometry( shellR, 48, 32 ), rimMaterial( kind === 'icy' ? 0xbfe0ff : 0x7fb4ff ) );
+            const shellR = kind === 'gas' ? size * 1.03 : radius * ( 1 + SURFACE[ kind ].amp * 4 ) + Math.max( 1500, radius * 0.02 );
+            const rim = new THREE.Mesh( new THREE.SphereGeometry( shellR, 48, 32 ), rimMaterial( kind === 'icy' ? 0xbfe0ff : kind === 'gas' ? 0xc8bc70 : 0x7fb4ff ) );
             rim.userData.shellR = shellR;
             group.add( rim );
             body.rim = rim;
@@ -176,13 +179,13 @@ class System {
         const planets = this.bodies.slice();
         let i = planets.length;
         for ( const host of planets ) {
-            if ( host.radius < 8000 ) continue;
-            const roll = this.rnd( host.i, 70 ), n = roll < 0.4 ? 0 : roll < 0.8 ? 1 : host.radius > 30000 ? 3 : 2;
-            const inner = Math.max( host.radius * 2.6, host.rings ? host.rings.outer * 1.4 : 0 );
+            if ( host.size < 8000 ) continue;
+            const roll = this.rnd( host.i, 70 ), n = roll < 0.4 ? 0 : roll < 0.8 ? 1 : host.size > 30000 ? ( host.kind === 'gas' ? 4 : 3 ) : 2;
+            const inner = Math.max( host.size * 2.6, host.rings ? host.rings.outer * 1.4 : 0 );
             const plane = new THREE.Vector3( this.rnd( host.i, 71 ) - 0.5, 1, this.rnd( host.i, 72 ) - 0.5 ).normalize();
             for ( let m = 0; m < n; m++, i++ ) {
                 const radius = Math.max( 700, host.radius * ( 0.05 + this.rnd( i, 3 ) * 0.11 ) );
-                const orbit = { host, orbitR: inner + host.radius * ( 1.2 * m + this.rnd( i, 4 ) * 0.8 ) + radius * 3, angle: this.rnd( i, 5 ) * Math.PI * 2, tilt: Math.acos( plane.y ) * ( this.rnd( i, 6 ) < 0.5 ? 1 : -1 ) };
+                const orbit = { host, orbitR: inner + host.size * ( 1.2 * m + this.rnd( i, 4 ) * 0.8 ) + radius * 3, angle: this.rnd( i, 5 ) * Math.PI * 2, tilt: Math.acos( plane.y ) * ( this.rnd( i, 6 ) < 0.5 ? 1 : -1 ) };
                 orbit.omega = Math.min( ( 2 * Math.PI ) / ( 600 + this.rnd( i, 9 ) * 1800 ), 60 / orbit.orbitR ) * ( this.rnd( i, 10 ) < 0.85 ? 1 : -1 );
                 const pos = this.space.orbitPoint( orbit, orbit.angle, new THREE.Vector3() );
                 const body = this.addBody( i, this.planetKind( host.q, radius ), host.q, radius, pos );
@@ -207,7 +210,7 @@ class System {
             const size = 12 + Math.floor( this.rnd( i, 20 ) * 10 ), voxel = 3 + this.rnd( i, 21 ) * 9;
             let pos;
             if ( belt ) {
-                const a = this.rnd( i, 22 ) * Math.PI * 2, r = host.radius * ( 2.7 + this.rnd( i, 23 ) * 1.6 );
+                const a = this.rnd( i, 22 ) * Math.PI * 2, r = ( host.size || host.radius ) * ( 2.7 + this.rnd( i, 23 ) * 1.6 );
                 pos = host.pos.clone().addScaledVector( u, Math.cos( a ) * r ).addScaledVector( v, Math.sin( a ) * r ).addScaledVector( normal, ( this.rnd( i, 24 ) - 0.5 ) * 1200 );
             } else {
                 const a = this.rnd( i, 25 ) * Math.PI * 2, r = 20000 + this.rnd( i, 26 ) * 90000;
@@ -236,7 +239,7 @@ class System {
             const speed = cls === 'small' ? 80 + this.rnd( i, 43 ) * 160 : cls === 'medium' ? 60 + this.rnd( i, 43 ) * 80 : 30 + this.rnd( i, 43 ) * 30;
             const ship = {
                 i, cls, host, system: this, group: new THREE.Group(), mesh: null, voxel, speed, seed: this.seed * 7 + i,
-                orbitR: host.radius * ( 1.35 + this.rnd( i, 40 ) * 0.9 ), angle: this.rnd( i, 41 ) * Math.PI * 2, tilt: ( this.rnd( i, 42 ) - 0.5 ) * 1.2,
+                orbitR: ( host.size || host.radius ) * ( 1.35 + this.rnd( i, 40 ) * 0.9 ), angle: this.rnd( i, 41 ) * Math.PI * 2, tilt: ( this.rnd( i, 42 ) - 0.5 ) * 1.2,
             };
             ship.omega = ship.speed / ship.orbitR;
             ship.sprite = new THREE.Sprite( spriteMat );
@@ -259,7 +262,7 @@ class System {
         for ( let i = 0; i < nSt; i++ ) {
             const host = hosts[ i % hosts.length ];
             const st = { i, host, system: this, name: `${host.name} Station`, group: new THREE.Group(), mesh: null, voxel: 7 + this.rnd( i, 50 ) * 3, seed: this.seed * 11 + i,
-                orbitR: host.radius * ( 1.9 + this.rnd( i, 51 ) * 0.5 ), angle: this.rnd( i, 52 ) * Math.PI * 2, tilt: ( this.rnd( i, 53 ) - 0.5 ) * 0.8, spin: 0.015 + this.rnd( i, 54 ) * 0.02 };
+                orbitR: ( host.size || host.radius ) * ( 1.9 + this.rnd( i, 51 ) * 0.5 ), angle: this.rnd( i, 52 ) * Math.PI * 2, tilt: ( this.rnd( i, 53 ) - 0.5 ) * 0.8, spin: 0.015 + this.rnd( i, 54 ) * 0.02 };
             st.omega = 25 / st.orbitR;
             this.scene.add( st.group );
             this.stations.push( st );
@@ -508,7 +511,7 @@ export class Space {
     nearest( pos ) {
         let best = null;
         for ( const b of this.bodies ) {
-            let d = pos.distanceTo( b.pos ) - b.radius;
+            let d = pos.distanceTo( b.pos ) - b.size;
             if ( d < b.radius * 0.4 ) d = pos.distanceTo( b.pos ) - this.surfaceRadius( b, pos );
             if ( ! best || d < best.d ) best = { name: b.name, kind: b.kind, d };
         }
@@ -527,8 +530,15 @@ export class Space {
             for ( const b of sys.bodies ) {
                 b.group.rotation.y += b.spin * dt;
                 if ( b.orbit ) { b.orbit.angle += b.orbit.omega * dt; this.orbitPoint( b.orbit, b.orbit.angle, b.pos ); b.group.position.copy( b.pos ); }
-                if ( b.cloud ) b.cloud.mat.uniforms.sunLocal.value.copy( sys.starPos ).sub( b.pos ).normalize().applyQuaternion( TMPQ.copy( b.group.quaternion ).invert() );
-                if ( b.rim ) b.rim.material.uniforms.fade.value = Math.min( 1, Math.max( 0, ( camPos.distanceTo( b.pos ) - b.rim.userData.shellR ) / ( b.radius * 0.4 ) ) );
+                if ( b.cloud ) {
+                    const sl = b.cloud.mat.uniforms.sunLocal.value.copy( sys.starPos ).sub( b.pos ).normalize().applyQuaternion( TMPQ.copy( b.group.quaternion ).invert() );
+                    if ( b.decks ) for ( const deck of b.decks ) deck.mat.uniforms.sunLocal.value.copy( sl );
+                    // A shell's far side must not paint over what lies inside it: outside you see only the
+                    // outer faces, inside only the underside.
+                    const dc = camPos.distanceTo( b.pos );
+                    for ( const sh of b.decks || [ b.cloud ] ) sh.mat.side = dc > sh.radius ? THREE.FrontSide : THREE.BackSide;
+                }
+                if ( b.rim ) b.rim.material.uniforms.fade.value = Math.min( 1, Math.max( 0, ( camPos.distanceTo( b.pos ) - b.rim.userData.shellR ) / ( b.size * 0.4 ) ) );
             }
             for ( const s of sys.ships ) {
                 s.angle += s.omega * dt;

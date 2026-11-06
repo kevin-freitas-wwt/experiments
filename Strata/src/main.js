@@ -158,7 +158,7 @@ function travel( kind, index = 0, approach = false ) {
     } else if ( kind === 'planet' ) {
         const b = typeof index === 'object' ? index : space.nearestSystem( wp ).bodies[ index ];
         if ( ! b ) return;
-        go( approach ? closer( b.pos, space.surfaceRadius( b, wp ), 1.5, true ) : away( b.pos, wp, b.rings ? b.rings.outer * 1.25 : b.radius * 2.6 ) );
+        go( approach ? closer( b.pos, space.surfaceRadius( b, wp ), 1.5, true ) : away( b.pos, wp, b.rings ? b.rings.outer * 1.25 : b.size * 2.6 ) );
         lookAt( b.pos );
     } else if ( kind === 'rock' ) {
         const r = typeof index === 'object' ? index : space.nearestRock( wp );
@@ -194,7 +194,7 @@ function aimTarget() {
         if ( ! best || t < best.t ) best = { t, kind, obj };
     };
     const p = new THREE.Vector3();
-    for ( const b of space.bodies ) test( b.pos, b.radius * 1.08, 'planet', b );
+    for ( const b of space.bodies ) test( b.pos, b.size * 1.08, 'planet', b );
     for ( const sys of space.systems.values() ) test( sys.starPos, sys.starRadius * 1.3, 'star', sys );
     for ( const r of space.rocks ) test( r.pos, Math.max( r.radius * 1.6, 25 ), 'rock', r );
     for ( const sh of space.ships ) test( sh.group.getWorldPosition( p ), ( sh.cls === 'capital' ? 55 : sh.cls === 'medium' ? 24 : 12 ) * sh.voxel, 'ship', sh );
@@ -267,7 +267,7 @@ function buildNav( sys ) {
     nav.innerHTML = '';
     const nPlanets = sys.bodies.length - sys.moons.length;
     document.getElementById( 'nav-title' ).textContent = `${sys.name}, a ${sys.starType.name} (${sys.starType.cls}) · ${nPlanets} planet${nPlanets === 1 ? '' : 's'}, ${sys.moons.length} moon${sys.moons.length === 1 ? '' : 's'}, ${sys.rocks.length} asteroids, ${sys.ships.length} ships, ${sys.stations.length} station${sys.stations.length === 1 ? '' : 's'}`;
-    const items = [ ...sys.bodies.slice( 0, 7 ).map( ( b, i ) => [ `${i + 1}`, b.name, `${b.orbit ? 'moon of ' + b.orbit.host.name + ', ' : ''}${b.kind}, ${( b.radius / 1000 ).toFixed( 1 )} km`, [ 'planet', i ] ] ),
+    const items = [ ...sys.bodies.slice( 0, 7 ).map( ( b, i ) => [ `${i + 1}`, b.name, `${b.orbit ? 'moon of ' + b.orbit.host.name + ', ' : ''}${b.kind === "gas" ? "gas giant" : b.kind}, ${( b.size / 1000 ).toFixed( 1 )} km`, [ 'planet', i ] ] ),
         [ '8', 'Nearest asteroid', 'belt and strays', [ 'rock' ] ], [ '9', 'Nearest ship', 'skiffs to capitals', [ 'ship' ] ] ];
     if ( sys.stations.length ) items.push( [ '-', 'Nearest station', 'in orbit', [ 'station' ] ] );
     items.push( [ '0', 'Home', 'the spawn shore', [ 'home' ] ] );
@@ -447,7 +447,7 @@ function managePlanetFar( dt ) {
     let best = null;
     for ( const b of space.bodies ) {
         const d = wp.distanceTo( b.pos );
-        if ( d > b.radius * 1.5 ) continue;
+        if ( d > b.size * 1.5 ) continue;
         const alt = d - space.surfaceRadius( b, wp );
         if ( alt < Math.min( 4000 * space.scale, b.radius * 0.5 ) && ( ! best || alt < best.alt ) ) best = { b, alt };
     }
@@ -587,9 +587,9 @@ function frame() {
         const atm = ATMOS[ b.kind ];
         if ( ! atm ) continue;
         const d = worldPos.distanceTo( b.pos );
-        if ( d < b.radius * 12 && ( ! hazeBody || d / b.radius < hazeBody.d / hazeBody.b.radius ) ) hazeBody = { b, d };
-        if ( d > b.radius + 11000 ) continue;
-        const bAlt = d - space.surfaceRadius( b, worldPos );
+        if ( d < b.size * 12 && ( ! hazeBody || d / b.size < hazeBody.d / hazeBody.b.size ) ) hazeBody = { b, d };
+        if ( d > b.size + 11000 ) continue;
+        const bAlt = d - space.surfaceRadius( b, worldPos ) - ( b.size - b.radius );
         const sp = Math.min( 1, Math.max( 0, ( bAlt - 1500 ) / 9000 ) );
         if ( sp < spaceness ) { spaceness = sp; skyUp = V_A.copy( worldPos ).sub( b.pos ).normalize(); skyTop = atm.zenith; skyBottom = atm.horizon; }
     }
@@ -597,10 +597,11 @@ function frame() {
     if ( hazeBody ) {
         const b = hazeBody.b, k = KINDS[ b.kind ];
         haze.on.value = 1; haze.flat.value = 0; haze.center.value.copy( b.pos ); haze.r.value = b.radius * ( 1 + k.seaLevel * k.amp * 4 );
-        haze.k.value = b.kind === 'icy' ? 3e-5 : 4.5e-5; haze.color.value.copy( ATMOS[ b.kind ].horizon ); haze.zenith.value.copy( ATMOS[ b.kind ].zenith );
+        haze.k.value = b.kind === 'icy' ? 3e-5 : b.kind === 'gas' ? 1.0e-4 : 4.5e-5; haze.color.value.copy( ATMOS[ b.kind ].horizon ); haze.zenith.value.copy( ATMOS[ b.kind ].zenith );
+        haze.h.value = b.kind === 'gas' ? Math.max( 2500, ( b.size - b.radius ) * 0.35 ) : 2500; haze.top.value = b.kind === 'gas' ? b.size - haze.r.value + 12000 : 12000;
         haze.sun.value.copy( b.system.starPos ).sub( b.pos ).normalize();
     } else if ( ! offHome ) {
-        haze.on.value = 1; haze.flat.value = 1; haze.seaY.value = home.group.position.y + SEA; haze.k.value = 4.5e-5; haze.color.value.copy( HORIZON ); haze.zenith.value.copy( ZENITH );
+        haze.on.value = 1; haze.flat.value = 1; haze.seaY.value = home.group.position.y + SEA; haze.k.value = 4.5e-5; haze.h.value = 2500; haze.top.value = 12000; haze.color.value.copy( HORIZON ); haze.zenith.value.copy( ZENITH );
         haze.sun.value.copy( sunDir );
     } else haze.on.value = 0;
     // How much a day sky washes out things beyond the air (zenith value): used for star glows and flares.
@@ -621,11 +622,14 @@ function frame() {
         cloudShade = cloudAt( home, V_A.set( homeLocal.x + sunDir.x * t - SPAWN.x, 0, homeLocal.z + sunDir.z * t - SPAWN.z ) );
         cloudSys = space.home;
     } else if ( hazeBody && hazeBody.b.cloud ) {
-        const b = hazeBody.b, rc = b.cloud.radius, oc = V_A.copy( camera.position ).sub( b.pos ), r2 = oc.lengthSq();
-        if ( r2 < rc * rc ) {
+        const b = hazeBody.b;
+        for ( const deck of b.decks || [ b.cloud ] ) {
+            const rc = deck.radius, oc = V_A.copy( camera.position ).sub( b.pos ), r2 = oc.lengthSq();
+            if ( r2 >= rc * rc ) continue;
             const dir = V_B.copy( b.system.starPos ).sub( camera.position ).normalize(), tb = -oc.dot( dir );
             const t = tb + Math.sqrt( Math.max( 0, tb * tb - ( r2 - rc * rc ) ) );
-            cloudShade = cloudAt( b, b.group.worldToLocal( V_C.copy( camera.position ).addScaledVector( dir, t ) ).normalize() );
+            const a = cloudAt( { cloud: deck }, b.group.worldToLocal( V_C.copy( camera.position ).addScaledVector( dir, t ) ).normalize() );
+            cloudShade = 1 - ( 1 - cloudShade ) * ( 1 - a );
             cloudSys = b.system;
         }
     }
@@ -654,7 +658,7 @@ function frame() {
         V_A.divideScalar( d );
         if ( V_A.dot( skyUpNow ) < -0.05 ) continue;
         const phase = 0.5 + 0.5 * V_B.copy( b.system.starPos ).sub( b.pos ).normalize().dot( V_C.copy( V_A ).negate() );
-        const k = 2.4 * ( b.radius / d ) ** 2 * phase * ( ALBEDO[ b.kind ] || 0.3 ) * 20;
+        const k = 2.4 * ( b.size / d ) ** 2 * phase * ( ALBEDO[ b.kind ] || 0.3 ) * 20;
         if ( k < 0.002 ) continue;
         shine += k;
         shineColor.add( starTint.set( BODY_TINT[ b.kind ] || 0xffffff ).multiplyScalar( k ) );
