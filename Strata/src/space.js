@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { hash2 } from './noise.js';
 import { bodyMat, rockMat, instanceMat, fadeIn, hazed } from './materials.js';
 import { addClouds } from './clouds.js';
+import { StarField } from './starfield.js';
+import { densityAt } from './galaxy.js';
 import { KINDS as SURFACE, surfaceAt, octavesFor } from './planet.js';
 import { RingField } from './rings.js';
 
@@ -19,9 +21,9 @@ const STARS = [
     { cls: 'F', share: 0.05, lum: [ 1.6, 4.5 ], color: 0xf4f6ff, radius: 7500, name: 'white star' },
     { cls: 'A', share: 0.03, lum: [ 5, 20 ], color: 0xbfd4ff, radius: 10000, name: 'blue-white star' },
 ];
-const HZ_BASE = 70000;
+const HZ_BASE = 3e6;
 const PATCH_N = 97;
-export const CELL = 900000;
+export const CELL = 6e7;
 
 const SCRATCH = new THREE.Vector3(), AIRLOCK_P = new THREE.Vector3(), TMPQ = new THREE.Quaternion();
 
@@ -78,7 +80,7 @@ class System {
         if ( ! this.home ) for ( const t of STARS ) { if ( roll < t.share ) { type = t; break; } roll -= t.share; }
         this.starType = type;
         this.lum = type.lum[ 0 ] + this.rnd( 0, 2 ) * ( type.lum[ 1 ] - type.lum[ 0 ] );
-        this.hz = this.home ? 300000 : HZ_BASE * Math.sqrt( this.lum );
+        this.hz = this.home ? 1500000 : HZ_BASE * Math.sqrt( this.lum );
         this.frost = this.hz * 2.7;
         this.starRadius = type.radius * ( 0.85 + this.rnd( 0, 3 ) * 0.3 );
         this.starColor = type.color;
@@ -107,19 +109,21 @@ class System {
         const n = Math.min( maxN, ( this.home ? 4 : 2 ) + Math.floor( this.rnd( 1, 1 ) * ( this.home ? 4 : 7 ) ) );
         this.rings = [];
         this.moons = [];
-        const inner = this.home ? 60000 : Math.max( this.hz * 0.22, this.starRadius * 4 );
+        const inner = this.home ? 280000 : Math.max( this.hz * 0.22, this.starRadius * 4 );
         const spread = this.home ? 1.6 : this.starType.cls === 'M' ? 1.6 : 1.9;
         const plane = new THREE.Vector3( ( this.rnd( 1, 2 ) - 0.5 ) * 0.4, 1, ( this.rnd( 1, 3 ) - 0.5 ) * 0.4 ).normalize();
         const pu = new THREE.Vector3( 1, 0, 0 ).cross( plane ).normalize(), pv = plane.clone().cross( pu );
-        // Radii on a rough power law, 1.3 km to 100 km (home-world scale); orbits are spaced so neighbours
-        // and their rings clear each other, and the home system starts beyond the home disc.
-        let prevDist = this.home ? 200000 : 0, prevR = 0;
+        // Radii on a rough power law, 1.3 km to 100 km. Orbits are spaced so no planet is wider than about
+        // 1.5 degrees from any other (forty radii apart); the home system keeps one showpiece, a 20 to 30 km
+        // ringed world 300 km out, and everything else beyond it.
+        let prevDist = 0, prevR = 0;
         for ( let i = 0; i < n; i++ ) {
             const u = this.rnd( i, 3 ), big = this.rnd( i, 12 );
-            const radius = Math.min( this.home && i === 0 ? 30000 : 1e9, big < 0.12 ? 40000 + u * 60000 : big < 0.4 ? 9000 + u * 31000 : 1300 + u * 7700 );
-            const gap = ( prevR + radius ) * 3 + 20000;
-            const dist = Math.max( inner * Math.pow( spread, i ) * ( 0.88 + this.rnd( i, 4 ) * 0.24 ), prevDist + gap );
-            if ( dist > 600000 ) continue;
+            const showpiece = this.home && i === 0;
+            const radius = showpiece ? 20000 + u * 10000 : big < 0.12 ? 40000 + u * 60000 : big < 0.4 ? 9000 + u * 31000 : 1300 + u * 7700;
+            const gap = 40 * Math.max( prevR, radius ) + 40000;
+            const dist = showpiece ? inner + u * 60000 : Math.max( inner * Math.pow( spread, i ) * ( 0.88 + this.rnd( i, 4 ) * 0.24 ), prevDist + gap );
+            if ( dist > 2.5e7 ) continue;
             prevDist = dist; prevR = radius;
             const az = this.rnd( i, 5 ) * Math.PI * 2;
             let pos;
@@ -323,6 +327,13 @@ export class Space {
         return new THREE.Vector3( ( i + 0.5 + ( h( 1 ) - 0.5 ) * 0.5 ) * CELL, ( j + ( h( 2 ) - 0.5 ) * 0.3 ) * CELL, ( k + 0.5 + ( h( 3 ) - 0.5 ) * 0.5 ) * CELL ).sub( this.offset );
     }
 
+    // A cell holds a system with a probability set by the galaxy's density there (about one cell in three at home).
+    hasSystem( i, j, k ) {
+        if ( i === 0 && j === 0 && k === 0 ) return true;
+        const c = this.cellCenter( i, j, k ), d = densityAt( c.x + this.offset.x, c.y + this.offset.y, c.z + this.offset.z, this.seed );
+        return hash2( i * 73 + j * 31 + k * 17, 9, this.seed + 5 ) < Math.min( 0.85, 0.3 * d );
+    }
+
     loadSystem( i, j, k, home = false ) {
         const key = `${i},${j},${k}`;
         if ( this.systems.has( key ) ) return this.systems.get( key );
@@ -338,7 +349,7 @@ export class Space {
         const wanted = new Set();
         for ( let i = ci - 2; i <= ci + 2; i++ ) for ( let j = cj - 2; j <= cj + 2; j++ ) for ( let k = ck - 2; k <= ck + 2; k++ ) {
             const c = this.cellCenter( i, j, k );
-            if ( c.distanceTo( camPos ) < CELL * 1.1 || ( i === 0 && j === 0 && k === 0 ) ) { wanted.add( `${i},${j},${k}` ); this.loadSystem( i, j, k ); }
+            if ( ( c.distanceTo( camPos ) < CELL * 1.1 || ( i === 0 && j === 0 && k === 0 ) ) && this.hasSystem( i, j, k ) ) { wanted.add( `${i},${j},${k}` ); this.loadSystem( i, j, k ); }
         }
         for ( const [ key, sys ] of this.systems ) if ( ! wanted.has( key ) && ! sys.home ) { sys.dispose(); this.systems.delete( key ); }
         this.homeLoaded = wanted.has( '0,0,0' );
@@ -474,22 +485,9 @@ export class Space {
     }
 
     makeSky() {
-        const n = 3000, pos = new Float32Array( n * 3 ), col = new Float32Array( n * 3 );
-        const r = ( i, j ) => hash2( i, j, this.seed + 7 );
-        for ( let i = 0; i < n; i++ ) {
-            const u = r( i, 60 ) * 2 - 1, a = r( i, 61 ) * Math.PI * 2, s = Math.sqrt( 1 - u * u );
-            pos.set( [ Math.cos( a ) * s * 2500000, u * 2500000, Math.sin( a ) * s * 2500000 ], i * 3 );
-            const w = 0.55 + r( i, 62 ) * 0.45, warm = r( i, 63 );
-            col.set( [ w, w * ( 0.92 + warm * 0.08 ), w * ( 0.85 + ( 1 - warm ) * 0.15 ) ], i * 3 );
-        }
-        const g = new THREE.BufferGeometry();
-        g.setAttribute( 'position', new THREE.BufferAttribute( pos, 3 ) );
-        g.setAttribute( 'color', new THREE.BufferAttribute( col, 3 ) );
-        // Soft round sprites rather than bare pixels: a hard 2 px square snaps to the pixel grid as the view turns and reads as jitter.
-        this.starMat = new THREE.PointsMaterial( { size: 4, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0, depthWrite: false, map: this.glow, blending: THREE.AdditiveBlending } );
-        this.stars = new THREE.Points( g, this.starMat );
-        this.stars.frustumCulled = false;
-        this.scene.add( this.stars );
+        this.starField = new StarField( this.scene, this.seed, this.glow );
+        this.stars = this.starField.group;
+        this.starMat = this.starField;
     }
 
     resolve( pos ) {

@@ -42,7 +42,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 const HORIZON = new THREE.Color( 0xeadfca ), ZENITH = new THREE.Color( 0x5d73a3 ), UP_Y = new THREE.Vector3( 0, 1, 0 ), WHITE = new THREE.Color( 0xffffff ), starTint = new THREE.Color();
 const ATMOS = Object.fromEntries( Object.entries( KINDS ).map( ( [ k, v ] ) => [ k, v.atmosphere && { zenith: new THREE.Color( v.atmosphere.zenith ), horizon: new THREE.Color( v.atmosphere.horizon ) } ] ) );
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera( 72, 1, 0.1, 3000000 );
+const camera = new THREE.PerspectiveCamera( 72, 1, 0.1, 1.2e8 );
 
 const skyMat = new THREE.ShaderMaterial( {
     side: THREE.BackSide, depthWrite: false, depthTest: false,
@@ -367,6 +367,8 @@ if ( pose ) {
     spawned = true;
 }
 
+// Light-time of a distance, shown from a tenth of a second up: the honest scale cue for a 15 million km galaxy.
+const fmtLight = ( m ) => { const t = m / 299792458; return t < 0.1 ? '' : t < 60 ? ` · light ${t.toFixed( 1 )} s` : ` · light ${( t / 60 ).toFixed( 1 )} min`; };
 const fmtDist = ( m ) => m < 1000 ? `${m.toFixed( 0 )} m` : m < 100000 ? `${( m / 1000 ).toFixed( 1 ) } km` : `${( m / 1000 ).toFixed( 0 ) } km`;
 
 const retiring = [];
@@ -636,6 +638,7 @@ function frame() {
     space.night = 1 - day;
     sky.position.copy( camera.position );
     space.stars.position.copy( camera.position ); // after the camera is placed, so the star shell never lags it
+    space.starField.place( homeLocal );
     const under = player.eyeInWater();
     tint.classList.toggle( 'on', under );
     hudTimer += dt;
@@ -653,8 +656,8 @@ function frame() {
         hud.mode.textContent = ( player.flying ? 'flying' : under ? 'under' : player.inWater() ? 'swimming' : 'on foot' ) + where;
         hud.speed.textContent = ( speed < 1000 ? `${speed.toFixed( 0 )} m/s` : `${( speed / 1000 ).toFixed( 1 )} km/s` ) + ( player.flying && player.boost > 1.05 ? ` · boost ${player.boost.toFixed( 1 )}×` : '' );
         const n = space.nearest( worldPos );
-        hud.body.textContent = n ? `${n.name} (${n.kind}) ${fmtDist( Math.max( 0, n.d ) )}` : '–';
-        hud.system.textContent = navSystem ? `${navSystem.name} · ${fmtDist( navSystem.center.distanceTo( worldPos ) )}` : '–';
+        hud.body.textContent = n ? `${n.name} (${n.kind}) ${fmtDist( Math.max( 0, n.d ) )}${fmtLight( n.d )}` : '–';
+        hud.system.textContent = navSystem ? `${navSystem.name} · ${fmtDist( navSystem.center.distanceTo( worldPos ) )}${fmtLight( navSystem.center.distanceTo( worldPos ) )}` : '–';
         hud.crumbs.textContent = crumbs.on ? `every ${crumbs.spacing} m · ${crumbs.count}` : crumbs.count ? `off · ${crumbs.count}` : 'off';
         if ( document.body.classList.contains( 'stats' ) ) {
             const m = renderer.info.memory;

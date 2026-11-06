@@ -148,7 +148,10 @@ export class Player {
         this.boost = thrusting ? Math.min( 8, ( this.boost || 1 ) + dt * 1.75 ) : Math.max( 1, ( this.boost || 1 ) - dt * 12 );
         const boostK = 1 + ( this.boost - 1 ) * Math.min( 1, clearance / 6000 );
         const flySpeed = 14 * ( 1 + clearance / 120 ) * ( 1 + clearance / 30000 ) * boostK;
-        const speed = this.flying ? Math.min( 500000, flySpeed * ( run ? 3 : 1 ) ) : swim ? 3 : ( run ? 9 : 5 );
+        // Time as distance: inside a system flight tops out at 500 km/s; the cap only climbs toward 6000 km/s
+        // in the deep between systems, so a neighbouring sun is seconds away and the far side of the arm is minutes.
+        const cap = 500000 + 5500000 * THREE.MathUtils.smoothstep( clearance, 2e6, 6e7 );
+        const speed = this.flying ? Math.min( cap, flySpeed * ( run ? 3 : 1 ) ) : swim ? 3 : ( run ? 9 : 5 );
         const sin = Math.sin( this.yaw ), cos = Math.cos( this.yaw );
         const cp = this.flying ? Math.cos( this.pitch ) : 1, sp = this.flying ? Math.sin( this.pitch ) : 0;
         let fx = 0, fy = 0, fz = 0;
