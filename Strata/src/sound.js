@@ -1,4 +1,4 @@
-// Procedural ambience, no files: wind that rises with speed and height, surf near water, a hull hum and
+// Procedural ambience, no files: a light breeze wherever there is air, surf near water, a hull hum and
 // ticks aboard a vessel, a low pad in the deep, and nothing at all on an airless world.
 export class Sound {
     constructor() {
@@ -53,10 +53,11 @@ export class Sound {
     update( dt, { speed, height, air, water, inside, space, rain = 0 } ) {
         if ( ! this.ctx || this.ctx.state !== 'running' ) return;
         const t = this.ctx.currentTime, ease = ( node, v, tc = 0.4 ) => node.gain.setTargetAtTime( v, t, tc );
-        const wind = air * Math.min( 1, 0.05 + speed / 60 + Math.min( 1, height / 2500 ) * 0.5 ) * ( inside ? 0.1 : 1 );
+        // A gentle breeze on any world with air; it does not rise with speed or height, so flight is quiet.
+        const wind = air * 0.18 * ( inside ? 0.1 : 1 );
         this.level = { wind, surf: air * water, hull: inside ? 1 : 0, pad: Math.max( space, 1 - air ), rain: rain * air };
         ease( this.windG, wind * 0.9 );
-        this.windF.frequency.setTargetAtTime( 250 + Math.min( 1, speed / 120 ) * 900, t, 0.5 );
+        this.windF.frequency.setTargetAtTime( 300, t, 0.5 );
         ease( this.surfG, air * water * ( inside ? 0 : 1 ) * 0.7, 0.8 );
         ease( this.hullG, inside ? 0.35 : 0, 0.6 );
         ease( this.rainG, rain * air * ( inside ? 0.25 : 1 ) * 0.5, 1 );
