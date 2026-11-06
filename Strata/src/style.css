@@ -145,16 +145,6 @@ body:not(.stats) #hud, body:not(.stats) #stamp-block { display: none; }
     position: relative;
     width: calc(100% - 32px);
 }
-.sheet::after {
-    background: var(--vermilion);
-    border-radius: 2px;
-    content: "";
-    height: 34px;
-    position: absolute;
-    right: 28px;
-    top: 26px;
-    width: 34px;
-}
 .sheet h1 {
     font-size: 44px;
     font-weight: 500;

@@ -205,7 +205,12 @@ canvas.addEventListener( 'mousedown', ( e ) => {
 const NAV = { Digit1: [ 'planet', 0 ], Digit2: [ 'planet', 1 ], Digit3: [ 'planet', 2 ], Digit4: [ 'planet', 3 ], Digit5: [ 'planet', 4 ], Digit6: [ 'planet', 5 ], Digit7: [ 'planet', 6 ], Digit8: [ 'rock' ], Digit9: [ 'ship' ], Minus: [ 'station' ], Digit0: [ 'home' ] };
 document.addEventListener( 'keydown', ( e ) => {
     // Esc on the start card is the same as pressing Set out; in play the browser's own Esc releases the pointer and the card returns.
-    if ( e.code === 'Escape' && ! overlay.classList.contains( 'hidden' ) && ! pose ) { e.preventDefault(); document.getElementById( 'enter' ).click(); return; }
+    if ( e.code === 'Escape' && ! pose ) {
+        // The press that released the pointer also reaches us (before or after the card appears): that one is not a Set out.
+        if ( performance.now() - unlockedAt < 700 || document.pointerLockElement ) return;
+        if ( ! overlay.classList.contains( 'hidden' ) ) { e.preventDefault(); document.getElementById( 'enter' ).click(); }
+        return;
+    }
     if ( e.repeat || ! overlay.classList.contains( 'hidden' ) ) return;
     if ( key( e.code, 'crumbs' ) ) crumbs.toggle();
     if ( key( e.code, 'clear' ) ) crumbs.clear();
@@ -284,9 +289,12 @@ radiusSelect.addEventListener( 'change', ( e ) => {
     q.set( 'r', e.target.value );
     location.search = q.toString();
 } );
+let unlockedAt = -1e9;
 document.addEventListener( 'pointerlockchange', () => {
-    if ( ! document.pointerLockElement && ! pose ) overlay.classList.remove( 'hidden' );
+    if ( ! document.pointerLockElement && ! pose ) { overlay.classList.remove( 'hidden' ); unlockedAt = performance.now(); }
 } );
+// A click on the view while the card is away but the pointer is free (a lock request Chrome refused) locks it again.
+canvas.addEventListener( 'mousedown', () => { if ( overlay.classList.contains( 'hidden' ) && ! document.pointerLockElement && ! pose ) lockPointer(); } );
 
 // Planar reflections: the scene mirrored in the liquid plane of the frame you stand in (the home sea, or a
 // shell's sea level), rendered at half size with everything below the plane clipped, sampled by the water.
