@@ -188,9 +188,54 @@ export function terrainMaterials() {
     const die = { dieAt: { value: -1 }, dieDur: { value: 1 } };
     return {
         die,
-        solid: hazed( fading( curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), null, true ), die ) ),
+        solid: hazed( weathered( fading( curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), null, true ), die ) ) ),
         water: hazed( fading( watery( curved( new THREE.MeshLambertMaterial( { vertexColors: true, transparent: true, opacity: 0.86, depthWrite: false } ) ) ), die ) ),
     };
+}
+
+// Weather on the ground: rain darkens the terrain and pools sky-coloured puddles on flat tops, and a snow
+// line (metres above the sea, lowered toward the poles and into the winter hemisphere) whitens upward faces
+// above it, so seasons move the snow without regenerating a block. wxUp is the frame's up for flat worlds.
+export const wx = {
+    wet: { value: 0 }, snowLine: { value: 1e9 }, season: { value: 0 }, polar: { value: 0 }, soft: { value: 40 },
+    flat: { value: 1 }, center: { value: new THREE.Vector3() }, r: { value: 1 }, seaY: { value: 0 }, axis: { value: new THREE.Vector3( 0, 1, 0 ) }, sky: { value: new THREE.Color( 0x9fb4d6 ) },
+};
+
+export function weathered( material ) {
+    const prev = material.onBeforeCompile || ( () => {} ), prevKey = material.customProgramCacheKey, prevPatch = material.userData.patch;
+    material.userData.patch = ( m ) => weathered( prevPatch ? prevPatch( m ) : m );
+    material.onBeforeCompile = ( shader ) => {
+        prev( shader );
+        for ( const [ k, u ] of Object.entries( wx ) ) shader.uniforms[ 'wx' + k[ 0 ].toUpperCase() + k.slice( 1 ) ] = u;
+        shader.vertexShader = shader.vertexShader
+            .replace( '#include <common>', '#include <common>\nvarying vec3 vWxW; varying vec3 vWxN;' )
+            .replace( '#include <begin_vertex>', '#include <begin_vertex>\nvWxW = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz; vWxN = normalize( mat3( modelMatrix ) * objectNormal );' );
+        shader.fragmentShader = shader.fragmentShader
+            .replace( '#include <common>', `#include <common>
+                uniform float wxWet; uniform float wxSnowLine; uniform float wxSeason; uniform float wxPolar; uniform float wxSoft; uniform float wxFlat; uniform vec3 wxCenter; uniform float wxR; uniform float wxSeaY; uniform vec3 wxAxis; uniform vec3 wxSky;
+                varying vec3 vWxW; varying vec3 vWxN;
+                float wxHash( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }
+                float wxNoise( vec2 p ) { vec2 i = floor( p ), f = fract( p ); f = f * f * ( 3.0 - 2.0 * f ); return mix( mix( wxHash( i ), wxHash( i + vec2( 1, 0 ) ), f.x ), mix( wxHash( i + vec2( 0, 1 ) ), wxHash( i + vec2( 1, 1 ) ), f.x ), f.y ); }` )
+            .replace( '#include <color_fragment>', `#include <color_fragment>
+                {
+                    vec3 wxUp = wxFlat > 0.5 ? vec3( 0.0, 1.0, 0.0 ) : normalize( vWxW - wxCenter );
+                    float wxAlt = wxFlat > 0.5 ? vWxW.y - wxSeaY : length( vWxW - wxCenter ) - wxR;
+                    float wxLat = wxFlat > 0.5 ? 1.0 : dot( wxUp, wxAxis );
+                    float wxFace = dot( vWxN, wxUp );
+                    if ( wxSnowLine < 1e8 ) {
+                        float line = wxSnowLine + wxSeason * wxLat - wxPolar * wxLat * wxLat;
+                        float snow = smoothstep( line, line + wxSoft, wxAlt + wxNoise( vWxW.xz * 0.05 + vWxW.yz * 0.03 ) * wxSoft * 0.8 ) * smoothstep( 0.35, 0.8, wxFace ) * smoothstep( 0.3, 1.5, wxAlt );
+                        diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.82, 0.85, 0.9 ), snow );
+                    }
+                    if ( wxWet > 0.001 ) {
+                        diffuseColor.rgb *= 1.0 - 0.3 * wxWet;
+                        float pool = smoothstep( 0.66, 0.74, wxNoise( vWxW.xz * 0.16 + vWxW.yz * 0.09 ) ) * smoothstep( 0.9, 0.99, wxFace ) * wxWet;
+                        diffuseColor.rgb = mix( diffuseColor.rgb, wxSky * 0.85, pool * 0.6 );
+                    }
+                }` );
+    };
+    material.customProgramCacheKey = () => ( prevKey ? prevKey.call( material ) : '' ) + '-wx';
+    return material;
 }
 
 // Aerial perspective. Optical depth along the fragment-to-camera path through an exponential atmosphere
@@ -199,7 +244,7 @@ export function terrainMaterials() {
 export const haze = {
     on: { value: 0 }, color: { value: new THREE.Color( 0xeadfca ) }, k: { value: 4.5e-5 }, h: { value: 2500 },
     center: { value: new THREE.Vector3() }, r: { value: 1 }, flat: { value: 1 }, seaY: { value: 0 }, sun: { value: new THREE.Vector3( 0, 1, 0 ) },
-    zenith: { value: new THREE.Color( 0x5d73a3 ) }, top: { value: 12000 }, veil: { value: 6.3 },
+    zenith: { value: new THREE.Color( 0x5d73a3 ) }, top: { value: 12000 }, veil: { value: 6.3 }, fog: { value: 0 }, fogH: { value: 60 },
 };
 
 export function hazed( material ) {
@@ -213,13 +258,20 @@ export function hazed( material ) {
             .replace( '#include <begin_vertex>', '#include <begin_vertex>\nvHazeW = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;' );
         shader.fragmentShader = shader.fragmentShader
             .replace( '#include <common>', `#include <common>
-                uniform float hazeOn; uniform vec3 hazeColor; uniform float hazeK; uniform float hazeH; uniform vec3 hazeCenter; uniform float hazeR; uniform float hazeFlat; uniform float hazeSeaY; uniform vec3 hazeSun; uniform vec3 hazeZenith; uniform float hazeTop; uniform float hazeVeil;
+                uniform float hazeOn; uniform vec3 hazeColor; uniform float hazeK; uniform float hazeH; uniform vec3 hazeCenter; uniform float hazeR; uniform float hazeFlat; uniform float hazeSeaY; uniform vec3 hazeSun; uniform vec3 hazeZenith; uniform float hazeTop; uniform float hazeVeil; uniform float hazeFog; uniform float hazeFogH;
                 varying vec3 vHazeW;
                 float hazeAlt( vec3 p ) { return hazeFlat > 0.5 ? p.y - hazeSeaY : length( p - hazeCenter ) - hazeR; }
                 float hazeDepth( vec3 a, vec3 b ) {
                     float a0 = max( hazeAlt( a ), 0.0 ), a1 = max( hazeAlt( b ), 0.0 ), e0 = exp( -a0 / hazeH ), e1 = exp( -a1 / hazeH );
                     float avg = abs( a1 - a0 ) < 1.0 ? e0 : ( e0 - e1 ) * hazeH / ( a1 - a0 );
-                    return hazeK * distance( a, b ) * avg;
+                    float tau = hazeK * distance( a, b ) * avg;
+                    if ( hazeFog > 0.0 ) {
+                        // A second, shallow layer: valley fog that pools a few tens of metres deep at dawn.
+                        float f0 = exp( -a0 / hazeFogH ), f1 = exp( -a1 / hazeFogH );
+                        float favg = abs( a1 - a0 ) < 1.0 ? f0 : ( f0 - f1 ) * hazeFogH / ( a1 - a0 );
+                        tau += hazeFog * distance( a, b ) * favg;
+                    }
+                    return tau;
                 }` )
             .replace( '#include <fog_fragment>', `#include <fog_fragment>
                 if ( hazeOn > 0.5 ) {
@@ -247,12 +299,12 @@ const edgeUniforms = () => ( { center: { value: new THREE.Vector2() }, r0: { val
 
 export const solidMat = curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), null, true );
 export const waterMat = watery( curved( new THREE.MeshLambertMaterial( { vertexColors: true, transparent: true, opacity: 0.86, depthWrite: false } ) ) );
-export const fineTileMat = hazed( curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() ) );
-export const midTileMat = hazed( curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() ) );
-export const coarseTileMat = hazed( curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() ) );
+export const fineTileMat = hazed( weathered( curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() ) ) );
+export const midTileMat = hazed( weathered( curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() ) ) );
+export const coarseTileMat = hazed( weathered( curved( new THREE.MeshLambertMaterial( { vertexColors: true } ), edgeUniforms() ) ) );
 export const oceanMat = hazed( curved( new THREE.MeshLambertMaterial( { color: 0x2d4e80 } ) ) );
-export const planetTileMat = hazed( tiled( new THREE.MeshLambertMaterial( { vertexColors: true } ) ) );
-export const bodyMat = hazed( holed( new THREE.MeshLambertMaterial( { vertexColors: true } ) ) );
+export const planetTileMat = hazed( weathered( tiled( new THREE.MeshLambertMaterial( { vertexColors: true } ) ) ) );
+export const bodyMat = hazed( weathered( holed( new THREE.MeshLambertMaterial( { vertexColors: true } ) ) ) );
 export const rockMat = hazed( new THREE.MeshLambertMaterial( { vertexColors: true } ) );
 export const instanceMat = hazed( new THREE.MeshLambertMaterial( { color: 0xffffff } ) );
 

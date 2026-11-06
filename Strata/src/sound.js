@@ -25,6 +25,10 @@ export class Sound {
         const swell = ctx.createGain(); swell.gain.value = 0.5;
         const swellLfo = ctx.createOscillator(), swellD = ctx.createGain(); swellLfo.frequency.value = 0.09; swellD.gain.value = 0.45; swellLfo.connect( swellD ).connect( swell.gain ); swellLfo.start();
         noise.connect( this.surfF ).connect( swell ).connect( this.surfG ).connect( this.master );
+        // rain: bright hiss
+        this.rainF = ctx.createBiquadFilter(); this.rainF.type = 'highpass'; this.rainF.frequency.value = 1800;
+        this.rainG = ctx.createGain(); this.rainG.gain.value = 0;
+        noise.connect( this.rainF ).connect( this.rainG ).connect( this.master );
         // hull: a low hum plus ticks
         this.hullG = ctx.createGain(); this.hullG.gain.value = 0;
         const hum = ctx.createOscillator(), humF = ctx.createBiquadFilter(); hum.type = 'sawtooth'; hum.frequency.value = 55; humF.type = 'lowpass'; humF.frequency.value = 160;
@@ -46,15 +50,16 @@ export class Sound {
 
     // speed m/s, height above ground m, air 0..1 (0 on airless worlds and in vacuum), water 0..1 (nearness),
     // inside (aboard a vessel), space 0..1
-    update( dt, { speed, height, air, water, inside, space } ) {
+    update( dt, { speed, height, air, water, inside, space, rain = 0 } ) {
         if ( ! this.ctx || this.ctx.state !== 'running' ) return;
         const t = this.ctx.currentTime, ease = ( node, v, tc = 0.4 ) => node.gain.setTargetAtTime( v, t, tc );
         const wind = air * Math.min( 1, 0.05 + speed / 60 + Math.min( 1, height / 2500 ) * 0.5 ) * ( inside ? 0.1 : 1 );
-        this.level = { wind, surf: air * water, hull: inside ? 1 : 0, pad: Math.max( space, 1 - air ) };
+        this.level = { wind, surf: air * water, hull: inside ? 1 : 0, pad: Math.max( space, 1 - air ), rain: rain * air };
         ease( this.windG, wind * 0.9 );
         this.windF.frequency.setTargetAtTime( 250 + Math.min( 1, speed / 120 ) * 900, t, 0.5 );
         ease( this.surfG, air * water * ( inside ? 0 : 1 ) * 0.7, 0.8 );
         ease( this.hullG, inside ? 0.35 : 0, 0.6 );
+        ease( this.rainG, rain * air * ( inside ? 0.25 : 1 ) * 0.5, 1 );
         ease( this.padG, ( inside ? 0.3 : 1 ) * Math.max( space, 1 - air ) * 0.22, 1.5 );
         if ( inside && t > this.nextTick ) { this.tickG.gain.setValueAtTime( 1.5, t ); this.tickG.gain.exponentialRampToValueAtTime( 0.001, t + 0.05 ); this.nextTick = t + 2 + Math.random() * 9; }
     }

@@ -8,7 +8,8 @@ import { Player } from './player.js';
 import { Crumbs } from './crumbs.js';
 import { Flares } from './flare.js';
 import { BIOMES, SEA, CHUNK, spawnOf } from './blocks.js';
-import { tickFades, hole, tileEdge, waterTime, terrainNow, haze, reflection, WATER_MATS, oceanMat } from './materials.js';
+import { tickFades, hole, tileEdge, waterTime, terrainNow, haze, wx, reflection, WATER_MATS, oceanMat } from './materials.js';
+import { Precip, homeAurora, AURORA_MATS } from './weather.js';
 import { KINDS } from './planet.js';
 import { cloudTime, cloudAt, homeClouds } from './clouds.js';
 import { densityAt } from './galaxy.js';
@@ -69,10 +70,19 @@ scene.add( sky );
 
 // The home sun circles the home world once per HOME_DAY seconds on a great circle through the zenith; its
 // phase at load comes from the seed. Elsewhere light comes from the nearest star and planets spin under it.
-const HOME_DAY = 1440, SUN0 = new THREE.Vector3( 0.6, 0.55, 0.35 ).normalize();
-const SUN_AXIS = new THREE.Vector3().crossVectors( SUN0, new THREE.Vector3( 0, 1, 0 ) ).normalize();
-const sunDir = SUN0.clone();
-const NOON = Math.acos( SUN0.y ), sunPhase0 = ( params.has( 'hour' ) ? ( parseFloat( params.get( 'hour' ) ) - 12 ) / 24 : ( seed % 1000 ) / 1000 - 0.5 ) * Math.PI * 2 + NOON;
+// The home world sits at 47 degrees north on a world tilted 23 degrees, so the sun's noon height and the day's
+// length swing with the season (`?day=` 0 to 365, else from the seed; a year passes in thirty home days).
+const HOME_DAY = 1440, HOME_LAT = 47 * Math.PI / 180, TILT = 23.4 * Math.PI / 180, YEAR = HOME_DAY * 30;
+const sunDir = new THREE.Vector3( 0, 1, 0 );
+const sunPhase0 = ( params.has( 'hour' ) ? ( parseFloat( params.get( 'hour' ) ) - 12 ) / 24 : ( seed % 1000 ) / 1000 - 0.5 ) * Math.PI * 2;
+const season0 = ( ( params.has( 'day' ) ? parseFloat( params.get( 'day' ) ) : seed % 365 ) - 80 ) / 365;
+let season = season0;
+function homeSun( t ) {
+    season = season0 + t / YEAR;
+    const H = sunPhase0 + t / HOME_DAY * Math.PI * 2, dec = TILT * Math.sin( season * Math.PI * 2 );
+    sunDir.set( Math.cos( dec ) * Math.sin( H ), Math.sin( HOME_LAT ) * Math.sin( dec ) + Math.cos( HOME_LAT ) * Math.cos( dec ) * Math.cos( H ), Math.cos( HOME_LAT ) * Math.sin( dec ) - Math.sin( HOME_LAT ) * Math.cos( dec ) * Math.cos( H ) );
+}
+homeSun( 0 );
 const sun = new THREE.DirectionalLight( 0xfff1d6, 2.4 );
 sun.position.copy( sunDir );
 const hemi = new THREE.HemisphereLight( 0xdcd8ea, 0x7a6a50, 1.15 );
@@ -91,9 +101,13 @@ const space = new Space( scene, pool, seed, radius, sunDir );
 const player = new Player( camera, home, canvas );
 const crumbs = new Crumbs( home.group, spacing );
 home.cloud = homeClouds( home.group, seed, SPAWN, SEA );
+home.aurora = homeAurora( home.group );
+const precip = new Precip( scene );
+let rainAmt = 0, prevElev = 0, dawnFog = 0;
 const flares = new Flares();
 const sound = new Sound();
 const V_A = new THREE.Vector3(), V_B = new THREE.Vector3(), V_C = new THREE.Vector3();
+const Q_A = new THREE.Quaternion();
 const shineColor = new THREE.Color(), BODY_TINT = { icy: 0xe8f0ff, lush: 0xc8d8ee, rocky: 0xd8d2c8, ember: 0xffa070, gas: 0xd8c8a0 };
 
 const hud = {};
@@ -577,7 +591,7 @@ function frame() {
     if ( nearSys && nearSys !== navSystem ) buildNav( nearSys );
     if ( nearSys ) sun.color.lerp( starTint.set( nearSys.starColor ).lerp( WHITE, 0.4 ), 1 - Math.exp( -dt * 2 ) );
     if ( space.home ) {
-        sunDir.copy( SUN0 ).applyAxisAngle( SUN_AXIS, sunPhase0 + ( pose ? 0 : timer.getElapsed() ) / HOME_DAY * Math.PI * 2 );
+        homeSun( pose ? 0 : timer.getElapsed() );
         space.home.setSunDir( sunDir );
     }
     if ( nearSys ) { V_A.copy( nearSys.starPos ).sub( camera.position ).normalize(); sun.position.copy( V_A ); fill.position.copy( V_A ).negate(); skyMat.uniforms.sunDir.value.copy( V_A ); }
@@ -633,6 +647,31 @@ function frame() {
             cloudSys = b.system;
         }
     }
+    // Weather. Rain (snow where it is cold) falls from the dense heart of the cloud overhead; it wets the
+    // ground, which dries over minutes. The snow line follows the season and the latitude. Valley fog pools
+    // for an hour either side of sunrise on clear mornings. Auroras hang near the poles at night.
+    let overhead = 0, cold = false, inAir = ! player.shell.interior && skyMat.uniforms.space.value < 0.5;
+    if ( hazeBody ) {
+        const b = hazeBody.b, k = KINDS[ b.kind ], relief = b.radius * k.amp * 4;
+        wx.flat.value = 0; wx.center.value.copy( b.pos ); wx.r.value = haze.r.value; wx.axis.value.set( 0, 1, 0 ).applyQuaternion( b.group.quaternion );
+        wx.snowLine.value = b.kind === 'lush' ? relief * ( 0.42 - k.seaLevel ) : 1e9; wx.season.value = relief * 0.1 * Math.sin( season * Math.PI * 2 ); wx.polar.value = relief * 0.45; wx.soft.value = Math.max( 20, relief * 0.04 );
+        if ( b.cloud && ! b.decks && hazeBody.d < b.cloud.radius ) {
+            overhead = cloudAt( { cloud: b.cloud }, b.group.worldToLocal( V_A.copy( camera.position ) ).normalize(), undefined, true );
+            const lat = V_A.dot( wx.axis.value ), line = wx.snowLine.value + wx.season.value * lat - wx.polar.value * lat * lat;
+            cold = b.kind === 'icy' || hazeBody.d - wx.r.value > line;
+        }
+    } else if ( ! offHome ) {
+        wx.flat.value = 1; wx.seaY.value = haze.seaY.value; wx.snowLine.value = 98 - SEA; wx.season.value = 36 * Math.sin( season * Math.PI * 2 ); wx.polar.value = 0; wx.soft.value = 12;
+        if ( homeLocal.y < home.cloud.y ) overhead = cloudAt( home, V_A.set( homeLocal.x - SPAWN.x, 0, homeLocal.z - SPAWN.z ), undefined, true );
+        cold = homeLocal.y - SEA > wx.snowLine.value + wx.season.value;
+    } else { wx.snowLine.value = 1e9; inAir = false; }
+    const rainTarget = inAir ? overhead : 0;
+    rainAmt += ( rainTarget - rainAmt ) * Math.min( 1, dt * 0.5 );
+    wx.wet.value += ( ( cold ? 0 : rainAmt ) - wx.wet.value ) * Math.min( 1, dt / ( rainAmt > wx.wet.value ? 15 : 90 ) );
+    if ( ! haze.on.value ) wx.wet.value = 0;
+    precip.update( dt, rainTarget, cold ? 1 : 0, player.shell.quaternion( Q_A ), camera.position );
+    if ( haze.on.value ) haze.k.value *= 1 + rainAmt * 1.5;
+    wx.sky.value.copy( skyMat.uniforms.bottom.value ).lerp( skyMat.uniforms.top.value, 0.5 );
     const ease = 1 - Math.exp( -dt * 3 );
     skyMat.uniforms.space.value += ( spaceness - skyMat.uniforms.space.value ) * ease;
     skyMat.uniforms.up.value.lerp( skyUp, ease ).normalize();
@@ -642,6 +681,15 @@ function frame() {
     const elev = skyMat.uniforms.sunDir.value.dot( skyMat.uniforms.up.value ), sp = skyMat.uniforms.space.value;
     const day = THREE.MathUtils.smoothstep( elev, -0.1, 0.16 ) * ( 1 - sp ) + sp;
     skyMat.uniforms.night.value = 1 - day;
+    const rising = elev > prevElev + 1e-7;
+    prevElev = elev;
+    const fogWant = haze.on.value && ( ! hazeBody || hazeBody.b.kind === 'lush' ) ? Math.exp( -( ( ( elev - 0.05 ) / 0.18 ) ** 2 ) ) * ( rising ? 1 : 0.15 ) * ( 1 - cloudShade * 0.6 ) * ( 1 - sp ) : 0;
+    dawnFog += ( fogWant - dawnFog ) * Math.min( 1, dt * 0.2 );
+    haze.fog.value = dawnFog * 4e-3; haze.fogH.value = 40;
+    for ( const m of AURORA_MATS ) m.uniforms.time.value = timer.getElapsed();
+    home.aurora.mesh.visible = ! offHome && ! hazeBody;
+    home.aurora.mesh.position.set( homeLocal.x, SEA + 11000, homeLocal.z - 36000 );
+    home.aurora.mat.uniforms.night.value = THREE.MathUtils.smoothstep( -sunDir.y, 0.03, 0.15 ) * ( 1 - sp );
     skyMat.uniforms.dusk.value = ( 1 - THREE.MathUtils.smoothstep( Math.abs( elev - 0.03 ), 0, 0.3 ) ) * ( 1 - sp );
     sun.intensity = 2.4 * ( sp + ( 1 - sp ) * THREE.MathUtils.smoothstep( elev, -0.04, 0.12 ) ) * ( 1 - 0.6 * cloudShade );
     // Night light comes from what is actually up there: the galaxy's own glow where you stand (bright in the
@@ -714,7 +762,7 @@ function frame() {
         const kind = player.shell.body ? player.shell.body.kind : 'lush';
         const airless = player.shell.planet && ! KINDS[ kind ].atmosphere;
         const top = w.top( px, pz ), height = top < 380 ? Math.max( 0, player.pos.y - top ) : ( player.shell === home ? Math.max( 0, player.pos.y - SEA ) : 0 );
-        sound.update( 0.25, { speed: lastPos.distanceTo( player.worldPos ) / Math.max( dt, 0.001 ), height, air: airless ? 0 : 1 - skyMat.uniforms.space.value, water: Math.min( 1, wet / 6 ), inside: !! player.shell.interior, space: skyMat.uniforms.space.value } );
+        sound.update( 0.25, { speed: lastPos.distanceTo( player.worldPos ) / Math.max( dt, 0.001 ), height, air: airless ? 0 : 1 - skyMat.uniforms.space.value, water: Math.min( 1, wet / 6 ), inside: !! player.shell.interior, space: skyMat.uniforms.space.value, rain: rainAmt * ( precip.u.snow.value > 0.5 ? 0.15 : 1 ) } );
     }
     renderReflection();
     renderer.render( scene, camera );
@@ -770,4 +818,4 @@ function restoreInterior() {
 }
 frame();
 
-window.__strata = { world, home, far, space, player, crumbs, pool, seed, renderer, scene, camera, flares, reflRT, mirrorCam, sound, travel, enterShell, leaveShell, enterInterior, exitInterior, useAirlock };
+window.__strata = { world, home, far, space, player, crumbs, pool, seed, renderer, scene, camera, flares, reflRT, mirrorCam, sound, wx, precip, haze, travel, enterShell, leaveShell, enterInterior, exitInterior, useAirlock };

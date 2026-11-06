@@ -48,6 +48,11 @@ Night light comes from what is actually overhead: the galaxy's own glow where yo
 
 Light always comes from the nearest star. At home the sun circles the world once every 24 minutes on a great circle through the zenith (`?hour=0` to `24` sets the phase at load; otherwise the seed picks it), and every other planet spins under its own star once every 20 to 50 minutes, so days pass while you walk. The sky dims to a deep blue at night with the star field showing through, warms to orange around the sun at dawn and dusk, and the directional, hemisphere and ambient lights follow the sun's elevation.
 
+
+## Weather and seasons
+
+The home world lies at 47° north on a planet tilted 23°, so the sun's noon height and the day's length swing with the season (`?day=` 0 to 365, else from the seed; a year passes in thirty home days). Snow follows: a snow line in the terrain shader whitens upward faces above a height that rises in summer and falls in winter (16 to 88 m above the sea at home; on lush planets it tracks the latitude too, lower toward the poles and into whichever hemisphere is having winter), with a noisy, soft edge, so the seasons move the snow without regenerating a block. Rain falls from the dense heart of the cloud overhead (snow where it is cold: icy worlds, or above the snow line): a box of streaks around you, oriented to the local up and animated entirely in the shader, with a hiss in the ambience and the haze thickened. It wets the ground, which darkens and pools sky-coloured puddles on flat tops, then dries over a minute or two once the rain stops. For a while either side of sunrise on clear mornings a second, shallow fog layer (40 m scale height) pools in the valleys and over the sea. At night, auroras hang near the poles of atmosphere worlds: curtains of green shading to violet in a band at 68° latitude above the air, animated and only on the night side; at home they stand as one wall far to the north.
+
 ## Start card
 
 The start card opens with a gallery of five seeds, each a still rendered from inside that world (`gallery/*.jpg`) and a link straight into it; Travel and Controls fold below.

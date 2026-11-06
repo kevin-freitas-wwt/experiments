@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { hash2 } from './noise.js';
 import { bodyMat, rockMat, instanceMat, fadeIn, hazed } from './materials.js';
 import { addClouds } from './clouds.js';
+import { addAuroras } from './weather.js';
 import { StarField } from './starfield.js';
 import { densityAt } from './galaxy.js';
 import { KINDS as SURFACE, surfaceAt, octavesFor } from './planet.js';
@@ -167,6 +168,7 @@ class System {
             body.rim = rim;
         }
         addClouds( body, this.rnd( i, 80 ) );
+        if ( kind === 'lush' || kind === 'icy' ) addAuroras( body );
         this.scene.add( group );
         this.bodies.push( body );
         this.space.requestBody( body, 0 );
@@ -533,6 +535,7 @@ export class Space {
                 if ( b.cloud ) {
                     const sl = b.cloud.mat.uniforms.sunLocal.value.copy( sys.starPos ).sub( b.pos ).normalize().applyQuaternion( TMPQ.copy( b.group.quaternion ).invert() );
                     if ( b.decks ) for ( const deck of b.decks ) deck.mat.uniforms.sunLocal.value.copy( sl );
+                    if ( b.aurora ) b.aurora.uniforms.sunLocal.value.copy( sl );
                     // A shell's far side must not paint over what lies inside it: outside you see only the
                     // outer faces, inside only the underside.
                     const dc = camPos.distanceTo( b.pos );

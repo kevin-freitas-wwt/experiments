@@ -38,7 +38,7 @@ export const FLAT = 1 / 6000;
 
 // Cloud cover in [0,1] at a body-local unit direction (or, for the flat home layer, a home-local point);
 // identical to the shader's.
-export function cloudAt( body, dir, t = cloudTime.value ) {
+export function cloudAt( body, dir, t = cloudTime.value, thick = false ) {
     const c = body.cloud;
     if ( ! c ) return 0;
     const k = c.flat ? FLAT : SCALE, y = c.flat ? 0 : dir.y * k;
@@ -46,7 +46,8 @@ export function cloudAt( body, dir, t = cloudTime.value ) {
     const weather = fbm3( p[ 0 ] * 0.4, p[ 1 ] * 0.4, p[ 2 ] * 0.4, c.seed, 3 );
     const detail = fbm3( p[ 0 ] * 1.3 + 7, p[ 1 ] * 1.3 + 7, p[ 2 ] * 1.3 + 7, c.seed + 5, 4 );
     const n = 0.5 * weather + 0.5 * detail, thr = 0.45 - c.cover * 0.9;
-    return THREE.MathUtils.smoothstep( n, thr, thr + 0.25 );
+    // `thick` asks for the dense heart of a cloud (the shader's own `thick`): what rains.
+    return thick ? THREE.MathUtils.smoothstep( n, thr + 0.12, thr + 0.45 ) : THREE.MathUtils.smoothstep( n, thr, thr + 0.25 );
 }
 
 // Adds a cloud shell to an atmosphere body: a translucent sphere above the peaks whose cover comes from the
