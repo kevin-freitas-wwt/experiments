@@ -11,6 +11,7 @@ import { BIOMES, SEA, CHUNK, spawnOf } from './blocks.js';
 import { tickFades, hole, tileEdge, waterTime, terrainNow, haze, reflection, WATER_MATS, oceanMat } from './materials.js';
 import { KINDS } from './planet.js';
 import { cloudTime, cloudAt, homeClouds } from './clouds.js';
+import { densityAt } from './galaxy.js';
 import { is as key, buildControls } from './keys.js';
 
 const params = new URLSearchParams( location.search );
@@ -77,7 +78,8 @@ const hemi = new THREE.HemisphereLight( 0xdcd8ea, 0x7a6a50, 1.15 );
 const fill = new THREE.DirectionalLight( 0x8090b8, 0.45 );
 fill.position.copy( sunDir ).negate();
 const ambient = new THREE.AmbientLight( 0x50586c, 0.6 );
-scene.add( sun, fill, hemi, ambient );
+const moon = new THREE.DirectionalLight( 0xffffff, 0 );
+scene.add( sun, fill, hemi, ambient, moon );
 
 const pool = new Pool();
 const home = new Shell( scene, pool, seed, radius );
@@ -90,6 +92,7 @@ const crumbs = new Crumbs( home.group, spacing );
 home.cloud = homeClouds( home.group, seed, SPAWN, SEA );
 const flares = new Flares();
 const V_A = new THREE.Vector3(), V_B = new THREE.Vector3(), V_C = new THREE.Vector3();
+const shineColor = new THREE.Color(), BODY_TINT = { icy: 0xe8f0ff, lush: 0xc8d8ee, rocky: 0xd8d2c8, ember: 0xffa070, gas: 0xd8c8a0 };
 
 const hud = {};
 for ( const id of [ 'alt', 'biome', 'coord', 'chunks', 'seed', 'mode', 'crumbs', 'speed', 'body', 'system', 'st-frame', 'st-draws', 'st-tris', 'st-workers', 'st-mem' ] ) hud[ id ] = document.getElementById( id );
@@ -633,8 +636,34 @@ function frame() {
     skyMat.uniforms.night.value = 1 - day;
     skyMat.uniforms.dusk.value = ( 1 - THREE.MathUtils.smoothstep( Math.abs( elev - 0.03 ), 0, 0.3 ) ) * ( 1 - sp );
     sun.intensity = 2.4 * ( sp + ( 1 - sp ) * THREE.MathUtils.smoothstep( elev, -0.04, 0.12 ) ) * ( 1 - 0.6 * cloudShade );
-    hemi.intensity = ( 1.15 - sp * 1.0 ) * ( 0.25 + 0.75 * day );
-    ambient.intensity = ( player.shell.interior ? 2.2 : 0.6 ) * ( 0.4 + 0.6 * day );
+    // Night light comes from what is actually up there: the galaxy's own glow where you stand (bright in the
+    // bulge, faint in the halo), and shine from lit moons and planets above the horizon, with ring shine
+    // when you stand on a ringed world. Exaggerated well past real moonlight so nights read.
+    const ALBEDO = { icy: 0.7, lush: 0.35, rocky: 0.25, ember: 0.2, gas: 0.5 };
+    const skyUpNow = skyMat.uniforms.up.value;
+    let shine = 0, best = 0;
+    shineColor.setRGB( 0, 0, 0 );
+    for ( const b of space.bodies ) {
+        if ( player.shell.body === b ) continue;
+        const d = V_A.copy( b.pos ).sub( worldPos ).length();
+        if ( d > b.radius * 80 ) continue;
+        V_A.divideScalar( d );
+        if ( V_A.dot( skyUpNow ) < -0.05 ) continue;
+        const phase = 0.5 + 0.5 * V_B.copy( b.system.starPos ).sub( b.pos ).normalize().dot( V_C.copy( V_A ).negate() );
+        const k = 2.4 * ( b.radius / d ) ** 2 * phase * ( ALBEDO[ b.kind ] || 0.3 ) * 20;
+        if ( k < 0.002 ) continue;
+        shine += k;
+        shineColor.add( starTint.set( BODY_TINT[ b.kind ] || 0xffffff ).multiplyScalar( k ) );
+        if ( k > best ) { best = k; moon.position.copy( V_A ); }
+    }
+    const ringed = player.shell.body && player.shell.body.rings ? player.shell.body : null;
+    if ( ringed ) { shine += 0.12; shineColor.add( starTint.set( 0xf2e6d0 ).multiplyScalar( 0.12 ) ); if ( ! best ) moon.position.copy( ringed.ringNormal ); }
+    if ( shine > 0 ) shineColor.multiplyScalar( 1 / shine );
+    moon.color.lerp( shineColor, 1 - Math.exp( -dt * 3 ) );
+    moon.intensity += ( Math.min( 0.45, shine ) * ( 1 - 0.85 * day ) - moon.intensity ) * ( 1 - Math.exp( -dt * 3 ) );
+    const starlight = 0.1 + 0.2 * Math.min( 3, Math.sqrt( densityAt( homeLocal.x, homeLocal.y, homeLocal.z, seed ) ) ) + Math.min( 0.3, shine * 0.6 );
+    hemi.intensity = ( 1.15 - sp * 1.0 ) * ( starlight + ( 1 - starlight ) * day );
+    ambient.intensity = ( player.shell.interior ? 2.2 : 0.6 ) * ( 0.25 + 0.5 * starlight + ( 0.75 - 0.5 * starlight ) * day );
     space.night = 1 - day;
     sky.position.copy( camera.position );
     space.stars.position.copy( camera.position ); // after the camera is placed, so the star shell never lags it

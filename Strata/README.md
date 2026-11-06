@@ -44,6 +44,8 @@ Flight speed scales with clearance: 14 m/s on the deck, growing by that much aga
 
 ## Day and night
 
+Night light comes from what is actually overhead: the galaxy's own glow where you stand (brighter in the bulge, faint in the halo), shine from lit moons and planets above the horizon as a coloured directional light from the brightest of them (phase and angular size, exaggerated well past real moonlight so nights read), and ring shine when you stand on a ringed world.
+
 Light always comes from the nearest star. At home the sun circles the world once every 24 minutes on a great circle through the zenith (`?hour=0` to `24` sets the phase at load; otherwise the seed picks it), and every other planet spins under its own star once every 20 to 50 minutes, so days pass while you walk. The sky dims to a deep blue at night with the star field showing through, warms to orange around the sun at dawn and dusk, and the directional, hemisphere and ambient lights follow the sun's elevation.
 
 ## Start card
